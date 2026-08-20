@@ -1111,9 +1111,36 @@ ${message}`;
 
 
 
+    const receptionistPrompt = `
+CURRENT BUSINESS ID:
+${business.id}
+
+IMPORTANT:
+This is the exact business ID for the current conversation.
+
+When using the getBusinessKnowledge tool, you MUST pass this exact value as the businessId argument.
+
+Do not guess the business ID.
+Do not omit the businessId argument.
+
+CUSTOMER MESSAGE:
+${message}
+
+CONVERSATION CONTEXT:
+${prompt}
+`;
+
+    console.log(
+      "RECEPTIONIST BUSINESS CONTEXT",
+      {
+        businessId: business.id,
+        conversationId,
+      },
+    );
+
     const result =
       await kubaReceptionistAgent.generate(
-        prompt,
+        receptionistPrompt,
       );
 
     // ---------------------------------------------------------
