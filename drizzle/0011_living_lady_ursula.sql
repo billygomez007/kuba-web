@@ -1,0 +1,1 @@
+ALTER TABLE `ai_employees` ADD `template_id` text;

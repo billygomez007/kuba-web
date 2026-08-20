@@ -24,3 +24,44 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+/* Kuba AI Employee Avatar Animation */
+@keyframes kuba-avatar-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes kuba-avatar-glow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.kuba-avatar-float {
+  animation: kuba-avatar-float 4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.kuba-avatar-glow {
+  animation: kuba-avatar-glow 4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kuba-avatar-float,
+  .kuba-avatar-glow {
+    animation: none;
+  }
+}

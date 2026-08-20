@@ -1,0 +1,1 @@
+ALTER TABLE `conversations` ADD `ai_mode` text DEFAULT 'active' NOT NULL;

@@ -1,0 +1,249 @@
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+
+import { auth } from "@/lib/auth";
+import { db } from "@/db";
+
+import {
+  businessUsers,
+  leads,
+  followUps,
+  aiEmployees,
+  aiBusinessSettings,
+} from "@/db/schema";
+
+import { eq } from "drizzle-orm";
+
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+
+
+export async function POST(
+  request: Request,
+) {
+
+  try {
+
+    const session =
+      await auth.api.getSession({
+        headers: await headers(),
+      });
+
+
+    if (!session?.user) {
+
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+        },
+        {
+          status: 401,
+        },
+      );
+
+    }
+
+
+    const body =
+      await request.json();
+
+
+    const message =
+      body.message;
+
+
+    const membership =
+      await db
+        .select({
+          businessId:
+            businessUsers.businessId,
+        })
+        .from(businessUsers)
+        .where(
+          eq(
+            businessUsers.userId,
+            session.user.id,
+          ),
+        )
+        .limit(1);
+
+
+    const business =
+      membership[0];
+
+
+    if (!business) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Business not found",
+        },
+        {
+          status: 404,
+        },
+      );
+
+    }
+
+
+    const [
+      leadsData,
+      followUpsData,
+      employeesData,
+      businessKnowledge,
+    ] =
+      await Promise.all([
+
+        db
+          .select()
+          .from(leads)
+          .where(
+            eq(
+              leads.businessId,
+              business.businessId,
+            ),
+          ),
+
+
+        db
+          .select()
+          .from(followUps)
+          .where(
+            eq(
+              followUps.businessId,
+              business.businessId,
+            ),
+          ),
+
+
+        db
+          .select()
+          .from(aiEmployees)
+          .where(
+            eq(
+              aiEmployees.businessId,
+              business.businessId,
+            ),
+          ),
+
+
+        db
+          .select()
+          .from(aiBusinessSettings)
+          .where(
+            eq(
+              aiBusinessSettings.businessId,
+              business.businessId,
+            ),
+          ),
+
+      ]);
+
+
+    const overdueFollowUps =
+      followUpsData.filter(
+        (item) =>
+          item.dueAt < new Date() &&
+          item.status !== "completed",
+      ).length;
+
+
+    const knowledge =
+      businessKnowledge[0];
+
+
+    const context = `
+You are Kuba, the AI CEO assistant.
+
+You help a business owner understand, operate,
+and improve their company.
+
+CURRENT BUSINESS INTELLIGENCE:
+
+BUSINESS PROFILE:
+
+Description:
+${knowledge?.businessDescription || "Not provided"}
+
+Products and Services:
+${knowledge?.productsAndServices || "Not provided"}
+
+Target Customers:
+${knowledge?.targetCustomers || "Not provided"}
+
+Frequently Asked Questions:
+${knowledge?.frequentlyAskedQuestions || "Not provided"}
+
+Business Instructions:
+${knowledge?.aiInstructions || "Not provided"}
+
+Communication Tone:
+${knowledge?.tone || "professional"}
+
+
+AI Workforce:
+${employeesData.length} active AI employees.
+
+Sales:
+${leadsData.length} total sales opportunities.
+
+Follow-ups:
+${followUpsData.length} total follow-ups.
+${overdueFollowUps} follow-ups are overdue.
+
+CEO Question:
+${message}
+
+
+Instructions:
+- Answer like an experienced business advisor.
+- Use the available business facts.
+- Recommend practical actions.
+- Never invent company information.
+- If information is unavailable, clearly say so.
+- Keep answers concise and executive-friendly.
+`;
+
+
+    const result =
+      await generateText({
+
+        model:
+          openai("gpt-4o-mini"),
+
+        prompt:
+          context,
+
+      });
+
+
+    return NextResponse.json({
+
+      response:
+        result.text,
+
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "Command center AI error",
+      error,
+    );
+
+
+    return NextResponse.json(
+      {
+        error:
+          "Unable to process request",
+      },
+      {
+        status: 500,
+      },
+    );
+
+  }
+
+}

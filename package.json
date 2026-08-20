@@ -9,16 +9,32 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.41",
+    "@better-auth/drizzle-adapter": "^1.6.28",
+    "@libsql/client": "^0.17.4",
+    "@mastra/core": "^1.59.0",
+    "@mastra/libsql": "^1.20.0",
+    "@mastra/memory": "^1.26.2",
+    "ai": "^7.0.66",
+    "better-auth": "^1.6.28",
+    "csv-parse": "^7.0.2",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.31.0",
+    "mammoth": "^1.12.1",
     "next": "16.3.1",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-icons": "^5.7.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",

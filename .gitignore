@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Kuba private knowledge files
+/storage/knowledge/
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# Local runtime files
+/storage/*
