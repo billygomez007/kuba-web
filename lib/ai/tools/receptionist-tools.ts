@@ -1,73 +1,158 @@
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 
 import { db } from "@/db";
 import { customers } from "@/db/schema";
 
-export async function findCustomerTool({
-  businessId,
-  email,
-  phone,
-}: {
-  businessId: string;
-  email?: string;
-  phone?: string;
-}) {
-  if (!email && !phone) {
-    throw new Error("Email or phone number is required.");
-  }
 
-  const conditions = [
-    eq(customers.businessId, businessId),
-  ];
+export const findCustomerTool = createTool({
 
-  if (email) {
-    conditions.push(eq(customers.email, email));
-  } else if (phone) {
-    conditions.push(eq(customers.phone, phone));
-  }
+  id: "find-customer",
 
-  const result = await db
-    .select()
-    .from(customers)
-    .where(and(...conditions))
-    .limit(1);
+  description:
+    "Find an existing customer using email or phone number.",
 
-  return {
-    success: true,
-    customer: result[0] || null,
-  };
-}
+  inputSchema: z.object({
+    businessId: z.string(),
+    email: z.string().optional(),
+    phone: z.string().optional(),
+  }),
 
-export async function createCustomerTool({
-  businessId,
-  name,
-  email,
-  phone,
-  source = "AI Receptionist",
-}: {
-  businessId: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  source?: string;
-}) {
-  const id = crypto.randomUUID();
-  const now = new Date();
+  execute: async ({
+    businessId,
+    email,
+    phone,
+  }) => {
 
-  await db.insert(customers).values({
-    id,
+    if (!email && !phone) {
+      throw new Error(
+        "Email or phone number is required.",
+      );
+    }
+
+    const conditions = [
+      eq(
+        customers.businessId,
+        businessId,
+      ),
+    ];
+
+    if (email) {
+      conditions.push(
+        eq(
+          customers.email,
+          email,
+        ),
+      );
+    } else if (phone) {
+      conditions.push(
+        eq(
+          customers.phone,
+          phone,
+        ),
+      );
+    }
+
+    const result =
+      await db
+        .select()
+        .from(customers)
+        .where(
+          and(...conditions),
+        )
+        .limit(1);
+
+
+    return {
+      success: true,
+      customer:
+        result[0] || null,
+    };
+  },
+});
+
+
+export const createCustomerTool = createTool({
+
+  id: "create-customer",
+
+  description:
+    "Create a new customer record for the business.",
+
+  inputSchema: z.object({
+
+    businessId:
+      z.string(),
+
+    name:
+      z.string(),
+
+    email:
+      z.string().optional(),
+
+    phone:
+      z.string().optional(),
+
+    source:
+      z.string().optional(),
+
+  }),
+
+
+  execute: async ({
     businessId,
     name,
-    email: email || null,
-    phone: phone || null,
-    source,
-    createdAt: now,
-    updatedAt: now,
-  });
+    email,
+    phone,
+    source = "AI Receptionist",
+  }) => {
 
-  return {
-    success: true,
-    customerId: id,
-    message: "Customer created successfully.",
-  };
-}
+    const id =
+      crypto.randomUUID();
+
+    const now =
+      new Date();
+
+
+    await db
+      .insert(customers)
+      .values({
+
+        id,
+
+        businessId,
+
+        name,
+
+        email:
+          email || null,
+
+        phone:
+          phone || null,
+
+        source,
+
+        createdAt:
+          now,
+
+        updatedAt:
+          now,
+
+      });
+
+
+    return {
+
+      success: true,
+
+      customerId:
+        id,
+
+      message:
+        "Customer created successfully.",
+
+    };
+  },
+
+});
