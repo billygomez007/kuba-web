@@ -1144,10 +1144,26 @@ ${prompt}
       promptLength: receptionistPrompt.length,
     });
 
+    console.log(
+      "STARTING KUBA RECEPTIONIST AI GENERATION",
+      {
+        businessId: business.id,
+        promptLength: receptionistPrompt.length,
+      },
+    );
+
     const result =
       await kubaReceptionistAgent.generate(
         receptionistPrompt,
       );
+
+    console.log(
+      "KUBA RECEPTIONIST AI RESPONSE GENERATED",
+      {
+        textLength: result.text.length,
+        text: result.text,
+      },
+    );
 
     console.log("KUBA AGENT COMPLETED", {
       responseLength: result.text?.length,
