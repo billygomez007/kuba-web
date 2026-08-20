@@ -8,6 +8,10 @@ type Message = {
 };
 
 export default function ReceptionistWorkspace() {
+  const [conversationId] = useState(() =>
+    crypto.randomUUID(),
+  );
+
   const [message, setMessage] = useState("");
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -97,6 +101,7 @@ export default function ReceptionistWorkspace() {
           },
           body: JSON.stringify({
             message: userMessage,
+            conversationId,
           }),
         },
       );
