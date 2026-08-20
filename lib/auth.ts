@@ -11,7 +11,15 @@ export const auth = betterAuth({
     modelName: "users",
   },
 
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  baseURL:
+    process.env.BETTER_AUTH_URL ||
+    "https://kuba-web-woad.vercel.app",
+
+  trustedOrigins: [
+    "https://kuba-web-woad.vercel.app",
+    "https://kuba-web-kuba-web.vercel.app",
+    "https://kuba-web-git-main-kuba-web.vercel.app",
+  ],
 
   emailAndPassword: {
     enabled: true,
