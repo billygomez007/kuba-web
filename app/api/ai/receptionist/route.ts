@@ -1138,10 +1138,20 @@ ${prompt}
       },
     );
 
+    console.log("ABOUT TO CALL KUBA AGENT", {
+      businessId: business.id,
+      conversationId,
+      promptLength: receptionistPrompt.length,
+    });
+
     const result =
       await kubaReceptionistAgent.generate(
         receptionistPrompt,
       );
+
+    console.log("KUBA AGENT COMPLETED", {
+      responseLength: result.text?.length,
+    });
 
     // ---------------------------------------------------------
     // 15. Save Kuba's response
