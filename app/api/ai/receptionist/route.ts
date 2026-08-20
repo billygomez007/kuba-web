@@ -1177,13 +1177,18 @@ ${prompt}
     });
   } catch (error) {
     console.error(
-      "Kuba Receptionist error:",
-      error instanceof Error
-        ? {
-            message: error.message,
-            stack: error.stack,
-          }
-        : error,
+      "KUBA RECEPTIONIST FULL ERROR:",
+      JSON.stringify(
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+            }
+          : error,
+        null,
+        2,
+      ),
     );
 
     return NextResponse.json(
