@@ -22,7 +22,8 @@ import { salesExternalActionTool } from "@/mastra/tools/sales-external-action";
 const salesMemory = new Memory({
   storage: new LibSQLStore({
     id: "kuba-sales-memory",
-    url: "file:./kuba-sales-memory.db",
+    url: process.env.TURSO_DATABASE_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN!,
   }),
   options: {
     lastMessages: 20,
