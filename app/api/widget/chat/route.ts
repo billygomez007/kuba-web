@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/api/rate-limit";
 
 export async function POST(
   request: Request,
 ) {
+  const limited = rateLimit(request, {
+    namespace: "widget-chat",
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   try {
 
     const body = await request.json();

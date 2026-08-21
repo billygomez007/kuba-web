@@ -10,7 +10,8 @@
   }
 
   const KUBA_API =
-    "https://kuba-web-woad.vercel.app";
+    script.dataset.apiUrl ||
+    (script.src ? new URL(script.src).origin : "https://superkuba.com");
 
   const button = document.createElement("button");
 
