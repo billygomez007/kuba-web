@@ -69,7 +69,7 @@ function LoginForm() {
               <Image
                 src="/brand/superkuba-logo.png"
                 alt="SuperKuba"
-                width={2132}
+                width={2131}
                 height={738}
                 priority
                 className="h-auto w-[210px] object-contain transition duration-300 group-hover:scale-[1.02] sm:w-[230px]"

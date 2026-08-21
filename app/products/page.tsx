@@ -1,6 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import SuperKubaAIWorkforceShowcase from "../components/SuperKubaAIWorkforceShowcase";
+import SuperKubaAnalyticsShowcase from "../components/SuperKubaAnalyticsShowcase";
+import SuperKubaAutomationShowcase from "../components/SuperKubaAutomationShowcase";
+import SuperKubaBusinessOperationsShowcase from "../components/SuperKubaBusinessOperationsShowcase";
+import SuperKubaCustomerOperationsShowcase from "../components/SuperKubaCustomerOperationsShowcase";
+import SuperKubaDashboardShowcase from "../components/SuperKubaDashboardShowcase";
 import {
   ArrowRight,
   Bot,
@@ -93,6 +99,7 @@ export default function ProductsPage() {
 
       </section>
 
+      <SuperKubaDashboardShowcase className="border-b-0" />
 
 
       <section className="px-6 pb-28 lg:px-8">
@@ -144,6 +151,16 @@ export default function ProductsPage() {
         </div>
 
       </section>
+
+      <SuperKubaAIWorkforceShowcase className="border-b-0" />
+
+      <SuperKubaCustomerOperationsShowcase className="border-b-0" />
+
+      <SuperKubaAnalyticsShowcase className="border-b-0" />
+
+      <SuperKubaAutomationShowcase className="border-b-0" />
+
+      <SuperKubaBusinessOperationsShowcase className="border-b-0" />
 
 
     </main>

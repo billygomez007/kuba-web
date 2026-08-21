@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import SuperKubaDashboardShowcase from "../components/SuperKubaDashboardShowcase";
 import {
   ArrowRight,
   Headphones,
@@ -102,6 +103,7 @@ export default function AIEmployeesPage() {
 
       </section>
 
+      <SuperKubaDashboardShowcase className="border-b-0" />
 
 
       <section className="px-6 pb-28 lg:px-8">

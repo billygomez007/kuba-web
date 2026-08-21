@@ -3,9 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import DashboardMockup from "./components/mockups/DashboardMockup";
 import EmployeeShowcase from "./components/EmployeeShowcase";
 import EmployeeWorkspaceMockup from "./components/mockups/EmployeeWorkspaceMockup";
+import SuperKubaAIWorkforceShowcase from "./components/SuperKubaAIWorkforceShowcase";
+import SuperKubaAnalyticsShowcase from "./components/SuperKubaAnalyticsShowcase";
+import SuperKubaAutomationShowcase from "./components/SuperKubaAutomationShowcase";
+import SuperKubaBusinessOperationsShowcase from "./components/SuperKubaBusinessOperationsShowcase";
+import SuperKubaCustomerOperationsShowcase from "./components/SuperKubaCustomerOperationsShowcase";
+import SuperKubaDashboardShowcase from "./components/SuperKubaDashboardShowcase";
 import {
   ArrowRight,
   Bot,
@@ -176,7 +181,7 @@ export default function KubaWebsite() {
   <Image
     src="/brand/superkuba-logo.png"
     alt="SuperKuba"
-    width={2132}
+    width={2131}
     height={738}
     priority
     className="h-auto w-[150px] object-contain sm:w-[175px]"
@@ -221,7 +226,7 @@ export default function KubaWebsite() {
             ))}
 
             <Link
-              href="/pricing"
+              href="/#pricing"
               className="text-sm font-medium text-white/60 transition hover:text-white"
             >
               Pricing
@@ -428,19 +433,17 @@ export default function KubaWebsite() {
       </section>
 
 
-      {/* =========================================================
-          KUBA DASHBOARD MOCKUP
-      ========================================================= */}
+      <SuperKubaDashboardShowcase />
 
-      <section className="relative px-6 py-20 lg:px-8">
+      <SuperKubaAIWorkforceShowcase />
 
-        <div className="mx-auto max-w-7xl">
+      <SuperKubaCustomerOperationsShowcase />
 
-          <DashboardMockup />
+      <SuperKubaAnalyticsShowcase />
 
-        </div>
+      <SuperKubaAutomationShowcase />
 
-      </section>
+      <SuperKubaBusinessOperationsShowcase />
 
 
       {/* =========================================================
@@ -717,7 +720,7 @@ AI workforce solutions built around how your industry operates.
             </Link>
 
             <Link
-              href="/pricing"
+              href="/#pricing"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-8 py-4 font-semibold text-white/75 transition hover:bg-white/[0.08] hover:text-white"
             >
               View pricing
@@ -739,7 +742,7 @@ AI workforce solutions built around how your industry operates.
   <Image
     src="/brand/superkuba-logo.png"
     alt="SuperKuba"
-    width={2132}
+    width={2131}
     height={738}
     className="h-auto w-[170px] object-contain"
   />

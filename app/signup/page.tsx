@@ -57,7 +57,7 @@ export default function SignupPage() {
           <Image
             src="/brand/superkuba-logo.png"
             alt="SuperKuba"
-            width={2132}
+            width={2131}
             height={738}
             priority
             className="mx-auto h-auto w-[200px] object-contain sm:w-[220px]"

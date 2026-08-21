@@ -127,7 +127,7 @@ export default function DashboardPage() {
               <Image
                 src="/brand/superkuba-logo.png"
                 alt="SuperKuba"
-                width={2132}
+                width={2131}
                 height={738}
                 priority
                 className="relative h-auto w-64 object-contain drop-shadow-[0_0_28px_rgba(0,200,255,0.22)]"
