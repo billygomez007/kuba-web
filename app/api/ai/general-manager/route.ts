@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
+import { buildEmployeeSkillContext } from "@/lib/ai/skill-context";
 
 import {
   searchKnowledge,
@@ -338,8 +339,17 @@ ${new Date().toISOString()}
 `;
 
 
+    const skillContext =
+      await buildEmployeeSkillContext(
+        employee.id,
+      );
+
     const prompt = `
 ${businessContext}
+
+EMPLOYEE SKILLS
+
+${skillContext}
 
 
 GENERAL MANAGER REQUEST

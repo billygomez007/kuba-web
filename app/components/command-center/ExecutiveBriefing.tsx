@@ -5,14 +5,34 @@ import { useEffect, useState } from "react";
 type Briefing = {
   headline: string;
   summary: string;
+
   metrics: {
     employees: number;
     sales: number;
     customers: number;
     followUps: number;
   };
-  priorities: string[];
+
+  sections: {
+    title: string;
+    content: string;
+  }[];
+
+  actions: {
+    title: string;
+    description: string;
+  }[];
 };
+
+
+function cleanBriefingText(text: string) {
+  return text
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/^[-*]\s*/gm, "")
+    .replace(/^\d+\.\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .trim();
+}
 
 
 export default function ExecutiveBriefing() {
@@ -105,16 +125,47 @@ export default function ExecutiveBriefing() {
 
 
         <p className="mt-4 whitespace-pre-line text-sm leading-8 text-white/75">
-          {briefing?.headline ||
-            "Kuba is analyzing your business activity."}
-          
+          {cleanBriefingText(
+            briefing?.headline ||
+            "Kuba is analyzing your business activity."
+          )}
+
           {"\n\n"}
 
-          {briefing?.summary ||
-            "Business intelligence is being prepared."}
+          {cleanBriefingText(
+            briefing?.summary ||
+            "Business intelligence is being prepared."
+          )}
         </p>
 
       </div>
+
+
+      {briefing?.sections && briefing.sections.length > 0 && (
+        <div className="mt-5 space-y-4">
+
+          {briefing.sections.map((section, index) => (
+
+            <div
+              key={index}
+              className="rounded-2xl border border-white/10 bg-black/20 p-5"
+            >
+
+              <h3 className="text-lg font-bold">
+                {section.title}
+              </h3>
+
+
+              <p className="mt-3 whitespace-pre-line text-sm leading-7 text-white/60">
+                {cleanBriefingText(section.content)}
+              </p>
+
+            </div>
+
+          ))}
+
+        </div>
+      )}
 
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -170,20 +221,36 @@ export default function ExecutiveBriefing() {
       )}
 
 
-      {briefing?.priorities && briefing.priorities.length > 0 && (
+      {briefing?.actions && briefing.actions.length > 0 && (
         <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
 
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/30">
-            Kuba recommends
+            Recommended Actions
           </p>
 
-          <ul className="mt-4 space-y-2 text-sm text-white/70">
-            {briefing?.priorities?.map((item, index) => (
-              <li key={index}>
-                {index + 1}. {item}
-              </li>
+
+          <div className="mt-5 space-y-4">
+
+            {briefing.actions.map((action, index) => (
+
+              <div
+                key={index}
+                className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
+              >
+
+                <p className="font-bold text-white">
+                  {index + 1}. {action.title}
+                </p>
+
+                <p className="mt-2 text-sm leading-6 text-white/50">
+                  {action.description}
+                </p>
+
+              </div>
+
             ))}
-          </ul>
+
+          </div>
 
         </div>
       )}

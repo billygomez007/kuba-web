@@ -1,0 +1,4647 @@
+{
+  "format": "kuba-drizzle-schema-manifest/v1",
+  "capturedAt": "2026-08-21T13:52:52.566Z",
+  "captureScope": "Schema metadata, indexes, foreign keys, row counts, and Drizzle ledger only; no table data or credentials.",
+  "application": {
+    "gitCommit": "1183e33c1ae1cd73a774f2581bab9e1e9fd0ecad",
+    "gitBranch": "chore/drizzle-migration-repair-staging",
+    "packageVersion": "0.1.0",
+    "nodeVersion": "v24.19.0"
+  },
+  "sqliteMaster": [
+    {
+      "type": "table",
+      "name": "__drizzle_migrations",
+      "tableName": "__drizzle_migrations",
+      "sql": "CREATE TABLE \"__drizzle_migrations\" (\n\t\t\tid SERIAL PRIMARY KEY,\n\t\t\thash text NOT NULL,\n\t\t\tcreated_at numeric\n\t\t)"
+    },
+    {
+      "type": "table",
+      "name": "account",
+      "tableName": "account",
+      "sql": "CREATE TABLE `account` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`account_id` text NOT NULL,\n\t`provider_id` text NOT NULL,\n\t`user_id` text NOT NULL,\n\t`access_token` text,\n\t`refresh_token` text,\n\t`id_token` text,\n\t`access_token_expires_at` integer,\n\t`refresh_token_expires_at` integer,\n\t`scope` text,\n\t`password` text,\n\t`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,\n\t`updated_at` integer NOT NULL,\n\tFOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+    },
+    {
+      "type": "table",
+      "name": "action_approvals",
+      "tableName": "action_approvals",
+      "sql": "CREATE TABLE `action_approvals` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`employee_id` text,\n\t`channel` text NOT NULL,\n\t`recipient` text NOT NULL,\n\t`message` text NOT NULL,\n\t`status` text DEFAULT 'pending' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "ai_business_settings",
+      "tableName": "ai_business_settings",
+      "sql": "CREATE TABLE `ai_business_settings` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`business_description` text,\n\t`products_and_services` text,\n\t`target_customers` text,\n\t`frequently_asked_questions` text,\n\t`ai_instructions` text,\n\t`tone` text DEFAULT 'professional',\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "ai_employee_activities",
+      "tableName": "ai_employee_activities",
+      "sql": "CREATE TABLE `ai_employee_activities` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`employee_id` text NOT NULL,\n\t`type` text NOT NULL,\n\t`title` text NOT NULL,\n\t`description` text,\n\t`status` text DEFAULT 'completed' NOT NULL,\n\t`created_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "ai_employee_settings",
+      "tableName": "ai_employee_settings",
+      "sql": "CREATE TABLE `ai_employee_settings` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`employee_id` text NOT NULL,\n\t`role_instructions` text,\n\t`goals` text,\n\t`responsibilities` text,\n\t`personality` text,\n\t`communication_style` text,\n\t`information_to_collect` text,\n\t`escalation_rules` text,\n\t`handoff_rules` text,\n\t`working_hours` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "ai_employee_teams",
+      "tableName": "ai_employee_teams",
+      "sql": "CREATE TABLE `ai_employee_teams` (\n  `id` text PRIMARY KEY NOT NULL,\n  `business_id` text NOT NULL,\n  `name` text NOT NULL,\n  `description` text,\n  `created_at` integer NOT NULL,\n  `updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "ai_employee_templates",
+      "tableName": "ai_employee_templates",
+      "sql": "CREATE TABLE `ai_employee_templates` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`type` text NOT NULL,\n\t`description` text,\n\t`version` text DEFAULT '1.0' NOT NULL,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "ai_employees",
+      "tableName": "ai_employees",
+      "sql": "CREATE TABLE `ai_employees` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`name` text NOT NULL,\n\t`type` text NOT NULL,\n\t`description` text,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`mastra_agent_id` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, `branch_id` text, `supervision_mode` text DEFAULT 'owner_supervised' NOT NULL, `supervisor_user_id` text, `template_id` text)"
+    },
+    {
+      "type": "table",
+      "name": "audit_logs",
+      "tableName": "audit_logs",
+      "sql": "CREATE TABLE audit_logs (\n      id TEXT PRIMARY KEY NOT NULL,\n      business_id TEXT NOT NULL,\n      user_id TEXT,\n      action TEXT NOT NULL,\n      resource TEXT NOT NULL,\n      resource_id TEXT,\n      description TEXT,\n      metadata TEXT,\n      ip_address TEXT,\n      user_agent TEXT,\n      created_at INTEGER NOT NULL\n    )"
+    },
+    {
+      "type": "table",
+      "name": "automation_runs",
+      "tableName": "automation_runs",
+      "sql": "CREATE TABLE `automation_runs` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`automation_id` text NOT NULL,\n\t`trigger_type` text NOT NULL,\n\t`trigger_data` text,\n\t`status` text DEFAULT 'running' NOT NULL,\n\t`error` text,\n\t`started_at` integer NOT NULL,\n\t`completed_at` integer\n)"
+    },
+    {
+      "type": "table",
+      "name": "automations",
+      "tableName": "automations",
+      "sql": "CREATE TABLE `automations` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`name` text NOT NULL,\n\t`description` text,\n\t`trigger` text NOT NULL,\n\t`conditions` text,\n\t`actions` text NOT NULL,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "branches",
+      "tableName": "branches",
+      "sql": "CREATE TABLE `branches` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`name` text NOT NULL,\n\t`location` text,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "business_invitations",
+      "tableName": "business_invitations",
+      "sql": "CREATE TABLE business_invitations (\n      id TEXT PRIMARY KEY NOT NULL,\n      business_id TEXT NOT NULL,\n      email TEXT NOT NULL,\n      name TEXT,\n      role TEXT DEFAULT 'member' NOT NULL,\n      permissions TEXT,\n      branch_id TEXT,\n      token TEXT NOT NULL,\n      invited_by_user_id TEXT NOT NULL,\n      status TEXT DEFAULT 'pending' NOT NULL,\n      expires_at INTEGER NOT NULL,\n      accepted_at INTEGER,\n      created_at INTEGER NOT NULL,\n      updated_at INTEGER NOT NULL\n    )"
+    },
+    {
+      "type": "table",
+      "name": "business_localization",
+      "tableName": "business_localization",
+      "sql": "CREATE TABLE `business_localization` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`country` text,\n\t`currency` text,\n\t`currency_code` text,\n\t`language` text DEFAULT 'en',\n\t`timezone` text DEFAULT 'Africa/Accra',\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "business_users",
+      "tableName": "business_users",
+      "sql": "CREATE TABLE `business_users` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`user_id` text NOT NULL,\n\t`role` text DEFAULT 'member' NOT NULL,\n\t`created_at` integer NOT NULL\n, `branch_id` text, `permissions` text)"
+    },
+    {
+      "type": "table",
+      "name": "businesses",
+      "tableName": "businesses",
+      "sql": "CREATE TABLE `businesses` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`slug` text NOT NULL,\n\t`industry` text,\n\t`logo_url` text,\n\t`plan` text DEFAULT 'starter' NOT NULL,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, `country` text, `business_size` text, `website` text)"
+    },
+    {
+      "type": "table",
+      "name": "channel_connections",
+      "tableName": "channel_connections",
+      "sql": "CREATE TABLE `channel_connections` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`channel` text NOT NULL,\n\t`account_name` text,\n\t`account_id` text,\n\t`access_token` text,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "communication_logs",
+      "tableName": "communication_logs",
+      "sql": "CREATE TABLE communication_logs (\n  id text PRIMARY KEY NOT NULL,\n  business_id text NOT NULL,\n  employee_id text,\n  customer_id text,\n  lead_id text,\n  channel text NOT NULL,\n  recipient text NOT NULL,\n  message text NOT NULL,\n  status text DEFAULT 'pending' NOT NULL,\n  provider text,\n  provider_message_id text,\n  created_at integer NOT NULL,\n  updated_at integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "conversations",
+      "tableName": "conversations",
+      "sql": "CREATE TABLE `conversations` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`integration_id` text NOT NULL,\n\t`external_conversation_id` text,\n\t`customer_name` text,\n\t`customer_phone` text,\n\t`customer_email` text,\n\t`assigned_employee_id` text,\n\t`status` text DEFAULT 'open' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, `customer_id` text, \"ai_mode\" text NOT NULL DEFAULT 'active')"
+    },
+    {
+      "type": "table",
+      "name": "customer_tags",
+      "tableName": "customer_tags",
+      "sql": "CREATE TABLE `customer_tags` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`customer_id` text NOT NULL,\n\t`tag` text NOT NULL,\n\t`created_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "customers",
+      "tableName": "customers",
+      "sql": "CREATE TABLE `customers` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`name` text,\n\t`email` text,\n\t`phone` text,\n\t`source` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "employee_skills",
+      "tableName": "employee_skills",
+      "sql": "CREATE TABLE `employee_skills` (\n  `id` text PRIMARY KEY NOT NULL,\n  `employee_id` text NOT NULL,\n  `skill_id` text NOT NULL,\n  `created_at` integer NOT NULL,\n  `updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "follow_ups",
+      "tableName": "follow_ups",
+      "sql": "CREATE TABLE `follow_ups` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`lead_id` text NOT NULL,\n\t`assigned_employee_id` text,\n\t`title` text NOT NULL,\n\t`description` text,\n\t`due_at` integer NOT NULL,\n\t`status` text DEFAULT 'pending' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "handoffs",
+      "tableName": "handoffs",
+      "sql": "CREATE TABLE `handoffs` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`conversation_id` text NOT NULL,\n\t`from_employee_id` text,\n\t`to_user_id` text,\n\t`reason` text NOT NULL,\n\t`status` text DEFAULT 'pending' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "integrations",
+      "tableName": "integrations",
+      "sql": "CREATE TABLE `integrations` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`provider` text NOT NULL,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`external_account_id` text,\n\t`external_phone_number_id` text,\n\t`display_name` text,\n\t`credentials_encrypted` text,\n\t`metadata` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, public_key TEXT)"
+    },
+    {
+      "type": "table",
+      "name": "knowledge_chunks",
+      "tableName": "knowledge_chunks",
+      "sql": "CREATE TABLE `knowledge_chunks` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`source_id` text NOT NULL,\n\t`chunk_index` integer NOT NULL,\n\t`content` text NOT NULL,\n\t`created_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "knowledge_sources",
+      "tableName": "knowledge_sources",
+      "sql": "CREATE TABLE `knowledge_sources` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`name` text NOT NULL,\n\t`original_name` text NOT NULL,\n\t`file_type` text NOT NULL,\n\t`mime_type` text,\n\t`file_size` integer,\n\t`storage_key` text NOT NULL,\n\t`status` text DEFAULT 'processing' NOT NULL,\n\t`processing_error` text,\n\t`description` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, `employee_id` text)"
+    },
+    {
+      "type": "table",
+      "name": "leads",
+      "tableName": "leads",
+      "sql": "CREATE TABLE `leads` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`name` text,\n\t`email` text,\n\t`phone` text,\n\t`source` text,\n\t`stage` text DEFAULT 'new' NOT NULL,\n\t`assigned_employee_id` text,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, `customer_id` text, service TEXT, destination TEXT, intent TEXT, notes TEXT, study_level TEXT, program TEXT, university TEXT, preferred_intake TEXT, budget TEXT, `estimated_value` text, `currency` text DEFAULT 'GHS', `deal_status` text DEFAULT 'open', `closed_at` integer)"
+    },
+    {
+      "type": "table",
+      "name": "messages",
+      "tableName": "messages",
+      "sql": "CREATE TABLE `messages` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`conversation_id` text NOT NULL,\n\t`integration_id` text NOT NULL,\n\t`external_message_id` text,\n\t`direction` text NOT NULL,\n\t`sender_type` text NOT NULL,\n\t`sender_id` text,\n\t`content` text NOT NULL,\n\t`message_type` text DEFAULT 'text' NOT NULL,\n\t`created_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "platform_manager_assignments",
+      "tableName": "platform_manager_assignments",
+      "sql": "CREATE TABLE `platform_manager_assignments` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`platform_manager_id` text NOT NULL,\n\t`business_id` text NOT NULL,\n\t`created_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "platform_managers",
+      "tableName": "platform_managers",
+      "sql": "CREATE TABLE `platform_managers` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`user_id` text NOT NULL,\n\t`role` text DEFAULT 'platform_manager' NOT NULL,\n\t`country` text,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "sales_activities",
+      "tableName": "sales_activities",
+      "sql": "CREATE TABLE `sales_activities` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`lead_id` text NOT NULL,\n\t`employee_id` text,\n\t`type` text NOT NULL,\n\t`title` text NOT NULL,\n\t`description` text,\n\t`created_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "session",
+      "tableName": "session",
+      "sql": "CREATE TABLE `session` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`expires_at` integer NOT NULL,\n\t`token` text NOT NULL,\n\t`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,\n\t`updated_at` integer NOT NULL,\n\t`ip_address` text,\n\t`user_agent` text,\n\t`user_id` text NOT NULL,\n\tFOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade\n)"
+    },
+    {
+      "type": "table",
+      "name": "skills",
+      "tableName": "skills",
+      "sql": "CREATE TABLE `skills` (\n  `id` text PRIMARY KEY NOT NULL,\n  `name` text NOT NULL,\n  `slug` text NOT NULL,\n  `description` text,\n  `category` text NOT NULL,\n  `type` text DEFAULT 'kuba_official' NOT NULL,\n  `version` text DEFAULT '1.0' NOT NULL,\n  `instructions` text,\n  `tools` text,\n  `status` text DEFAULT 'active' NOT NULL,\n  `created_at` integer NOT NULL,\n  `updated_at` integer NOT NULL\n, publisher text DEFAULT 'Kuba' NOT NULL, icon text, is_marketplace integer DEFAULT 1 NOT NULL, price integer DEFAULT 0 NOT NULL, rating integer DEFAULT 5 NOT NULL, install_count integer DEFAULT 0 NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "tasks",
+      "tableName": "tasks",
+      "sql": "CREATE TABLE `tasks` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`business_id` text NOT NULL,\n\t`title` text NOT NULL,\n\t`description` text,\n\t`status` text DEFAULT 'pending' NOT NULL,\n\t`priority` text DEFAULT 'normal' NOT NULL,\n\t`assigned_user_id` text,\n\t`assigned_employee_id` text,\n\t`lead_id` text,\n\t`customer_id` text,\n\t`automation_id` text,\n\t`due_at` integer,\n\t`completed_at` integer,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "users",
+      "tableName": "users",
+      "sql": "CREATE TABLE `users` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`name` text NOT NULL,\n\t`email` text NOT NULL,\n\t`email_verified` integer DEFAULT false NOT NULL,\n\t`image` text,\n\t`platform_role` text DEFAULT 'user' NOT NULL,\n\t`status` text DEFAULT 'active' NOT NULL,\n\t`created_at` integer NOT NULL,\n\t`updated_at` integer NOT NULL\n, `platform_scope` text, `phone` text, `phone_verified` integer DEFAULT false NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "verification",
+      "tableName": "verification",
+      "sql": "CREATE TABLE `verification` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`identifier` text NOT NULL,\n\t`value` text NOT NULL,\n\t`expires_at` integer NOT NULL,\n\t`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,\n\t`updated_at` integer NOT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "website_widgets",
+      "tableName": "website_widgets",
+      "sql": "CREATE TABLE website_widgets (\n      id text PRIMARY KEY NOT NULL,\n      business_id text NOT NULL,\n      name text NOT NULL,\n      website_url text,\n      employee_id text,\n      public_key text NOT NULL,\n      status text DEFAULT 'active' NOT NULL,\n      welcome_message text,\n      position text DEFAULT 'bottom-right' NOT NULL,\n      created_at integer NOT NULL,\n      updated_at integer NOT NULL\n    )"
+    },
+    {
+      "type": "index",
+      "name": "account_userId_idx",
+      "tableName": "account",
+      "sql": "CREATE INDEX `account_userId_idx` ON `account` (`user_id`)"
+    },
+    {
+      "type": "index",
+      "name": "ai_business_settings_business_id_unique",
+      "tableName": "ai_business_settings",
+      "sql": "CREATE UNIQUE INDEX `ai_business_settings_business_id_unique` ON `ai_business_settings` (`business_id`)"
+    },
+    {
+      "type": "index",
+      "name": "ai_employee_settings_employee_id_unique",
+      "tableName": "ai_employee_settings",
+      "sql": "CREATE UNIQUE INDEX `ai_employee_settings_employee_id_unique` ON `ai_employee_settings` (`employee_id`)"
+    },
+    {
+      "type": "index",
+      "name": "business_invitations_token_unique",
+      "tableName": "business_invitations",
+      "sql": "CREATE UNIQUE INDEX business_invitations_token_unique\n    ON business_invitations(token)\n  "
+    },
+    {
+      "type": "index",
+      "name": "business_localization_business_id_unique",
+      "tableName": "business_localization",
+      "sql": "CREATE UNIQUE INDEX `business_localization_business_id_unique` ON `business_localization` (`business_id`)"
+    },
+    {
+      "type": "index",
+      "name": "businesses_slug_unique",
+      "tableName": "businesses",
+      "sql": "CREATE UNIQUE INDEX `businesses_slug_unique` ON `businesses` (`slug`)"
+    },
+    {
+      "type": "index",
+      "name": "employeeSkills_employeeId_idx",
+      "tableName": "employee_skills",
+      "sql": "CREATE INDEX `employeeSkills_employeeId_idx`\nON `employee_skills` (`employee_id`)"
+    },
+    {
+      "type": "index",
+      "name": "employeeSkills_skillId_idx",
+      "tableName": "employee_skills",
+      "sql": "CREATE INDEX `employeeSkills_skillId_idx`\nON `employee_skills` (`skill_id`)"
+    },
+    {
+      "type": "index",
+      "name": "idx_channel_installations_platform_agent",
+      "tableName": "mastra_channel_installations",
+      "sql": "CREATE INDEX idx_channel_installations_platform_agent ON \"mastra_channel_installations\" (\"platform\", \"agentId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_channel_installations_webhook",
+      "tableName": "mastra_channel_installations",
+      "sql": "CREATE UNIQUE INDEX idx_channel_installations_webhook ON \"mastra_channel_installations\" (\"webhookId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_dataset_items_dataset_externalid_version",
+      "tableName": "mastra_dataset_items",
+      "sql": "CREATE INDEX idx_dataset_items_dataset_externalid_version ON \"mastra_dataset_items\" (\"datasetId\", \"externalId\", \"datasetVersion\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_dataset_items_dataset_validto",
+      "tableName": "mastra_dataset_items",
+      "sql": "CREATE INDEX idx_dataset_items_dataset_validto ON \"mastra_dataset_items\" (\"datasetId\", \"validTo\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_dataset_items_dataset_validto_deleted",
+      "tableName": "mastra_dataset_items",
+      "sql": "CREATE INDEX idx_dataset_items_dataset_validto_deleted ON \"mastra_dataset_items\" (\"datasetId\", \"validTo\", \"isDeleted\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_dataset_items_dataset_version",
+      "tableName": "mastra_dataset_items",
+      "sql": "CREATE INDEX idx_dataset_items_dataset_version ON \"mastra_dataset_items\" (\"datasetId\", \"datasetVersion\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_dataset_items_tenancy_list",
+      "tableName": "mastra_dataset_items",
+      "sql": "CREATE INDEX idx_dataset_items_tenancy_list ON \"mastra_dataset_items\" (\"organizationId\", \"projectId\", \"datasetId\", \"validTo\", \"isDeleted\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_dataset_versions_dataset_version",
+      "tableName": "mastra_dataset_versions",
+      "sql": "CREATE INDEX idx_dataset_versions_dataset_version ON \"mastra_dataset_versions\" (\"datasetId\", \"version\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_dataset_versions_dataset_version_unique",
+      "tableName": "mastra_dataset_versions",
+      "sql": "CREATE UNIQUE INDEX idx_dataset_versions_dataset_version_unique ON \"mastra_dataset_versions\" (\"datasetId\", \"version\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_datasets_tenancy_candidate",
+      "tableName": "mastra_datasets",
+      "sql": "CREATE INDEX idx_datasets_tenancy_candidate ON \"mastra_datasets\" (\"organizationId\", \"projectId\", \"candidateKey\", \"candidateId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_datasets_tenancy_createdat",
+      "tableName": "mastra_datasets",
+      "sql": "CREATE INDEX idx_datasets_tenancy_createdat ON \"mastra_datasets\" (\"organizationId\", \"projectId\", \"createdAt\", \"id\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_experiment_results_exp_item",
+      "tableName": "mastra_experiment_results",
+      "sql": "CREATE UNIQUE INDEX idx_experiment_results_exp_item ON \"mastra_experiment_results\" (\"experimentId\", \"itemId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_experiment_results_experimentid",
+      "tableName": "mastra_experiment_results",
+      "sql": "CREATE INDEX idx_experiment_results_experimentid ON \"mastra_experiment_results\" (\"experimentId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_experiment_results_org_project",
+      "tableName": "mastra_experiment_results",
+      "sql": "CREATE INDEX idx_experiment_results_org_project ON \"mastra_experiment_results\" (\"organizationId\", \"projectId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_experiments_datasetid",
+      "tableName": "mastra_experiments",
+      "sql": "CREATE INDEX idx_experiments_datasetid ON \"mastra_experiments\" (\"datasetId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_experiments_grouping",
+      "tableName": "mastra_experiments",
+      "sql": "CREATE INDEX idx_experiments_grouping ON \"mastra_experiments\" (\"experimentSetId\", \"comparisonId\", \"variantId\", \"trialIndex\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_experiments_org_project",
+      "tableName": "mastra_experiments",
+      "sql": "CREATE INDEX idx_experiments_org_project ON \"mastra_experiments\" (\"organizationId\", \"projectId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_favorites_entity",
+      "tableName": "mastra_favorites",
+      "sql": "CREATE INDEX idx_favorites_entity ON \"mastra_favorites\" (\"entityType\", \"entityId\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_mcp_client_versions_client_version",
+      "tableName": "mastra_mcp_client_versions",
+      "sql": "CREATE UNIQUE INDEX idx_mcp_client_versions_client_version ON \"mastra_mcp_client_versions\" (\"mcpClientId\", \"versionNumber\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_mcp_server_versions_server_version",
+      "tableName": "mastra_mcp_server_versions",
+      "sql": "CREATE UNIQUE INDEX idx_mcp_server_versions_server_version ON \"mastra_mcp_server_versions\" (\"mcpServerId\", \"versionNumber\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_messages_thread_created_at",
+      "tableName": "mastra_messages",
+      "sql": "CREATE INDEX idx_messages_thread_created_at ON mastra_messages (thread_id, \"createdAt\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_messages_thread_resource_created_at",
+      "tableName": "mastra_messages",
+      "sql": "CREATE INDEX idx_messages_thread_resource_created_at ON mastra_messages (thread_id, \"resourceId\", \"createdAt\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_notifications_coalescing",
+      "tableName": "mastra_notifications",
+      "sql": "CREATE INDEX idx_notifications_coalescing ON \"mastra_notifications\" (\"threadId\", \"source\", \"kind\", \"status\", \"agentId\", \"resourceId\", \"dedupeKey\", \"coalesceKey\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_notifications_due",
+      "tableName": "mastra_notifications",
+      "sql": "CREATE INDEX idx_notifications_due ON \"mastra_notifications\" (\"status\", \"deliverAt\", \"summaryAt\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_notifications_thread_status_updated",
+      "tableName": "mastra_notifications",
+      "sql": "CREATE INDEX idx_notifications_thread_status_updated ON \"mastra_notifications\" (\"threadId\", \"status\", \"updatedAt\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_om_lookup_key",
+      "tableName": "mastra_observational_memory",
+      "sql": "CREATE INDEX idx_om_lookup_key ON \"mastra_observational_memory\" (\"lookupKey\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_prompt_block_versions_block_version",
+      "tableName": "mastra_prompt_block_versions",
+      "sql": "CREATE UNIQUE INDEX idx_prompt_block_versions_block_version ON \"mastra_prompt_block_versions\" (\"blockId\", \"versionNumber\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_schedule_triggers_schedule_fire",
+      "tableName": "mastra_schedule_triggers",
+      "sql": "CREATE INDEX idx_schedule_triggers_schedule_fire ON \"mastra_schedule_triggers\" (\"schedule_id\", \"actual_fire_at\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_schedules_status_next_fire",
+      "tableName": "mastra_schedules",
+      "sql": "CREATE INDEX idx_schedules_status_next_fire ON \"mastra_schedules\" (\"status\", \"next_fire_at\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_scorer_definition_versions_scorer_version",
+      "tableName": "mastra_scorer_definition_versions",
+      "sql": "CREATE UNIQUE INDEX idx_scorer_definition_versions_scorer_version ON \"mastra_scorer_definition_versions\" (\"scorerDefinitionId\", \"versionNumber\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_skill_versions_skill_version",
+      "tableName": "mastra_skill_versions",
+      "sql": "CREATE UNIQUE INDEX idx_skill_versions_skill_version ON \"mastra_skill_versions\" (\"skillId\", \"versionNumber\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_tool_provider_connections_author",
+      "tableName": "mastra_tool_provider_connections",
+      "sql": "CREATE INDEX idx_tool_provider_connections_author ON \"mastra_tool_provider_connections\" (\"authorId\", \"providerId\", \"toolkit\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_workflow_definitions_status",
+      "tableName": "mastra_workflow_definitions",
+      "sql": "CREATE INDEX idx_workflow_definitions_status ON \"mastra_workflow_definitions\" (\"status\")"
+    },
+    {
+      "type": "index",
+      "name": "idx_workspace_versions_workspace_version",
+      "tableName": "mastra_workspace_versions",
+      "sql": "CREATE UNIQUE INDEX idx_workspace_versions_workspace_version ON \"mastra_workspace_versions\" (\"workspaceId\", \"versionNumber\")"
+    },
+    {
+      "type": "index",
+      "name": "integrations_public_key_unique",
+      "tableName": "integrations",
+      "sql": "CREATE UNIQUE INDEX integrations_public_key_unique ON integrations(public_key)"
+    },
+    {
+      "type": "index",
+      "name": "session_token_unique",
+      "tableName": "session",
+      "sql": "CREATE UNIQUE INDEX `session_token_unique` ON `session` (`token`)"
+    },
+    {
+      "type": "index",
+      "name": "session_userId_idx",
+      "tableName": "session",
+      "sql": "CREATE INDEX `session_userId_idx` ON `session` (`user_id`)"
+    },
+    {
+      "type": "index",
+      "name": "skills_slug_unique",
+      "tableName": "skills",
+      "sql": "CREATE UNIQUE INDEX `skills_slug_unique`\nON `skills` (`slug`)"
+    },
+    {
+      "type": "index",
+      "name": "users_email_unique",
+      "tableName": "users",
+      "sql": "CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`)"
+    },
+    {
+      "type": "index",
+      "name": "verification_identifier_idx",
+      "tableName": "verification",
+      "sql": "CREATE INDEX `verification_identifier_idx` ON `verification` (`identifier`)"
+    },
+    {
+      "type": "index",
+      "name": "website_widgets_public_key_unique",
+      "tableName": "website_widgets",
+      "sql": "CREATE UNIQUE INDEX website_widgets_public_key_unique\n    ON website_widgets(public_key)\n  "
+    }
+  ],
+  "tables": {
+    "account": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "account_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "provider_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "access_token",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "refresh_token",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "id_token",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "access_token_expires_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "refresh_token_expires_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "scope",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "password",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "cast(unixepoch('subsecond') * 1000 as integer)",
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "account_userId_idx",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 3,
+              "name": "user_id"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_account_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "users",
+          "from": "user_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "rowCount": 10
+    },
+    "action_approvals": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "channel",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "recipient",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "message",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_action_approvals_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "ai_business_settings": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "business_description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "products_and_services",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "target_customers",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "frequently_asked_questions",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "ai_instructions",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "tone",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'professional'",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ai_business_settings_business_id_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "business_id"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_ai_business_settings_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 7
+    },
+    "ai_employee_activities": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "title",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'completed'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ai_employee_activities_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "ai_employee_settings": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "role_instructions",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "goals",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "responsibilities",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "personality",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "communication_style",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "information_to_collect",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "escalation_rules",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "handoff_rules",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "working_hours",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ai_employee_settings_employee_id_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "employee_id"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_ai_employee_settings_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 1
+    },
+    "ai_employee_teams": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ai_employee_teams_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "ai_employee_templates": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "version",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'1.0'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ai_employee_templates_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "ai_employees": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "mastra_agent_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "branch_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "supervision_mode",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'owner_supervised'",
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "supervisor_user_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "template_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_ai_employees_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 16
+    },
+    "audit_logs": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "action",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "resource",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "resource_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "metadata",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "ip_address",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "user_agent",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_audit_logs_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "automation_runs": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "automation_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "trigger_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "trigger_data",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'running'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "error",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "started_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "completed_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_automation_runs_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "automations": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "trigger",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "conditions",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "actions",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_automations_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 1
+    },
+    "branches": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "location",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_branches_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "business_invitations": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "email",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "role",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'member'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "permissions",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "branch_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "invited_by_user_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "expires_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "accepted_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "business_invitations_token_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 7,
+              "name": "token"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_business_invitations_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 1
+    },
+    "business_localization": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "currency",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "currency_code",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "language",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'en'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "timezone",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'Africa/Accra'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "business_localization_business_id_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "business_id"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_business_localization_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "business_users": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "role",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'member'",
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "branch_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "permissions",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_business_users_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 16
+    },
+    "businesses": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "slug",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "industry",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "logo_url",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "plan",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'starter'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "business_size",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "website",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "businesses_slug_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "slug"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_businesses_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 16
+    },
+    "channel_connections": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "channel",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "account_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "account_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "access_token",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_channel_connections_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "communication_logs": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "customer_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "lead_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "channel",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "recipient",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "message",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "provider_message_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_communication_logs_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "conversations": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "integration_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "external_conversation_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "customer_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "customer_phone",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "customer_email",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "assigned_employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'open'",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "customer_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "ai_mode",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_conversations_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 43
+    },
+    "customer_tags": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "customer_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "tag",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_customer_tags_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "customers": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "email",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "phone",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "source",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_customers_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 34
+    },
+    "employee_skills": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "skill_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "employeeSkills_skillId_idx",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "skill_id"
+            }
+          ]
+        },
+        {
+          "name": "employeeSkills_employeeId_idx",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "employee_id"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_employee_skills_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "follow_ups": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "lead_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "assigned_employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "title",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "due_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_follow_ups_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 7
+    },
+    "handoffs": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "conversation_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "from_employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "to_user_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "reason",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_handoffs_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "integrations": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "external_account_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "external_phone_number_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "display_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "credentials_encrypted",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "metadata",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "public_key",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "integrations_public_key_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 11,
+              "name": "public_key"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_integrations_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 4
+    },
+    "knowledge_chunks": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "source_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "chunk_index",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "content",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_knowledge_chunks_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "knowledge_sources": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "original_name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "file_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "mime_type",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "file_size",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "storage_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'processing'",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "processing_error",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_knowledge_sources_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "leads": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "email",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "phone",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "source",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "stage",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'new'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "assigned_employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "customer_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "service",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "destination",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "intent",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "notes",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "study_level",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "program",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 17,
+          "name": "university",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 18,
+          "name": "preferred_intake",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 19,
+          "name": "budget",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 20,
+          "name": "estimated_value",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 21,
+          "name": "currency",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'GHS'",
+          "pk": 0
+        },
+        {
+          "cid": 22,
+          "name": "deal_status",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'open'",
+          "pk": 0
+        },
+        {
+          "cid": 23,
+          "name": "closed_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_leads_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 17
+    },
+    "messages": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "conversation_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "integration_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "external_message_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "direction",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "sender_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "sender_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "content",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "message_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'text'",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_messages_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 160
+    },
+    "platform_manager_assignments": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "platform_manager_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_platform_manager_assignments_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "platform_managers": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "role",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'platform_manager'",
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_platform_managers_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "sales_activities": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "lead_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "title",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_sales_activities_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 37
+    },
+    "session": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "expires_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "cast(unixepoch('subsecond') * 1000 as integer)",
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "ip_address",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "user_agent",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "session_userId_idx",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 7,
+              "name": "user_id"
+            }
+          ]
+        },
+        {
+          "name": "session_token_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "token"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_session_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "users",
+          "from": "user_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ],
+      "rowCount": 19
+    },
+    "skills": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "slug",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "category",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'kuba_official'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "version",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'1.0'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "instructions",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "tools",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "publisher",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'Kuba'",
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "icon",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "is_marketplace",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "1",
+          "pk": 0
+        },
+        {
+          "cid": 15,
+          "name": "price",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 16,
+          "name": "rating",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "5",
+          "pk": 0
+        },
+        {
+          "cid": 17,
+          "name": "install_count",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "skills_slug_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "slug"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_skills_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 4
+    },
+    "tasks": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "title",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "priority",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'normal'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "assigned_user_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "assigned_employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "lead_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "customer_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "automation_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "due_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
+          "name": "completed_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 13,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 14,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_tasks_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 1
+    },
+    "users": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "email",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "email_verified",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "false",
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "image",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "platform_role",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'user'",
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "platform_scope",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "phone",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "phone_verified",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "false",
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "users_email_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "email"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_users_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 3
+    },
+    "verification": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "identifier",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "value",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "expires_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "cast(unixepoch('subsecond') * 1000 as integer)",
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "verification_identifier_idx",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "identifier"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_verification_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 0
+    },
+    "website_widgets": {
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 1
+        },
+        {
+          "cid": 1,
+          "name": "business_id",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 2,
+          "name": "name",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 3,
+          "name": "website_url",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 4,
+          "name": "employee_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 5,
+          "name": "public_key",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 6,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'active'",
+          "pk": 0
+        },
+        {
+          "cid": 7,
+          "name": "welcome_message",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "position",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'bottom-right'",
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "created_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "updated_at",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "website_widgets_public_key_unique",
+          "unique": true,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 5,
+              "name": "public_key"
+            }
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_website_widgets_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "rowCount": 1
+    }
+  },
+  "drizzleMigrations": []
+}

@@ -1,9 +1,7 @@
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
-import { db } from "@/db";
-import { businessUsers } from "@/db/schema";
+import { AuthorizationError, requireBusinessContext } from "@/lib/auth/authorization";
 
 export async function getCurrentUser() {
   const session =
@@ -18,69 +16,31 @@ export async function getCurrentUser() {
   return session.user;
 }
 
-export async function getCurrentMembership() {
-  const user =
-    await getCurrentUser();
-
-  if (!user) {
+export async function getCurrentMembership(request?: Request) {
+  try {
+    return (await requireBusinessContext(request)).membership;
+  } catch {
     return null;
   }
-
-  const result =
-    await db
-      .select({
-        id: businessUsers.id,
-        businessId:
-          businessUsers.businessId,
-        userId:
-          businessUsers.userId,
-        role:
-          businessUsers.role,
-        permissions:
-          businessUsers.permissions,
-        branchId:
-          businessUsers.branchId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          user.id,
-        ),
-      )
-      .limit(1);
-
-  return result[0] ?? null;
 }
 
-export async function requireBusinessMembership() {
-  const user =
-    await getCurrentUser();
-
+export async function requireBusinessMembership(request?: Request) {
+  const user = await getCurrentUser();
   if (!user) {
-    return {
-      user: null,
-      membership: null,
-      error: "Unauthorized",
-    } as const;
+    return { user: null, membership: null, error: "Unauthorized" } as const;
   }
 
-  const membership =
-    await getCurrentMembership();
-
-  if (!membership) {
+  try {
+    const context = await requireBusinessContext(request);
+    return { user: context.user, membership: context.membership, error: null } as const;
+  } catch (error) {
+    const authorizationError = error instanceof AuthorizationError ? error : null;
     return {
       user,
       membership: null,
-      error: "Business access denied.",
+      error: authorizationError?.message || "Business access denied.",
     } as const;
   }
-
-  return {
-    user,
-    membership,
-    error: null,
-  } as const;
 }
 
 export function isSameBusiness(

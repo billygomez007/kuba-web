@@ -1,82 +1,24 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import {
-  aiEmployees,
-  businessUsers,
-} from "@/db/schema";
+import { aiEmployees } from "@/db/schema";
+import { authorizationErrorResponse, requirePermission } from "@/lib/auth/authorization";
+import { PERMISSIONS } from "@/lib/auth/permissions";
 
-
-export async function GET() {
-
-  const session =
-    await auth.api.getSession({
-      headers: await headers(),
-    });
-
-
-  if (!session?.user) {
-    return NextResponse.json(
-      {
-        error: "Unauthorized",
-      },
-      {
-        status: 401,
-      },
-    );
+/**
+ * Existing AI workforce directory. Human workforce records will use a separate
+ * employee domain once its schema and migration lineage are safely established.
+ */
+export async function GET(request: Request) {
+  try {
+    const context = await requirePermission(PERMISSIONS.WORKFORCE_VIEW, request);
+    const employees = await db.select().from(aiEmployees).where(eq(aiEmployees.businessId, context.business.id));
+    return NextResponse.json({ success: true, employees });
+  } catch (error) {
+    const authorizationResponse = authorizationErrorResponse(error);
+    if (authorizationResponse) return authorizationResponse;
+    console.error("AI workforce directory error:", error);
+    return NextResponse.json({ error: "Unable to load AI workforce." }, { status: 500 });
   }
-
-
-  const membership =
-    await db
-      .select({
-        businessId:
-          businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
-
-
-  const business =
-    membership[0];
-
-
-  if (!business) {
-    return NextResponse.json(
-      {
-        error: "Business not found",
-      },
-      {
-        status:404,
-      },
-    );
-  }
-
-
-  const employees =
-    await db
-      .select()
-      .from(aiEmployees)
-      .where(
-        eq(
-          aiEmployees.businessId,
-          business.businessId,
-        ),
-      );
-
-
-  return NextResponse.json({
-    success:true,
-    employees,
-  });
-
 }

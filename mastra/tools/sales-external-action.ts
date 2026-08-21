@@ -2,7 +2,9 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { actionApprovals } from "@/db/schema";
+import { aiEmployees } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { createPendingAIAction } from "@/lib/ai/security";
 
 export const salesExternalActionTool = createTool({
   id: "sales-external-action",
@@ -30,19 +32,25 @@ export const salesExternalActionTool = createTool({
     recipient,
     message,
   }) => {
-    const approvalId = crypto.randomUUID();
-    const now = new Date();
+    const employee = (await db.select({ id: aiEmployees.id })
+      .from(aiEmployees)
+      .where(and(
+        eq(aiEmployees.businessId, businessId),
+        eq(aiEmployees.type, "sales"),
+        eq(aiEmployees.status, "active"),
+      ))
+      .limit(1))[0];
 
-    await db.insert(actionApprovals).values({
-      id: approvalId,
+    if (!employee) {
+      return { success: false, error: "No active Sales AI employee is available for this business." };
+    }
+
+    const { id: approvalId } = await createPendingAIAction({
       businessId,
-      employeeId: null,
+      employeeId: employee.id,
       channel,
       recipient,
       message,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
     });
 
     return {

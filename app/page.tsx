@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
+import DashboardMockup from "./components/mockups/DashboardMockup";
+import EmployeeShowcase from "./components/EmployeeShowcase";
+import EmployeeWorkspaceMockup from "./components/mockups/EmployeeWorkspaceMockup";
 import {
   ArrowRight,
   Bot,
@@ -9,6 +13,7 @@ import {
   Check,
   ChevronRight,
   Globe2,
+  Phone,
   Headphones,
   Megaphone,
   MessageSquare,
@@ -105,7 +110,60 @@ const industries = [
   "Financial Services",
 ];
 
+
+const menuItems = [
+  {
+    name: "Products",
+    items: [
+      ["AI Employees", "/ai-employees"],
+      ["AI Voice Agents", "/voice-agents"],
+      ["AI Communication Platform", "/communication-platform"],
+      ["AI Workforce Platform", "#platform"],
+      ["Business Automation", "#solutions"],
+      ["View All Products →", "/products"],
+    ],
+  },
+  {
+    name: "Solutions",
+    items: [
+      ["Customer Service", "#solutions"],
+      ["Sales & Lead Generation", "#solutions"],
+      ["Marketing Automation", "#solutions"],
+      ["Finance & Accounting", "#solutions"],
+      ["Human Resources", "#solutions"],
+      ["Business Operations", "#solutions"],
+      ["View All Solutions →", "/solutions"],
+    ],
+  },
+  {
+    name: "Industries",
+    items: [
+      ["Travel & Tourism", "/industries"],
+      ["Real Estate", "/industries"],
+      ["Healthcare", "/industries"],
+      ["Education", "/industries"],
+      ["Hospitality", "/industries"],
+      ["Retail & E-commerce", "/industries"],
+      ["Financial Services", "/industries"],
+      ["View All Industries →", "/industries"],
+    ],
+  },
+  {
+    name: "Resources",
+    items: [
+      ["Documentation", "#resources"],
+      ["Help Center", "#resources"],
+      ["AI Guides", "#resources"],
+      ["Blog", "#resources"],
+    ],
+  },
+];
+
+
 export default function KubaWebsite() {
+
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#060609] text-white">
       {/* =========================================================
@@ -115,41 +173,60 @@ export default function KubaWebsite() {
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/[0.06] bg-[#060609]/75 backdrop-blur-2xl">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
           <Link href="/" className="flex items-center">
-  <img
-    src="/brand/kuba-logo-3d.png"
-    alt="Kuba AI"
-    className="h-auto w-[150px] sm:w-[175px]"
+  <Image
+    src="/brand/superkuba-logo.png"
+    alt="SuperKuba"
+    width={2132}
+    height={738}
+    priority
+    className="h-auto w-[150px] object-contain sm:w-[175px]"
   />
 </Link>
 
           <nav className="hidden items-center gap-8 md:flex">
-            <a
-              href="#workforce"
-              className="text-sm font-medium text-white/60 transition hover:text-white"
-            >
-              AI Workforce
-            </a>
 
-            <a
-              href="#platform"
-              className="text-sm font-medium text-white/60 transition hover:text-white"
-            >
-              Platform
-            </a>
+            {menuItems.map((menu) => (
+              <div
+                key={menu.name}
+                className="relative"
+              >
 
-            <a
-              href="#solutions"
-              className="text-sm font-medium text-white/60 transition hover:text-white"
-            >
-              Solutions
-            </a>
+                <button
+                  onClick={() =>
+                    setOpenMenu(openMenu === menu.name ? null : menu.name)
+                  }
+                  className="text-sm font-medium text-white/60 transition hover:text-white"
+                >
+                  {menu.name}
+                </button>
 
-            <a
-              href="#pricing"
+
+                {openMenu === menu.name && (
+                  <div className="absolute left-0 top-10 w-72 rounded-2xl border border-white/10 bg-[#0b0b12] p-4 shadow-2xl">
+
+                    {menu.items.map(([label, link]) => (
+                      <Link
+                        key={label}
+                        href={link}
+                        className="block rounded-xl px-4 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+                      >
+                        {label}
+                      </Link>
+                    ))}
+
+                  </div>
+                )}
+
+              </div>
+            ))}
+
+            <Link
+              href="/pricing"
               className="text-sm font-medium text-white/60 transition hover:text-white"
             >
               Pricing
-            </a>
+            </Link>
+
           </nav>
 
           <div className="flex items-center gap-3">
@@ -164,7 +241,7 @@ export default function KubaWebsite() {
               href="/signup"
               className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-black transition hover:scale-105 hover:bg-white/90"
             >
-              Get started
+              Start for Free
             </Link>
           </div>
         </div>
@@ -228,17 +305,17 @@ export default function KubaWebsite() {
                 href="/signup"
                 className="group flex items-center gap-3 rounded-full bg-white px-7 py-4 text-base font-bold text-black shadow-2xl shadow-white/10 transition hover:-translate-y-1 hover:shadow-white/20"
               >
-                Build your AI workforce
+                Start for Free
 
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
 
-              <a
-                href="#workforce"
+              <Link
+                href="/demo"
                 className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-7 py-4 text-base font-semibold text-white/80 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.08]"
               >
-                Explore Kuba
-              </a>
+                Book a Demo
+              </Link>
             </div>
 
             {/* Trust */}
@@ -261,7 +338,7 @@ export default function KubaWebsite() {
                 <div className="flex flex-col gap-5 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-left">
                     <div className="text-xs font-bold uppercase tracking-[0.25em] text-white/25">
-                      Kuba AI Workforce
+                      SuperKuba AI Workforce
                     </div>
 
                     <h2 className="mt-2 text-2xl font-bold">
@@ -350,6 +427,22 @@ export default function KubaWebsite() {
         </div>
       </section>
 
+
+      {/* =========================================================
+          KUBA DASHBOARD MOCKUP
+      ========================================================= */}
+
+      <section className="relative px-6 py-20 lg:px-8">
+
+        <div className="mx-auto max-w-7xl">
+
+          <DashboardMockup />
+
+        </div>
+
+      </section>
+
+
       {/* =========================================================
           INTRO
       ========================================================= */}
@@ -387,6 +480,14 @@ export default function KubaWebsite() {
           </div>
         </div>
       </section>
+
+
+      {/* =========================================================
+          AI EMPLOYEE SHOWCASE
+      ========================================================= */}
+
+      <EmployeeShowcase />
+
 
       {/* =========================================================
           PLATFORM
@@ -635,10 +736,12 @@ AI workforce solutions built around how your industry operates.
             {/* Brand */}
             <div className="md:col-span-2">
               <Link href="/" className="flex items-center">
-  <img
-    src="/brand/kuba-logo-3d.png"
-    alt="Kuba AI"
-    className="h-auto w-[170px]"
+  <Image
+    src="/brand/superkuba-logo.png"
+    alt="SuperKuba"
+    width={2132}
+    height={738}
+    className="h-auto w-[170px] object-contain"
   />
 </Link>
 
@@ -674,7 +777,7 @@ AI workforce solutions built around how your industry operates.
 
             {/* Company */}
             <div>
-              <h3 className="font-bold">Kuba</h3>
+              <h3 className="font-bold">SuperKuba</h3>
 
               <div className="mt-5 space-y-3 text-sm text-white/40">
                 <Link className="block hover:text-white" href="/login">
@@ -698,7 +801,7 @@ AI workforce solutions built around how your industry operates.
 
           <div className="mt-14 flex flex-col gap-4 border-t border-white/[0.06] pt-7 text-xs text-white/25 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              © {new Date().getFullYear()} Kuba AI. All rights reserved.
+              © {new Date().getFullYear()} SuperKuba AI. All rights reserved.
             </span>
 
             <div className="flex gap-5">

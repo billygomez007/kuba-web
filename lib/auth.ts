@@ -19,6 +19,7 @@ export const auth = betterAuth({
     "https://kuba-web-woad.vercel.app",
     "https://kuba-web-kuba-web.vercel.app",
     "https://kuba-web-git-main-kuba-web.vercel.app",
+    "http://localhost:3001",
   ],
 
   emailAndPassword: {

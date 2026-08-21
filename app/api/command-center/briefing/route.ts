@@ -14,7 +14,8 @@ import {
 
 import { eq } from "drizzle-orm";
 
-import { generateText } from "ai";
+import { generateObject } from "ai";
+import { z } from "zod";
 import { openai } from "@ai-sdk/openai";
 
 
@@ -129,12 +130,51 @@ export async function GET() {
     const prompt = `
 You are Kuba, the CEO intelligence assistant.
 
-Create a CEO-level business intelligence briefing.
+Analyze this company like an executive advisor.
 
-Focus on:
-- What is happening in the business now
-- What requires the CEO's attention
-- The most important action to take next
+Your purpose is to help the CEO understand:
+- What is happening in the business
+- What requires attention
+- What opportunities exist
+- What actions should happen next
+
+Create an executive briefing using simple professional business language.
+
+Important rules:
+- Do not use markdown.
+- Do not use # symbols.
+- Do not use bullet points.
+- Do not use asterisks.
+- Keep responses concise and executive-focused.
+- Return ONLY valid JSON.
+
+Your response must follow this exact structure:
+
+{
+  "headline": "The most important business situation right now",
+  "summary": "A short CEO-level explanation",
+  "sections": [
+    {
+      "title": "Business Overview",
+      "content": "Explain the current business state"
+    },
+    {
+      "title": "Key Insights",
+      "content": "Explain important observations, risks, or opportunities"
+    },
+    {
+      "title": "Growth Opportunities",
+      "content": "Explain ways the business can improve"
+    }
+  ],
+  "actions": [
+    {
+      "title": "Action name",
+      "description": "Explain what the CEO should do next"
+    }
+  ]
+}
+
 
 Business data:
 
@@ -150,51 +190,38 @@ ${customerList.length}
 Follow-ups:
 ${followUpList.length}
 
-
-Rules:
-- Be concise.
-- Speak like a business advisor.
-- Do not invent information.
-- Mention recommended actions.
 `;
 
-
     const result =
-      await generateText({
+      await generateObject({
         model:
           openai("gpt-4o-mini"),
 
-        prompt: `${prompt}
+        schema: z.object({
+          headline: z.string(),
 
-Return ONLY valid JSON:
+          summary: z.string(),
 
-{
-  "headline": "the most important business situation right now",
-  "summary": "a CEO-focused explanation of what is happening and why it matters",
-  "priorities": [
-    "specific CEO action one",
-    "specific CEO action two",
-    "specific CEO action three"
-  ]
-}`,
+          sections: z.array(
+            z.object({
+              title: z.string(),
+              content: z.string(),
+            }),
+          ),
+
+          actions: z.array(
+            z.object({
+              title: z.string(),
+              description: z.string(),
+            }),
+          ),
+        }),
+
+        prompt,
       });
 
-    let aiInsight;
 
-    try {
-      const cleaned = result.text
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-      aiInsight = JSON.parse(cleaned);
-    } catch {
-      aiInsight = {
-        headline: "Business analysis available",
-        summary: result.text,
-        priorities: [],
-      };
-    }
+    const aiInsight = result.object;
 
 
     return NextResponse.json({
@@ -206,7 +233,8 @@ Return ONLY valid JSON:
         customers: customerList.length,
         followUps: followUpList.length,
       },
-      priorities: aiInsight.priorities,
+      sections: aiInsight.sections || [],
+      actions: aiInsight.actions || [],
     });
 
 

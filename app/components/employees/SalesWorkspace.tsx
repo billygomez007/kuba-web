@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SalesEmployeeChat from "../SalesEmployeeChat";
+import EmployeeQuickActions from "./EmployeeQuickActions";
 
 type WorkspaceTask = {
   id: string;
@@ -67,6 +68,10 @@ type Props = {
 export default function SalesWorkspace({
   employeeId,
 }: Props) {
+
+  const [quickPrompt, setQuickPrompt] =
+    useState("");
+
   const [briefing, setBriefing] =
     useState<Briefing | null>(null);
 
@@ -321,7 +326,16 @@ export default function SalesWorkspace({
 
       {/* CHAT */}
       <section>
-        <SalesEmployeeChat employeeId={employeeId} />
+        <EmployeeQuickActions
+          onAction={(prompt) =>
+            setQuickPrompt(prompt)
+          }
+        />
+
+        <SalesEmployeeChat
+          employeeId={employeeId}
+          initialPrompt={quickPrompt}
+        />
       </section>
 
 

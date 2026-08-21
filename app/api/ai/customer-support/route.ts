@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
+import { buildEmployeeSkillContext } from "@/lib/ai/skill-context";
 
 export async function POST(request: Request) {
   try {
@@ -176,8 +177,17 @@ CURRENT DATE AND TIME
 ${new Date().toISOString()}
 `;
 
+    const skillContext =
+      await buildEmployeeSkillContext(
+        employee.id,
+      );
+
     const prompt = `
 ${businessContext}
+
+EMPLOYEE SKILLS
+
+${skillContext}
 
 CUSTOMER SUPPORT REQUEST
 

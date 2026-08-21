@@ -1,131 +1,52 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 
+import { createPendingAIAction } from "@/lib/ai/security";
+import { db } from "@/db";
+import { aiEmployees } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+
 export const sendWhatsAppMessageTool = createTool({
   id: "send-whatsapp-message",
-
   description:
-    "Send a WhatsApp text message to a lead using the business WhatsApp Cloud API. Use only when the user explicitly asks Kuba to send/contact/message a lead and the lead phone number is available. A successful result means Meta accepted the message and returned a WhatsApp message ID.",
-
+    "Request approval for a WhatsApp message. This tool never sends a message directly.",
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the current business."),
-
-    phone: z
-      .string()
-      .describe(
-        "The recipient WhatsApp phone number in international format.",
-      ),
-
-    message: z
-      .string()
-      .min(1)
-      .describe("The exact WhatsApp message to send."),
+    businessId: z.string(),
+    phone: z.string().min(1),
+    message: z.string().min(1),
   }),
-
-  execute: async ({
-    businessId,
-    phone,
-    message,
-  }) => {
-    const accessToken =
-      process.env.WHATSAPP_ACCESS_TOKEN;
-
-    const phoneNumberId =
-      process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-    const configuredBusinessId =
-      process.env.WHATSAPP_BUSINESS_ID;
-
-    const graphApiVersion =
-      process.env.WHATSAPP_GRAPH_API_VERSION ||
-      "v25.0";
-
-    if (!accessToken || !phoneNumberId) {
-      return {
-        success: false,
-        error:
-          "WhatsApp credentials are not configured.",
-      };
-    }
-
-    if (
-      configuredBusinessId &&
-      configuredBusinessId !== businessId
-    ) {
-      return {
-        success: false,
-        error:
-          "The configured WhatsApp business does not match the current business.",
-      };
-    }
-
+  execute: async ({ businessId, phone, message }) => {
     const recipient = phone.trim();
-
-    if (!recipient) {
-      return {
-        success: false,
-        error:
-          "A recipient phone number is required.",
-      };
+    const content = message.trim();
+    if (!recipient || !content) {
+      return { success: false, error: "A recipient and message are required." };
     }
 
-    const response = await fetch(
-      `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/messages`,
-      {
-        method: "POST",
-
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: recipient,
-          type: "text",
-          text: {
-            preview_url: false,
-            body: message,
-          },
-        }),
-      },
-    );
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error(
-        "Kuba Sales WhatsApp send error:",
-        JSON.stringify(result, null, 2),
-      );
-
-      return {
-        success: false,
-        error:
-          "WhatsApp message could not be sent.",
-        details: result,
-      };
+    const employee = (await db.select({ id: aiEmployees.id })
+      .from(aiEmployees)
+      .where(and(
+        eq(aiEmployees.businessId, businessId),
+        eq(aiEmployees.type, "sales"),
+        eq(aiEmployees.status, "active"),
+      ))
+      .limit(1))[0];
+    if (!employee) {
+      return { success: false, error: "No active Sales AI employee is available for this business." };
     }
 
-    const externalMessageId =
-      result.messages?.[0]?.id || null;
-
-    if (!externalMessageId) {
-      return {
-        success: false,
-        error:
-          "WhatsApp accepted the request but did not return a message ID.",
-      };
-    }
+    const { id: approvalId } = await createPendingAIAction({
+      businessId,
+      employeeId: employee.id,
+      channel: "whatsapp",
+      recipient,
+      message: content,
+    });
 
     return {
       success: true,
-      phone: recipient,
-      message,
-      externalMessageId,
+      status: "approval_required",
+      approvalId,
+      messageToUser: "The WhatsApp message is awaiting approval.",
     };
   },
 });

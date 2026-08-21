@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { and, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-  businesses,
-  businessUsers,
   aiBusinessSettings,
   aiEmployees,
   aiEmployeeSettings,
@@ -17,6 +13,9 @@ import {
   salesActivities,
 } from "@/db/schema";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
+import { buildEmployeeSkillContext } from "@/lib/ai/skill-context";
+import { authorizationErrorResponse, logSecurityEvent, requirePermission } from "@/lib/auth/authorization";
+import { PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST(request: Request) {
   try {
@@ -24,18 +23,10 @@ export async function POST(request: Request) {
     // 1. Authenticate the user
     // ---------------------------------------------------------
 
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
-      return NextResponse.json(
-        {
-          error: "You must be logged in.",
-        },
-        { status: 401 },
-      );
-    }
+    const context = await requirePermission(
+      PERMISSIONS.RECEPTION_AI,
+      request,
+    );
 
     // ---------------------------------------------------------
     // 2. Read the request
@@ -73,38 +64,7 @@ export async function POST(request: Request) {
     // 3. Find the user's business
     // ---------------------------------------------------------
 
-    const businessResult = await db
-      .select({
-        business: businesses,
-      })
-      .from(businessUsers)
-      .innerJoin(
-        businesses,
-        eq(
-          businessUsers.businessId,
-          businesses.id,
-        ),
-      )
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
-
-    const business =
-      businessResult[0]?.business;
-
-    if (!business) {
-      return NextResponse.json(
-        {
-          error:
-            "No business is associated with your account.",
-        },
-        { status: 404 },
-      );
-    }
+    const business = context.business;
 
     // ---------------------------------------------------------
     // 4. Load business AI settings
@@ -340,9 +300,9 @@ Follow the employee settings above while also following the business-level AI in
       .select()
       .from(conversations)
       .where(
-        eq(
-          conversations.id,
-          conversationId,
+        and(
+          eq(conversations.id, conversationId),
+          eq(conversations.businessId, business.id),
         ),
       )
       .limit(1);
@@ -465,9 +425,9 @@ Follow the employee settings above while also following the business-level AI in
             updatedAt: new Date(),
           })
           .where(
-            eq(
-              customers.id,
-              customerId,
+            and(
+              eq(customers.id, customerId),
+              eq(customers.businessId, business.id),
             ),
           );
 
@@ -514,9 +474,9 @@ Follow the employee settings above while also following the business-level AI in
           .select()
           .from(conversations)
           .where(
-            eq(
-              conversations.id,
-              conversationId,
+            and(
+              eq(conversations.id, conversationId),
+              eq(conversations.businessId, business.id),
             ),
           )
           .limit(1);
@@ -534,9 +494,9 @@ Follow the employee settings above while also following the business-level AI in
           updatedAt: new Date(),
         })
         .where(
-          eq(
-            conversations.id,
-            conversationId,
+          and(
+            eq(conversations.id, conversationId),
+            eq(conversations.businessId, business.id),
           ),
         );
     }
@@ -577,9 +537,9 @@ Follow the employee settings above while also following the business-level AI in
         })
         .from(messages)
         .where(
-          eq(
-            messages.conversationId,
-            conversationId,
+          and(
+            eq(messages.conversationId, conversationId),
+            eq(messages.businessId, business.id),
           ),
         )
         .orderBy(
@@ -931,9 +891,9 @@ ${message}`;
             .select()
             .from(leads)
             .where(
-              eq(
-                leads.customerId,
-                customerId,
+              and(
+                eq(leads.customerId, customerId),
+                eq(leads.businessId, business.id),
               ),
             )
             .limit(1);
@@ -1091,9 +1051,9 @@ ${message}`;
               new Date(),
           })
           .where(
-            eq(
-              leads.id,
-              lead.id,
+            and(
+              eq(leads.id, lead.id),
+              eq(leads.businessId, business.id),
             ),
           );
 
@@ -1111,6 +1071,13 @@ ${message}`;
 
 
 
+    const skillContext =
+      receptionist?.employee.id
+        ? await buildEmployeeSkillContext(
+            receptionist.employee.id,
+          )
+        : "";
+
     const receptionistPrompt = `
 CURRENT BUSINESS ID:
 ${business.id}
@@ -1122,6 +1089,8 @@ When using the getBusinessKnowledge tool, you MUST pass this exact value as the 
 
 Do not guess the business ID.
 Do not omit the businessId argument.
+
+${skillContext}
 
 CUSTOMER MESSAGE:
 ${message}
@@ -1191,6 +1160,15 @@ ${prompt}
         createdAt: new Date(),
       });
 
+    await logSecurityEvent({
+      context,
+      request,
+      action: "ai.receptionist.responded",
+      resource: "conversation",
+      resourceId: conversationId,
+      result: "success",
+    });
+
     // ---------------------------------------------------------
     // 16. Return response
     // ---------------------------------------------------------
@@ -1202,6 +1180,8 @@ ${prompt}
       customerId,
     });
   } catch (error) {
+    const authorizationResponse = authorizationErrorResponse(error);
+    if (authorizationResponse) return authorizationResponse;
     console.error(
       "KUBA RECEPTIONIST FULL ERROR:",
       JSON.stringify(

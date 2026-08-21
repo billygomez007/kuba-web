@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   Sparkles,
@@ -62,14 +63,15 @@ export default function KubaHero() {
       {/* Navigation */}
       <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black shadow-lg shadow-white/10">
-            <span className="text-xl font-black">K</span>
-          </div>
-
-          <span className="text-2xl font-black tracking-tight">
-            kuba<span className="text-violet-400">.</span>
-          </span>
+        <Link href="/" className="flex items-center" aria-label="SuperKuba home">
+          <Image
+            src="/brand/superkuba-logo.png"
+            alt="SuperKuba"
+            width={2132}
+            height={738}
+            priority
+            className="h-auto w-[145px] object-contain sm:w-[165px]"
+          />
         </Link>
 
         {/* Desktop navigation */}

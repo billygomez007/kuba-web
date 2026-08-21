@@ -35,6 +35,8 @@ export const PERMISSIONS = {
   WORKFORCE_VIEW: "workforce.view",
   WORKFORCE_MANAGE: "workforce.manage",
 
+  SKILLS_MANAGE: "skills.manage",
+
   AUTOMATIONS_VIEW: "automations.view",
   AUTOMATIONS_MANAGE: "automations.manage",
 

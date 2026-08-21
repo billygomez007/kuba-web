@@ -23,6 +23,7 @@ type Overview = {
   };
 };
 
+
 export default function BusinessHealthCards() {
 
   const [overview, setOverview] =
@@ -32,7 +33,9 @@ export default function BusinessHealthCards() {
   useEffect(() => {
 
     async function loadOverview() {
+
       try {
+
         const response = await fetch(
           "/api/command-center/overview",
           {
@@ -40,197 +43,196 @@ export default function BusinessHealthCards() {
           },
         );
 
+
         if (!response.ok) {
-          throw new Error(
-            "Unable to load command center overview",
-          );
+          throw new Error("Unable to load overview");
         }
+
 
         const data = await response.json();
 
         setOverview(data);
 
+
       } catch (error) {
+
         console.error(
           "Business overview error:",
           error,
         );
+
       }
+
     }
+
 
     loadOverview();
 
   }, []);
 
 
+
   const cards = [
+
     {
-      title: "Sales Pipeline",
-      value:
-        overview
-          ? overview.salesPipeline.total
-          : "...",
+      title: "Revenue Pipeline",
+      value: overview
+        ? overview.salesPipeline.total
+        : "...",
       description:
-        "Active revenue opportunities",
+        "Active opportunities driving future revenue.",
+      insight:
+        overview
+          ? `${overview.salesPipeline.stages.qualified} qualified opportunities`
+          : "Analyzing sales activity",
       icon: "↗",
     },
 
+
     {
       title: "Customers",
-      value:
-        overview
-          ? overview.customers
-          : "...",
+      value: overview
+        ? overview.customers
+        : "...",
       description:
-        "Customers connected to your business",
+        "Customers connected with your business.",
+      insight:
+        "Customer relationships monitored by Kuba AI",
       icon: "◎",
     },
 
+
     {
       title: "AI Workforce",
-      value:
-        overview
-          ? overview.employees
-          : "...",
+      value: overview
+        ? overview.employees
+        : "...",
       description:
-        "AI employees currently active",
+        "AI employees currently active.",
+      insight:
+        "Digital workers operating across departments",
       icon: "✦",
     },
 
+
     {
-      title: "Conversations",
-      value:
-        overview
-          ? overview.conversations
-          : "...",
+      title: "Customer Activity",
+      value: overview
+        ? overview.conversations
+        : "...",
       description:
-        "Customer conversations handled by Kuba",
+        "Conversations handled by Kuba.",
+      insight:
+        "Real-time customer interactions",
       icon: "◌",
     },
 
+
     {
-      title: "Attention Needed",
-      value:
-        overview
-          ? overview.followUps.overdue
-          : "...",
+      title: "Attention Required",
+      value: overview
+        ? overview.followUps.overdue
+        : "...",
       description:
-        "Overdue actions requiring attention",
-      icon: "◈",
+        "Actions requiring executive attention.",
+      insight:
+        overview
+          ? `${overview.followUps.pending} pending actions`
+          : "Checking priorities",
+      icon: "⚠",
     },
+
   ];
 
 
+
   return (
+
     <section className="mt-8">
 
-      <p className="text-xs font-bold uppercase tracking-[0.25em] text-white/30">
-        Business Pulse
+      <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300/60">
+        Executive Business Pulse
       </p>
 
-      <h2 className="mt-2 text-2xl font-black">
-        Your Business at a Glance
+
+      <h2 className="mt-2 text-3xl font-black">
+        Your Company At A Glance
       </h2>
 
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <p className="mt-3 max-w-2xl text-sm text-white/40">
+        Kuba AI continuously monitors your business performance
+        and highlights what needs your attention.
+      </p>
+
+
+
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
+
 
         {cards.map((card) => (
+
           <div
             key={card.title}
-            className="rounded-3xl border border-white/10 bg-white/[0.04] p-5"
+            className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-400/30"
           >
 
-            <div className="flex justify-between">
+
+            <div className="flex items-center justify-between">
 
               <span className="text-xl text-cyan-300">
                 {card.icon}
               </span>
 
-              <span className="text-xs uppercase text-white/30">
+
+              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+
                 Live
+
               </span>
 
             </div>
 
 
-            <h3 className="mt-5 text-3xl font-black">
+
+            <p className="mt-6 text-3xl font-black">
               {card.value}
-            </h3>
-
-
-            <p className="mt-2 text-sm font-semibold">
-              {card.title}
             </p>
 
 
-            <p className="mt-1 text-xs text-white/40">
+
+            <h3 className="mt-2 font-bold">
+              {card.title}
+            </h3>
+
+
+
+            <p className="mt-2 text-xs leading-5 text-white/40">
               {card.description}
             </p>
 
 
-            {card.title === "Sales Pipeline" &&
-              overview && (
-                <div className="mt-4 space-y-1 text-xs text-white/50">
 
-                  <p>
-                    New:
-                    {" "}
-                    {overview.salesPipeline.stages.new}
-                  </p>
+            <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-3">
 
-                  <p>
-                    Contacted:
-                    {" "}
-                    {overview.salesPipeline.stages.contacted}
-                  </p>
+              <p className="text-xs text-white/60">
+                {card.insight}
+              </p>
 
-                  <p>
-                    Qualified:
-                    {" "}
-                    {overview.salesPipeline.stages.qualified}
-                  </p>
-
-                  <p>
-                    Converted:
-                    {" "}
-                    {overview.salesPipeline.stages.converted}
-                  </p>
-
-                </div>
-              )}
+            </div>
 
 
-            {card.title === "Attention Needed" &&
-              overview && (
-                <div className="mt-4 space-y-1 text-xs text-white/50">
-
-                  <p>
-                    Pending:
-                    {" "}
-                    {overview.followUps.pending}
-                  </p>
-
-                  <p>
-                    Overdue:
-                    {" "}
-                    {overview.followUps.overdue}
-                  </p>
-
-                  <p>
-                    Assigned to Kuba:
-                    {" "}
-                    {overview.followUps.assignedToKuba}
-                  </p>
-
-                </div>
-              )}
 
           </div>
+
         ))}
+
 
       </div>
 
     </section>
+
   );
 }

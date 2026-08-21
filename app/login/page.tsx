@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { authClient } from "../../lib/auth-client";
 
 function LoginForm() {
@@ -65,10 +66,13 @@ function LoginForm() {
           {/* Kuba Logo */}
           <div className="mb-10 flex justify-center">
             <Link href="/" className="group">
-              <img
-                src="/brand/kuba-logo-3d.png"
-                alt="Kuba AI"
-                className="h-auto w-[230px] object-contain transition duration-300 group-hover:scale-[1.02]"
+              <Image
+                src="/brand/superkuba-logo.png"
+                alt="SuperKuba"
+                width={2132}
+                height={738}
+                priority
+                className="h-auto w-[210px] object-contain transition duration-300 group-hover:scale-[1.02] sm:w-[230px]"
               />
             </Link>
           </div>
@@ -80,7 +84,7 @@ function LoginForm() {
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-white/45">
-              Sign in to your Kuba AI workspace.
+              Sign in to your SuperKuba AI workspace.
             </p>
           </div>
 
@@ -173,7 +177,7 @@ function LoginForm() {
             </p>
 
             <p className="mt-3 text-xs text-white/20">
-              © {new Date().getFullYear()} Kuba AI. All rights reserved.
+              © {new Date().getFullYear()} SuperKuba AI. All rights reserved.
             </p>
           </div>
 

@@ -218,6 +218,27 @@
       "when": 1787147277580,
       "tag": "0030_regular_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1787221763094,
+      "tag": "0031_sparkling_red_shift",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1787233602133,
+      "tag": "0032_chemical_killmonger",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1787275969689,
+      "tag": "0033_minor_sally_floyd",
+      "breakpoints": true
     }
   ]
 }

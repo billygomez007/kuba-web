@@ -1,9 +1,6 @@
 (function () {
-  const script =
-    document.currentScript;
-
-  const publicKey =
-    script?.dataset.publicKey;
+  const script = document.currentScript;
+  const publicKey = script?.dataset.publicKey;
 
   if (!publicKey) {
     console.error(
@@ -12,8 +9,10 @@
     return;
   }
 
-  const button =
-    document.createElement("button");
+  const KUBA_API =
+    "https://kuba-web-woad.vercel.app";
+
+  const button = document.createElement("button");
 
   button.innerHTML = "💬";
 
@@ -36,8 +35,7 @@
 
   document.body.appendChild(button);
 
-  const box =
-    document.createElement("div");
+  const box = document.createElement("div");
 
   Object.assign(box.style, {
     position: "fixed",
@@ -47,20 +45,22 @@
     height: "420px",
     background: "#111",
     color: "white",
-    borderRadius: "20px",
-    padding: "20px",
-    display: "none",
-    zIndex: "999999",
+    borderRadius: "18px",
     boxShadow:
-      "0 20px 50px rgba(0,0,0,.35)",
-    boxSizing: "border-box",
+      "0 15px 50px rgba(0,0,0,.3)",
+    zIndex: "999999",
+    display: "none",
+    overflow: "hidden",
+    fontFamily:
+      "Arial, sans-serif",
   });
 
   box.innerHTML = `
     <div style="
-      font-weight:bold;
-      font-size:18px;
-      margin-bottom:15px;
+      padding:16px;
+      background:#06b6d4;
+      font-weight:700;
+      color:white;
     ">
       Kuba AI
     </div>
@@ -68,78 +68,102 @@
     <div
       id="kuba-messages"
       style="
-        height:320px;
-        overflow:auto;
-        margin-bottom:10px;
+        height:310px;
+        overflow-y:auto;
+        padding:14px;
       "
     ></div>
 
-    <input
-      id="kuba-input"
-      placeholder="Ask us anything..."
-      style="
-        width:100%;
-        padding:10px;
-        border-radius:10px;
-        border:none;
-        box-sizing:border-box;
-        color:#111;
-      "
-    />
+    <div style="
+      display:flex;
+      border-top:1px solid #333;
+    ">
+      <input
+        id="kuba-input"
+        type="text"
+        placeholder="Type your message..."
+        style="
+          flex:1;
+          padding:12px;
+          border:none;
+          outline:none;
+          background:#181818;
+          color:white;
+        "
+      />
+
+      <button
+        id="kuba-send"
+        style="
+          padding:12px 15px;
+          border:none;
+          background:#06b6d4;
+          color:white;
+          cursor:pointer;
+        "
+      >
+        Send
+      </button>
+    </div>
   `;
 
   document.body.appendChild(box);
 
-  button.onclick =
-    function () {
-      box.style.display =
-        box.style.display === "none"
-          ? "block"
-          : "none";
-    };
+  const messages =
+    box.querySelector("#kuba-messages");
 
   const input =
-    box.querySelector(
-      "#kuba-input"
-    );
+    box.querySelector("#kuba-input");
 
-  const messages =
-    box.querySelector(
-      "#kuba-messages"
-    );
+  const send =
+    box.querySelector("#kuba-send");
 
-  let conversationId =
-    null;
+  let conversationId = "";
 
-  function addMessage(
-    sender,
-    text
-  ) {
-    const item =
-      document.createElement("p");
+  function addMessage(sender, text) {
+    const wrapper =
+      document.createElement("div");
 
-    item.style.margin =
-      "8px 0";
+    wrapper.style.marginBottom = "12px";
 
-    const strong =
-      document.createElement("b");
+    wrapper.innerHTML = `
+      <div style="
+        font-size:11px;
+        opacity:.55;
+        margin-bottom:3px;
+      ">
+        ${sender}
+      </div>
 
-    strong.textContent =
-      sender + ":";
+      <div style="
+        background:#1d1d1d;
+        padding:10px;
+        border-radius:10px;
+        line-height:1.4;
+      ">
+        ${String(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br>")}
+      </div>
+    `;
 
-    item.appendChild(strong);
-
-    item.appendChild(
-      document.createTextNode(
-        " " + text
-      )
-    );
-
-    messages.appendChild(item);
+    messages.appendChild(wrapper);
 
     messages.scrollTop =
       messages.scrollHeight;
   }
+
+  button.addEventListener(
+    "click",
+    () => {
+      box.style.display =
+        box.style.display === "none"
+          ? "block"
+          : "none";
+    }
+  );
 
   async function sendMessage() {
     const text =
@@ -147,23 +171,26 @@
 
     if (!text) return;
 
-    addMessage(
-      "You",
-      text
-    );
+    addMessage("You", text);
 
     input.value = "";
+
+    send.disabled = true;
 
     try {
       const response =
         await fetch(
-          "/api/integrations/website-chat",
+          `${KUBA_API}/api/integrations/website-chat`,
           {
             method: "POST",
+
             headers: {
               "Content-Type":
                 "application/json",
+              Accept:
+                "application/json",
             },
+
             body:
               JSON.stringify({
                 publicKey,
@@ -173,13 +200,32 @@
           }
         );
 
-      const data =
-        await response.json();
+      const raw =
+        await response.text();
+
+      let data = null;
+
+      try {
+        data = raw
+          ? JSON.parse(raw)
+          : null;
+      } catch {
+        console.error(
+          "Kuba returned non-JSON:",
+          raw
+        );
+      }
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            "Unable to contact Kuba."
+          data?.error ||
+            `Kuba API returned HTTP ${response.status}`
+        );
+      }
+
+      if (!data) {
+        throw new Error(
+          "Kuba returned an empty response."
         );
       }
 
@@ -193,8 +239,9 @@
       addMessage(
         "Kuba",
         data.response ||
-          "I’m sorry, I couldn't respond right now."
+          "I'm sorry, I couldn't respond right now."
       );
+
     } catch (error) {
       console.error(
         "Kuba Chat error:",
@@ -203,17 +250,26 @@
 
       addMessage(
         "Kuba",
-        "Sorry, something went wrong. Please try again."
+        error instanceof Error
+          ? error.message
+          : "Sorry, something went wrong. Please try again."
       );
+
+    } finally {
+      send.disabled = false;
+      input.focus();
     }
   }
 
+  send.addEventListener(
+    "click",
+    sendMessage
+  );
+
   input.addEventListener(
-    "keypress",
-    function (event) {
-      if (
-        event.key === "Enter"
-      ) {
+    "keydown",
+    (event) => {
+      if (event.key === "Enter") {
         sendMessage();
       }
     }

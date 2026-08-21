@@ -826,10 +826,17 @@ Answer naturally, helpfully and professionally.
       error,
     );
 
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
     return NextResponse.json(
       {
         error:
           "Unable to respond.",
+        details:
+          errorMessage,
       },
       { status: 500 },
     );

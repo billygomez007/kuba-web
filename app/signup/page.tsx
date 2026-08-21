@@ -3,15 +3,13 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { authClient } from "../../lib/auth-client";
 
 export default function SignupPage() {
   const router = useRouter();
 
   const [name, setName] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [website, setWebsite] = useState("");
-  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -36,16 +34,16 @@ export default function SignupPage() {
       return;
     }
 
-    const onboardingData = {
-      businessName,
-      website,
-      phone,
-    };
-
-    sessionStorage.setItem(
-      "kuba_onboarding_data",
-      JSON.stringify(onboardingData),
-    );
+    await fetch("/api/email/welcome", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        name,
+      }),
+    });
 
     router.push("/onboarding");
     router.refresh();
@@ -56,14 +54,17 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
 
         <div className="mb-8 text-center">
-          <img
-            src="/brand/kuba-logo-3d.png"
-            alt="Kuba AI"
-            className="mx-auto w-[220px]"
+          <Image
+            src="/brand/superkuba-logo.png"
+            alt="SuperKuba"
+            width={2132}
+            height={738}
+            priority
+            className="mx-auto h-auto w-[200px] object-contain sm:w-[220px]"
           />
 
           <h1 className="mt-8 text-3xl font-bold">
-            Create your Kuba account
+            Create your SuperKuba account
           </h1>
 
           <p className="mt-3 text-white/50">
@@ -80,30 +81,6 @@ export default function SignupPage() {
               placeholder="Full name"
               value={name}
               onChange={(e)=>setName(e.target.value)}
-              className="w-full rounded-xl bg-white/10 px-4 py-3"
-            />
-
-            <input
-              required
-              placeholder="Business name"
-              value={businessName}
-              onChange={(e)=>setBusinessName(e.target.value)}
-              className="w-full rounded-xl bg-white/10 px-4 py-3"
-            />
-
-            <input
-              placeholder="Website (example.com)"
-              value={website}
-              onChange={(e)=>setWebsite(e.target.value)}
-              className="w-full rounded-xl bg-white/10 px-4 py-3"
-            />
-
-            <input
-              required
-              placeholder="Mobile number"
-              type="tel"
-              value={phone}
-              onChange={(e)=>setPhone(e.target.value)}
               className="w-full rounded-xl bg-white/10 px-4 py-3"
             />
 
@@ -136,7 +113,7 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-violet-500 py-3 font-bold"
             >
-              {loading ? "Creating account..." : "Create Kuba account"}
+              {loading ? "Creating account..." : "Create SuperKuba account"}
             </button>
 
           </form>

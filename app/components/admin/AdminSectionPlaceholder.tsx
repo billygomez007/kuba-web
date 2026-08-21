@@ -1,0 +1,3 @@
+export function AdminSectionPlaceholder({ title, description }: { title: string; description: string }) {
+  return <main className="min-h-screen bg-[#050507] p-8 text-white"><div className="max-w-4xl"><p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300/70">Super Admin</p><h1 className="mt-3 text-4xl font-black">{title}</h1><p className="mt-3 max-w-2xl text-white/50">{description}</p><div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-sm text-white/50">This protected platform section is reserved for a future approved implementation.</div></div></main>;
+}

@@ -1,16 +1,16 @@
 import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-  businessUsers,
   followUps,
   leads,
+  aiEmployees,
 } from "@/db/schema";
 
-import { sendWhatsAppMessageTool } from "@/mastra/tools/send-whatsapp-message";
+import { createPendingAIAction } from "@/lib/ai/security";
+import { authorizationErrorResponse, requirePermission } from "@/lib/auth/authorization";
+import { PERMISSIONS } from "@/lib/auth/permissions";
 
 
 export async function POST(
@@ -21,17 +21,10 @@ export async function POST(
 ) {
   try {
 
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const access = await requirePermission(
+      PERMISSIONS.FOLLOWUPS_MANAGE,
+      request,
+    );
 
 
     const { id } = await context.params;
@@ -48,32 +41,6 @@ export async function POST(
       return NextResponse.json(
         { error: "Message required" },
         { status: 400 },
-      );
-    }
-
-
-    const membership = await db
-      .select({
-        businessId:
-          businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
-
-
-    const business = membership[0];
-
-
-    if (!business) {
-      return NextResponse.json(
-        { error: "Business not found" },
-        { status: 404 },
       );
     }
 
@@ -98,7 +65,7 @@ export async function POST(
           ),
           eq(
             followUps.businessId,
-            business.businessId,
+            access.business.id,
           ),
         ),
       )
@@ -118,23 +85,44 @@ export async function POST(
       );
     }
 
+    const salesEmployee = await db
+      .select({ id: aiEmployees.id })
+      .from(aiEmployees)
+      .where(
+        and(
+          eq(aiEmployees.businessId, access.business.id),
+          eq(aiEmployees.type, "sales"),
+          eq(aiEmployees.status, "active"),
+        ),
+      )
+      .limit(1);
 
-    const response =
-      await sendWhatsAppMessageTool.execute!(
-        {
-          businessId:
-            business.businessId,
-          phone: lead.phone,
-          message,
-        },
-        {} as any,
+    if (!salesEmployee[0]) {
+      return NextResponse.json(
+        { error: "No active Sales AI employee is available." },
+        { status: 409 },
       );
+    }
 
 
-    return NextResponse.json(response);
+    const { id: approvalId } = await createPendingAIAction({
+      businessId: access.business.id,
+      employeeId: salesEmployee[0].id,
+      channel: "whatsapp",
+      recipient: lead.phone,
+      message,
+    });
+
+    return NextResponse.json({
+      success: true,
+      status: "approval_required",
+      approvalId,
+    });
 
 
   } catch (error) {
+    const authorizationResponse = authorizationErrorResponse(error);
+    if (authorizationResponse) return authorizationResponse;
 
     console.error(
       "Follow-up WhatsApp send error",

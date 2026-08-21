@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787318759736,
+      "tag": "0000_canonical_baseline",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787329758440,
+      "tag": "0001_team_and_routing_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787356800000,
+      "tag": "0002_identity_permissions_and_approvals_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787443200000,
+      "tag": "0003_hr_core_foundation",
+      "breakpoints": true
+    }
+  ]
+}

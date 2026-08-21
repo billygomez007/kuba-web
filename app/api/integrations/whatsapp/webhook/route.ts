@@ -118,10 +118,7 @@ export async function POST(request: Request) {
     const body =
       JSON.parse(rawBody);
 
-    console.log(
-      "WhatsApp webhook received:",
-      JSON.stringify(body, null, 2),
-    );
+    // Do not log the raw webhook body: it can include customer content and PII.
 
     if (body.object !== "whatsapp_business_account") {
       return NextResponse.json({ received: true });

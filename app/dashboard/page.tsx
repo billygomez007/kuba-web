@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import ActivateEmployeeButton from "../components/ActivateEmployeeButton";
 import SalesEmployeeChat from "../components/SalesEmployeeChat";
@@ -121,17 +122,20 @@ export default function DashboardPage() {
       <main className="min-h-screen bg-[#050507] text-white">
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
-            <div className="relative mx-auto h-28 w-28">
+            <div className="relative mx-auto flex h-28 w-72 items-center justify-center">
               <div className="absolute inset-0 animate-pulse rounded-[2rem] bg-cyan-400/10 blur-2xl" />
-              <img
-                src="/kuba-command-loading.png"
-                alt="Kuba AI"
-                className="relative h-28 w-28 rounded-[2rem] object-cover shadow-[0_0_45px_rgba(0,200,255,0.18)]"
+              <Image
+                src="/brand/superkuba-logo.png"
+                alt="SuperKuba"
+                width={2132}
+                height={738}
+                priority
+                className="relative h-auto w-64 object-contain drop-shadow-[0_0_28px_rgba(0,200,255,0.22)]"
               />
             </div>
 
             <p className="mt-6 text-sm font-medium tracking-wide text-white/50">
-              Loading your Kuba workspace...
+              Loading your SuperKuba workspace...
             </p>
 
             <div className="mx-auto mt-3 h-1 w-24 overflow-hidden rounded-full bg-white/10">
@@ -454,7 +458,7 @@ export default function DashboardPage() {
           <footer className="mt-14 border-t border-white/[0.06] py-8">
             <div className="flex flex-col gap-3 text-xs text-white/25 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Kuba AI · Your Business, Powered by an AI Workforce.
+                SuperKuba AI · Your Business, Powered by an AI Workforce.
               </span>
 
               <span>

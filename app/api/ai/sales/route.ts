@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { businesses, businessUsers, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
+import { buildEmployeeSkillContext } from "@/lib/ai/skill-context";
 
 export async function POST(request: Request) {
   try {
@@ -259,6 +260,11 @@ ${item.content}`,
       );
     }
 
+    const skillContext =
+      await buildEmployeeSkillContext(
+        salesEmployee.id,
+      );
+
     const prompt = `${businessContext}
 
 ${workQueueContext}
@@ -266,6 +272,10 @@ ${workQueueContext}
 SALES KNOWLEDGE
 
 ${knowledgeContext}
+
+EMPLOYEE SKILLS
+
+${skillContext}
 
 KNOWLEDGE RULES
 

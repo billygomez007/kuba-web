@@ -9,10 +9,12 @@ type Message = {
 
 type Props = {
   employeeId: string;
+  initialPrompt?: string;
 };
 
 export default function SalesEmployeeChat({
   employeeId,
+  initialPrompt,
 }: Props) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,18 +78,32 @@ export default function SalesEmployeeChat({
     loadConversation();
   }, [employeeId]);
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
+  useEffect(() => {
 
-    const trimmedMessage = message.trim();
+    if (!initialPrompt) {
+      return;
+    }
+
+    sendMessage(initialPrompt);
+
+  }, [initialPrompt]);
+
+
+  async function sendMessage(
+    text: string,
+  ) {
+
+    const trimmedMessage =
+      text.trim();
+
 
     if (!trimmedMessage || loading) {
       return;
     }
 
+
     setMessage("");
+
 
     setMessages((current) => [
       ...current,
@@ -97,36 +113,51 @@ export default function SalesEmployeeChat({
       },
     ]);
 
+
     setLoading(true);
 
-    try {
-      const response = await fetch("/api/ai/sales", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: trimmedMessage,
-          employeeId,
-        }),
-      });
 
-      const data = await response.json();
+    try {
+
+      const response =
+        await fetch("/api/ai/sales", {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            message:
+              trimmedMessage,
+            employeeId,
+          }),
+        });
+
+
+      const data =
+        await response.json();
+
 
       if (!response.ok) {
         throw new Error(
-          data.error || "Kuba Sales could not respond.",
+          data.error ||
+          "Kuba Sales could not respond.",
         );
       }
+
 
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
-          content: data.response,
+          content:
+            data.response,
         },
       ]);
-    } catch (error) {
+
+
+    } catch(error) {
+
       setMessages((current) => [
         ...current,
         {
@@ -137,10 +168,26 @@ export default function SalesEmployeeChat({
               : "Something went wrong.",
         },
       ]);
+
     } finally {
+
       setLoading(false);
+
     }
+
   }
+
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+
+    event.preventDefault();
+
+    await sendMessage(message);
+
+  }
+
 
   return (
     <div className="flex h-[560px] flex-col rounded-3xl border border-white/10 bg-white/[0.025] overflow-hidden">

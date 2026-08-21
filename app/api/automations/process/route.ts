@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { and, eq, lte } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -29,10 +30,10 @@ function isAuthorized(request: Request) {
       "x-automation-secret",
     );
 
-  return (
-    providedSecret !== null &&
-    providedSecret === configuredSecret
-  );
+  if (!providedSecret) return false;
+  const expected = Buffer.from(configuredSecret);
+  const received = Buffer.from(providedSecret);
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
 
@@ -157,10 +158,7 @@ export async function POST(
           status:
             "failed",
 
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error),
+          error: "Automation trigger failed.",
         });
       }
     }

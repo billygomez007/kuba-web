@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
 
+import { db } from "@/db";
+import { users } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import {
   getBusinessMembership,
@@ -20,11 +23,28 @@ export async function GET() {
       );
     }
 
-    const membership = await getBusinessMembership(
-      session.user.id,
-    );
+    const [membership, platformUser] = await Promise.all([
+      getBusinessMembership(session.user.id),
+      db.select({ platformRole: users.platformRole })
+        .from(users)
+        .where(eq(users.id, session.user.id))
+        .limit(1),
+    ]);
 
     if (!membership) {
+      if (platformUser[0]?.platformRole === "super_admin") {
+        return NextResponse.json({
+          success: true,
+          user: {
+            id: session.user.id,
+            name: session.user.name,
+            email: session.user.email,
+            platformRole: "super_admin",
+          },
+          membership: null,
+        });
+      }
+
       return NextResponse.json(
         { error: "Business access denied." },
         { status: 403 },
@@ -68,6 +88,7 @@ export async function GET() {
         id: session.user.id,
         name: session.user.name,
         email: session.user.email,
+        platformRole: platformUser[0]?.platformRole ?? "user",
       },
       membership: {
         businessId: membership.businessId,

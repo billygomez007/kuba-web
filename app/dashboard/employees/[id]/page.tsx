@@ -17,6 +17,7 @@ import ReceptionistWorkspace from "../../../components/employees/ReceptionistWor
 import CustomerSupportWorkspace from "../../../components/employees/CustomerSupportWorkspace";
 import GeneralManagerWorkspace from "../../../components/employees/GeneralManagerWorkspace";
 import AIEmployeeHeader from "../../../components/employees/AIEmployeeHeader";
+import EmployeeSkills from "../../../components/employees/EmployeeSkills";
 
 type Props = {
   params: Promise<{
@@ -241,6 +242,11 @@ export default async function EmployeeWorkspace({
 
           </div>
         </section>
+
+
+        <EmployeeSkills
+          employeeId={employee.id}
+        />
 
 
         <div className="mt-8">
