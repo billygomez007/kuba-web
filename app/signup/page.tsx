@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { authClient } from "../../lib/auth-client";
 
 export default function SignupPage() {
@@ -56,14 +57,17 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
 
         <div className="mb-8 text-center">
-          <img
-            src="/brand/kuba-logo-3d.png"
-            alt="Kuba AI"
-            className="mx-auto w-[220px]"
+          <Image
+            src="/brand/superkuba-logo.png"
+            alt="SuperKuba"
+            width={2131}
+            height={738}
+            priority
+            className="mx-auto h-auto w-[200px] object-contain sm:w-[220px]"
           />
 
           <h1 className="mt-8 text-3xl font-bold">
-            Create your Kuba account
+            Create your SuperKuba account
           </h1>
 
           <p className="mt-3 text-white/50">
@@ -136,7 +140,7 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-violet-500 py-3 font-bold"
             >
-              {loading ? "Creating account..." : "Create Kuba account"}
+              {loading ? "Creating account..." : "Create SuperKuba account"}
             </button>
 
           </form>

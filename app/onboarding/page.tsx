@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 const africanCountries = [
   "Algeria",
@@ -185,10 +186,13 @@ export default function OnboardingPage() {
           {/* Kuba Brand */}
           <div className="mb-10 flex justify-center">
             <Link href="/" className="group">
-              <img
-                src="/brand/kuba-logo-3d.png"
-                alt="Kuba AI"
-                className="h-auto w-[210px] object-contain transition duration-300 group-hover:scale-[1.02]"
+              <Image
+                src="/brand/superkuba-logo.png"
+                alt="SuperKuba"
+                width={2131}
+                height={738}
+                priority
+                className="h-auto w-[195px] object-contain transition duration-300 group-hover:scale-[1.02] sm:w-[215px]"
               />
             </Link>
           </div>
@@ -196,7 +200,7 @@ export default function OnboardingPage() {
           {/* Introduction */}
           <div className="mb-9 text-center">
             <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-300/70">
-              Welcome to Kuba
+              Welcome to SuperKuba
             </p>
 
             <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
@@ -441,7 +445,7 @@ export default function OnboardingPage() {
               >
                 {loading
                   ? "Setting up your business..."
-                  : "Continue to Kuba"}
+                  : "Continue to SuperKuba"}
               </button>
             </form>
           </div>

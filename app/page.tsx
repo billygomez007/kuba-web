@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import SuperKubaAIWorkforceShowcase from "./components/SuperKubaAIWorkforceShowcase";
+import SuperKubaAnalyticsShowcase from "./components/SuperKubaAnalyticsShowcase";
+import SuperKubaAutomationShowcase from "./components/SuperKubaAutomationShowcase";
+import SuperKubaBusinessOperationsShowcase from "./components/SuperKubaBusinessOperationsShowcase";
+import SuperKubaCustomerOperationsShowcase from "./components/SuperKubaCustomerOperationsShowcase";
+import SuperKubaDashboardShowcase from "./components/SuperKubaDashboardShowcase";
 import {
   ArrowRight,
   Bot,
@@ -115,10 +121,13 @@ export default function KubaWebsite() {
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/[0.06] bg-[#060609]/75 backdrop-blur-2xl">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
           <Link href="/" className="flex items-center">
-  <img
-    src="/brand/kuba-logo-3d.png"
-    alt="Kuba AI"
-    className="h-auto w-[150px] sm:w-[175px]"
+  <Image
+    src="/brand/superkuba-logo.png"
+    alt="SuperKuba"
+    width={2131}
+    height={738}
+    priority
+    className="h-auto w-[150px] object-contain sm:w-[175px]"
   />
 </Link>
 
@@ -349,6 +358,13 @@ export default function KubaWebsite() {
           </div>
         </div>
       </section>
+
+      <SuperKubaDashboardShowcase />
+      <SuperKubaAIWorkforceShowcase />
+      <SuperKubaCustomerOperationsShowcase />
+      <SuperKubaAnalyticsShowcase />
+      <SuperKubaAutomationShowcase />
+      <SuperKubaBusinessOperationsShowcase />
 
       {/* =========================================================
           INTRO
@@ -635,10 +651,12 @@ AI workforce solutions built around how your industry operates.
             {/* Brand */}
             <div className="md:col-span-2">
               <Link href="/" className="flex items-center">
-  <img
-    src="/brand/kuba-logo-3d.png"
-    alt="Kuba AI"
-    className="h-auto w-[170px]"
+  <Image
+    src="/brand/superkuba-logo.png"
+    alt="SuperKuba"
+    width={2131}
+    height={738}
+    className="h-auto w-[170px] object-contain"
   />
 </Link>
 

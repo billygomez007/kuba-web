@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { authClient } from "../../lib/auth-client";
 
 function LoginForm() {
@@ -65,10 +66,13 @@ function LoginForm() {
           {/* Kuba Logo */}
           <div className="mb-10 flex justify-center">
             <Link href="/" className="group">
-              <img
-                src="/brand/kuba-logo-3d.png"
-                alt="Kuba AI"
-                className="h-auto w-[230px] object-contain transition duration-300 group-hover:scale-[1.02]"
+              <Image
+                src="/brand/superkuba-logo.png"
+                alt="SuperKuba"
+                width={2131}
+                height={738}
+                priority
+                className="h-auto w-[210px] object-contain transition duration-300 group-hover:scale-[1.02] sm:w-[230px]"
               />
             </Link>
           </div>
@@ -80,7 +84,7 @@ function LoginForm() {
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-white/45">
-              Sign in to your Kuba AI workspace.
+              Sign in to your SuperKuba AI workspace.
             </p>
           </div>
 
@@ -144,13 +148,13 @@ function LoginForm() {
                 disabled={loading}
                 className="w-full rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:scale-[1.01] hover:shadow-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Signing in..." : "Sign in to Kuba"}
+                {loading ? "Signing in..." : "Sign in to SuperKuba"}
               </button>
             </form>
 
             {/* Signup */}
             <div className="mt-7 border-t border-white/[0.07] pt-6 text-center text-sm text-white/40">
-              Don&apos;t have a Kuba account?{" "}
+              Don&apos;t have a SuperKuba account?{" "}
               <Link
                 href={
                   invitationToken
@@ -173,7 +177,7 @@ function LoginForm() {
             </p>
 
             <p className="mt-3 text-xs text-white/20">
-              © {new Date().getFullYear()} Kuba AI. All rights reserved.
+              © {new Date().getFullYear()} SuperKuba AI. All rights reserved.
             </p>
           </div>
 
@@ -186,7 +190,7 @@ function LoginLoading() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#050507] text-white">
       <p className="text-white/60">
-        Loading Kuba...
+        Loading SuperKuba...
       </p>
     </main>
   );
