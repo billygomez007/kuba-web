@@ -91,7 +91,7 @@ export async function GET(
       );
 
 
-  const customerFollowUps: any[] =
+  const customerFollowUps: never[] =
     [];
 
 

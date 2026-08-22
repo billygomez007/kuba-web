@@ -3,11 +3,18 @@
 import { useEffect, useState } from "react";
 import EmptyState from "../../components/EmptyState";
 
+type PendingAction = {
+  id: string;
+  channel: string;
+  message: string;
+  recipient: string;
+};
+
 
 export default function ActionsPage(){
 
   const [actions,setActions] =
-    useState<any[]>([]);
+    useState<PendingAction[]>([]);
 
 
   useEffect(()=>{

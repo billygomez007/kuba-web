@@ -10,6 +10,24 @@ import {
   businessUsers,
 } from "@/db/schema";
 
+type AutomationBody = {
+  name?: unknown;
+  description?: unknown;
+  trigger?: unknown;
+  conditions?: unknown;
+  actions?: unknown;
+  status?: unknown;
+};
+
+function isObjectRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null
+  );
+}
+
 
 async function getBusinessId() {
   const session =
@@ -47,26 +65,31 @@ async function getBusinessId() {
 }
 
 
-function validateAutomation(body: any) {
+function validateAutomation(body: unknown) {
+  const payload: AutomationBody =
+    isObjectRecord(body)
+      ? body
+      : {};
+
   const name =
-    String(body.name || "").trim();
+    String(payload.name || "").trim();
 
   const description =
-    body.description
-      ? String(body.description).trim()
+    payload.description
+      ? String(payload.description).trim()
       : null;
 
   const trigger =
-    String(body.trigger || "").trim();
+    String(payload.trigger || "").trim();
 
   const conditions =
-    body.conditions ?? [];
+    payload.conditions ?? [];
 
   const actions =
-    body.actions ?? [];
+    payload.actions ?? [];
 
   const status =
-    body.status === "paused"
+    payload.status === "paused"
       ? "paused"
       : "active";
 

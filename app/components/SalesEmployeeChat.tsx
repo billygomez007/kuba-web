@@ -7,6 +7,11 @@ type Message = {
   content: string;
 };
 
+type StoredConversationMessage = {
+  direction: string;
+  content: string;
+};
+
 type Props = {
   employeeId: string;
 };
@@ -54,7 +59,7 @@ export default function SalesEmployeeChat({
 
         if (data.messages?.length) {
           setMessages(
-            data.messages.map((item: any) => ({
+            data.messages.map((item: StoredConversationMessage) => ({
               role:
                 item.direction === "inbound"
                   ? "user"

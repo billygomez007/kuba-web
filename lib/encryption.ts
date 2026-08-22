@@ -1,14 +1,26 @@
 import crypto from "crypto";
 
-const key = crypto
-  .createHash("sha256")
-  .update(process.env.ENCRYPTION_KEY || "kuba-secret-key")
-  .digest();
-
 const algorithm = "aes-256-cbc";
+
+function getEncryptionKey() {
+  const encryptionKey = process.env.ENCRYPTION_KEY?.trim();
+
+  if (!encryptionKey) {
+    throw new Error(
+      "ENCRYPTION_KEY must be configured before using application encryption.",
+    );
+  }
+
+  return crypto
+    .createHash("sha256")
+    .update(encryptionKey)
+    .digest();
+}
 
 export function encrypt(text: string) {
   const iv = crypto.randomBytes(16);
+
+  const key = getEncryptionKey();
 
   const cipher = crypto.createCipheriv(
     algorithm,
@@ -26,6 +38,8 @@ export function encrypt(text: string) {
 
 export function decrypt(data: string) {
   const [ivHex, encryptedHex] = data.split(":");
+
+  const key = getEncryptionKey();
 
   const decipher = crypto.createDecipheriv(
     algorithm,

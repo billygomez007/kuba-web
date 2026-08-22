@@ -40,7 +40,37 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
-    loadCustomers();
+    let cancelled = false;
+
+    async function loadInitialCustomers() {
+      try {
+        const response = await fetch("/api/customers", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to load customers.");
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setCustomers(data.customers ?? []);
+        }
+      } catch (error) {
+        console.error("Customer loading error:", error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialCustomers();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredCustomers = useMemo(() => {

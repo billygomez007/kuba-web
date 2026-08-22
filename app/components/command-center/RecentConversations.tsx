@@ -3,8 +3,14 @@
 import { useEffect, useState } from "react";
 import EmptyState from "../EmptyState";
 
+type ConversationPreview = {
+  id: string;
+  senderType: string;
+  content: string;
+};
+
 export default function RecentConversations() {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ConversationPreview[]>([]);
 
   useEffect(() => {
     fetch("/api/ai/conversations", {

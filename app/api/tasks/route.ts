@@ -307,7 +307,11 @@ export async function PATCH(
       );
     }
 
-    const updates: Record<string, unknown> = {
+    type TaskUpdates = Partial<
+      typeof tasks.$inferInsert
+    >;
+
+    const updates: TaskUpdates = {
       updatedAt: new Date(),
     };
 
@@ -426,7 +430,7 @@ export async function PATCH(
 
     await db
       .update(tasks)
-      .set(updates as any)
+      .set(updates)
       .where(
         and(
           eq(tasks.id, taskId),

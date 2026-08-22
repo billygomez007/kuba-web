@@ -91,7 +91,46 @@ export default function TasksPage() {
   }
 
   useEffect(() => {
-    loadTasks();
+    let cancelled = false;
+
+    async function loadInitialTasks() {
+      try {
+        const response =
+          await fetch("/api/tasks");
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to load tasks.",
+          );
+        }
+
+        if (!cancelled) {
+          setTasks(data.tasks || []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load tasks.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialTasks();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function createTask(

@@ -378,7 +378,115 @@ export default function TeamPage() {
   }
 
   useEffect(() => {
-    loadTeam();
+    let cancelled = false;
+
+    async function loadInitialTeam() {
+      try {
+        const [
+          membersResponse,
+          invitationsResponse,
+          teamsResponse,
+          teamMembersResponse,
+          teamAIResponse,
+        ] = await Promise.all([
+          fetch("/api/team/members"),
+          fetch("/api/team/invitations"),
+          fetch("/api/teams"),
+          fetch("/api/teams/members"),
+          fetch("/api/teams/ai-employees"),
+        ]);
+
+        const membersData = await membersResponse.json();
+        const invitationsData = await invitationsResponse.json();
+
+        if (!membersResponse.ok) {
+          throw new Error(
+            membersData.error ||
+            "Unable to load team.",
+          );
+        }
+
+        const teamsData = await teamsResponse.json();
+        const teamMembersData = await teamMembersResponse.json();
+        const teamAIData = await teamAIResponse.json();
+        const employeesResponse = await fetch("/api/ai-employees");
+        const employeesData = await employeesResponse.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        setMembers(membersData.members || []);
+
+        if (teamsResponse.ok) {
+          setTeams(teamsData.teams || []);
+        }
+
+        if (teamMembersResponse.ok) {
+          const groupedMembers: Record<string, string[]> = {};
+
+          for (const item of teamMembersData.memberships || []) {
+            if (!groupedMembers[item.teamId]) {
+              groupedMembers[item.teamId] = [];
+            }
+
+            groupedMembers[item.teamId].push(
+              item.businessUserId,
+            );
+          }
+
+          setTeamMembers(groupedMembers);
+        }
+
+        if (teamAIResponse.ok) {
+          const groupedAI: Record<string, string[]> = {};
+
+          for (const item of teamAIData.assignments || []) {
+            if (!groupedAI[item.teamId]) {
+              groupedAI[item.teamId] = [];
+            }
+
+            groupedAI[item.teamId].push(
+              item.aiEmployeeId,
+            );
+          }
+
+          setTeamAiEmployees(groupedAI);
+        }
+
+        if (employeesResponse.ok) {
+          setAiEmployees(
+            employeesData.employees || [],
+          );
+        }
+
+        if (invitationsResponse.ok) {
+          setInvitations(
+            invitationsData.invitations || [],
+          );
+        } else {
+          setInvitations([]);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load team.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialTeam();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function toggleTeamAI(

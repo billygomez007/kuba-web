@@ -31,6 +31,7 @@ export default function FollowUpsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [currentTime] = useState(() => Date.now());
 
   async function loadData() {
     try {
@@ -60,7 +61,44 @@ export default function FollowUpsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+
+    async function loadInitialData() {
+      try {
+        const [followUpsResponse, leadsResponse] = await Promise.all([
+          fetch("/api/follow-ups", {
+            cache: "no-store",
+          }),
+          fetch("/api/leads", {
+            cache: "no-store",
+          }),
+        ]);
+
+        if (!followUpsResponse.ok || !leadsResponse.ok) {
+          throw new Error("Unable to load sales workflow.");
+        }
+
+        const followUpsData = await followUpsResponse.json();
+        const leadsData = await leadsResponse.json();
+
+        if (!cancelled) {
+          setLeads(leadsData.leads ?? []);
+          setItems(followUpsData.followUps ?? []);
+        }
+      } catch (error) {
+        console.error("Follow-up loading error:", error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredItems = useMemo(() => {
@@ -100,7 +138,7 @@ export default function FollowUpsPage() {
 
     const time = new Date(followUp.dueAt).getTime();
 
-    return !Number.isNaN(time) && time < Date.now();
+    return !Number.isNaN(time) && time < currentTime;
   });
 
   return (
@@ -199,6 +237,7 @@ export default function FollowUpsPage() {
                   <FollowUpCard
                     key={item.followUp.id}
                     item={item}
+                    currentTime={currentTime}
                     onStatusChange={async (id, status) => {
                       try {
                         const response = await fetch(
@@ -304,9 +343,11 @@ function Stat({
 
 function FollowUpCard({
   item,
+  currentTime,
   onStatusChange,
 }: {
   item: FollowUpResult;
+  currentTime: number;
   onStatusChange: (id: string, status: string) => void;
 }) {
   const { followUp, lead } = item;
@@ -316,7 +357,7 @@ function FollowUpCard({
   const isOverdue =
     followUp.status !== "completed" &&
     !Number.isNaN(date.getTime()) &&
-    date.getTime() < Date.now();
+    date.getTime() < currentTime;
 
   return (
     <div className="flex flex-col justify-between gap-5 p-6 transition hover:bg-white/[0.02] lg:flex-row lg:items-center">

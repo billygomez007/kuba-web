@@ -197,7 +197,7 @@ export default function CustomerProfilePage({
             </p>
 
             <p className="mt-2 text-sm leading-6 text-white/30">
-              This customer is part of your business's shared Kuba
+              This customer is part of your business&apos;s shared Kuba
               customer intelligence.
             </p>
           </div>
@@ -240,7 +240,7 @@ export default function CustomerProfilePage({
             </h2>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/35">
-              The goal is simple: Kuba's AI employees should understand the
+              The goal is simple: Kuba&apos;s AI employees should understand the
               same customer context instead of operating as isolated tools.
               That means less repetition for your team and a much more
               intelligent customer experience.
