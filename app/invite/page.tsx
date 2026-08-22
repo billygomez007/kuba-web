@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
 
 function InviteForm() {
@@ -112,18 +113,23 @@ function InviteForm() {
       <div className="w-full max-w-md">
 
         <div className="mb-8 text-center">
-          <img
-            src="/brand/kuba-logo-3d.png"
-            alt="Kuba AI"
-            className="mx-auto w-[190px]"
-          />
+          <Link href="/" aria-label="SuperKuba homepage">
+            <Image
+              src="/brand/superkuba-logo.png"
+              alt="SuperKuba"
+              width={2131}
+              height={738}
+              priority
+              className="mx-auto h-auto w-[180px] object-contain sm:w-[200px]"
+            />
+          </Link>
 
           <h1 className="mt-8 text-3xl font-bold">
             Join your team
           </h1>
 
           <p className="mt-3 text-white/50">
-            Create your Kuba account and join the
+            Create your SuperKuba account and join the
             business you were invited to.
           </p>
         </div>
@@ -221,7 +227,7 @@ function InviteForm() {
           )}
 
           <div className="mt-6 text-center text-sm text-white/40">
-            Already have a Kuba account?{" "}
+            Already have a SuperKuba account?{" "}
             <Link
               href="/login"
               className="text-cyan-300"

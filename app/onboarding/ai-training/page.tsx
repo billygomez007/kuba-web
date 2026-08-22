@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import BackNavigation from "../../components/BackNavigation";
 
 const employees = [
   {
@@ -119,6 +120,7 @@ export default function AITrainingPage() {
   return (
     <main className="min-h-screen bg-[#050507] px-6 py-10 text-white">
       <div className="mx-auto max-w-4xl">
+        <BackNavigation className="mb-8" label="Back" />
 
         <h1 className="text-center text-4xl font-black">
           Choose Your AI Workforce

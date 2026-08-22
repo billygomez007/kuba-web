@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -152,10 +153,13 @@ export default function DashboardLayout({
         {/* Logo */}
         <div className="flex h-20 items-center border-b border-white/[0.07] px-6">
           <Link href="/dashboard" className="flex items-center">
-            <img
-              src="/brand/kuba-logo-3d.png"
-              alt="Kuba AI"
-              className="h-auto w-[145px]"
+            <Image
+              src="/brand/superkuba-logo.png"
+              alt="SuperKuba"
+              width={2131}
+              height={738}
+              priority
+              className="h-auto w-[145px] object-contain"
             />
           </Link>
         </div>
@@ -257,10 +261,13 @@ export default function DashboardLayout({
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#050507]/90 backdrop-blur-xl lg:hidden">
         <div className="flex h-16 items-center justify-between px-5">
           <Link href="/dashboard">
-            <img
-              src="/brand/kuba-logo-3d.png"
-              alt="Kuba AI"
-              className="h-auto w-[125px]"
+            <Image
+              src="/brand/superkuba-logo.png"
+              alt="SuperKuba"
+              width={2131}
+              height={738}
+              priority
+              className="h-auto w-[125px] object-contain"
             />
           </Link>
 

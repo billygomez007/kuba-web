@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import EmptyState from "../../components/EmptyState";
 
 
 type KnowledgeForm = {
@@ -861,23 +862,13 @@ export default function KnowledgePage() {
           <div className="mt-8">
 
             {sources.length === 0 ? (
-
-              <div className="rounded-3xl border border-dashed border-white/10 p-10 text-center">
-
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03]">
-                  ✦
-                </div>
-
-                <p className="mt-4 text-sm font-bold">
-                  No knowledge sources yet
-                </p>
-
-                <p className="mt-2 text-xs leading-5 text-white/25">
-                  Upload your first business document
-                  and it will appear here.
-                </p>
-
-              </div>
+              <EmptyState
+                icon="✦"
+                title="Teach your AI workforce about your business"
+                description="Add trusted documents so your AI employees can answer accurately using your products, policies, and operating knowledge."
+                actionLabel="Add Knowledge"
+                onAction={() => fileInputRef.current?.click()}
+              />
 
             ) : (
 

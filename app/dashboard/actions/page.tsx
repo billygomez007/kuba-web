@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import EmptyState from "../../components/EmptyState";
 
 
 export default function ActionsPage(){
@@ -139,9 +140,13 @@ export default function ActionsPage(){
 
         {actions.length === 0 && (
 
-          <p className="text-white/40">
-            No pending actions.
-          </p>
+          <EmptyState
+            icon="✓"
+            title="You’re in control of sensitive AI actions"
+            description="When an AI employee needs permission to send a message or take an important action, it will appear here for your review."
+            actionLabel="View AI Workforce"
+            actionHref="/dashboard/workforce"
+          />
 
         )}
 

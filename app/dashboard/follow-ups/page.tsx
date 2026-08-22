@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import EmptyState from "../../components/EmptyState";
 
 type Lead = {
   id: string;
@@ -182,27 +183,16 @@ export default function FollowUpsPage() {
                 Loading follow-ups...
               </div>
             ) : filteredItems.length === 0 ? (
-              <div className="p-14 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-xl">
-                  ✓
-                </div>
-
-                <h3 className="mt-5 text-lg font-bold">
-                  No follow-ups yet
-                </h3>
-
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/30">
-                  Create a follow-up so Kuba knows what needs to happen next.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => setShowForm(true)}
-                  className="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
-                >
-                  Create follow-up
-                </button>
-              </div>
+              <EmptyState
+                icon="↻"
+                title="Never let a promising customer go cold"
+                description="Schedule the next touchpoint or let your AI Sales Assistant keep every lead moving at the right time."
+                actionLabel="Create Follow-up"
+                onAction={() => setShowForm(true)}
+                secondaryLabel="View Sales"
+                secondaryHref="/dashboard/sales"
+                className="m-5"
+              />
             ) : (
               <div className="divide-y divide-white/[0.06]">
                 {filteredItems.map((item) => (
