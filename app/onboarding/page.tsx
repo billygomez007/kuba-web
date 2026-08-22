@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import BackNavigation from "../components/BackNavigation";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -62,6 +63,7 @@ export default function OnboardingPage() {
 
       <div className="relative min-h-screen px-6 py-10 sm:py-14">
         <div className="mx-auto w-full max-w-2xl">
+          <BackNavigation className="mb-8" label="Back to SuperKuba" />
 
           {/* Kuba Brand */}
           <div className="mb-10 flex justify-center">

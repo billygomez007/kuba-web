@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { authClient } from "../../lib/auth-client";
+import BackNavigation from "../components/BackNavigation";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -52,16 +53,19 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen bg-[#050507] text-white flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
+        <BackNavigation className="mb-8" label="Back to SuperKuba" />
 
         <div className="mb-8 text-center">
-          <Image
-            src="/brand/superkuba-logo.png"
-            alt="SuperKuba"
-            width={2131}
-            height={738}
-            priority
-            className="mx-auto h-auto w-[200px] object-contain sm:w-[220px]"
-          />
+          <Link href="/" aria-label="SuperKuba homepage">
+            <Image
+              src="/brand/superkuba-logo.png"
+              alt="SuperKuba"
+              width={2131}
+              height={738}
+              priority
+              className="mx-auto h-auto w-[200px] object-contain sm:w-[220px]"
+            />
+          </Link>
 
           <h1 className="mt-8 text-3xl font-bold">
             Create your SuperKuba account

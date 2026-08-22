@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { authClient } from "../../lib/auth-client";
+import BackNavigation from "../components/BackNavigation";
 
 function LoginForm() {
   const router = useRouter();
@@ -62,6 +63,7 @@ function LoginForm() {
 
       <div className="relative flex min-h-screen items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
+          <BackNavigation className="mb-8" label="Back to SuperKuba" />
 
           {/* Kuba Logo */}
           <div className="mb-10 flex justify-center">

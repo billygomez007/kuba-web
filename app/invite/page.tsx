@@ -113,14 +113,16 @@ function InviteForm() {
       <div className="w-full max-w-md">
 
         <div className="mb-8 text-center">
-          <Image
-            src="/brand/superkuba-logo.png"
-            alt="SuperKuba"
-            width={2131}
-            height={738}
-            priority
-            className="mx-auto h-auto w-[180px] object-contain sm:w-[200px]"
-          />
+          <Link href="/" aria-label="SuperKuba homepage">
+            <Image
+              src="/brand/superkuba-logo.png"
+              alt="SuperKuba"
+              width={2131}
+              height={738}
+              priority
+              className="mx-auto h-auto w-[180px] object-contain sm:w-[200px]"
+            />
+          </Link>
 
           <h1 className="mt-8 text-3xl font-bold">
             Join your team

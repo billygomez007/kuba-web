@@ -7,6 +7,8 @@ import SuperKubaAutomationShowcase from "../components/SuperKubaAutomationShowca
 import SuperKubaBusinessOperationsShowcase from "../components/SuperKubaBusinessOperationsShowcase";
 import SuperKubaCustomerOperationsShowcase from "../components/SuperKubaCustomerOperationsShowcase";
 import SuperKubaDashboardShowcase from "../components/SuperKubaDashboardShowcase";
+import MarketingHeader from "../components/MarketingHeader";
+import BackNavigation from "../components/BackNavigation";
 import {
   ArrowRight,
   Bot,
@@ -63,9 +65,13 @@ export default function ProductsPage() {
   return (
 
     <main className="min-h-screen bg-[#060609] text-white">
+      <MarketingHeader />
+      <div className="mx-auto max-w-7xl px-6 pt-28 lg:px-8">
+        <BackNavigation label="Back to SuperKuba" />
+      </div>
 
 
-      <section className="px-6 pb-20 pt-32 lg:px-8">
+      <section className="px-6 pb-20 pt-12 lg:px-8">
 
         <div className="mx-auto max-w-7xl text-center">
 
@@ -116,6 +122,7 @@ export default function ProductsPage() {
 
               <div
                 key={product.title}
+                id={product.title === "Integrations" ? "integrations" : undefined}
                 className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 transition hover:-translate-y-1 hover:border-white/20"
               >
 
@@ -152,15 +159,15 @@ export default function ProductsPage() {
 
       </section>
 
-      <SuperKubaAIWorkforceShowcase className="border-b-0" />
+      <div id="ai-workforce"><SuperKubaAIWorkforceShowcase className="border-b-0" /></div>
 
-      <SuperKubaCustomerOperationsShowcase className="border-b-0" />
+      <div id="customer-operations"><SuperKubaCustomerOperationsShowcase className="border-b-0" /></div>
 
-      <SuperKubaAnalyticsShowcase className="border-b-0" />
+      <div id="analytics"><SuperKubaAnalyticsShowcase className="border-b-0" /></div>
 
-      <SuperKubaAutomationShowcase className="border-b-0" />
+      <div id="automation"><SuperKubaAutomationShowcase className="border-b-0" /></div>
 
-      <SuperKubaBusinessOperationsShowcase className="border-b-0" />
+      <div id="business-operations"><SuperKubaBusinessOperationsShowcase className="border-b-0" /></div>
 
 
     </main>
