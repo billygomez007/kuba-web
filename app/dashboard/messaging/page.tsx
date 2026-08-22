@@ -2,10 +2,54 @@
 
 import { useEffect, useState } from "react";
 
+type Conversation = {
+  id: string;
+  customerId: string | null;
+  customerName: string | null;
+  integrationId: string;
+  status: string;
+  assignedEmployeeId: string | null;
+  aiMode?: string | null;
+};
+
+type ConversationMessage = {
+  id: string;
+  direction: string;
+  senderType: string;
+  content: string;
+  createdAt?: string | number | Date | null;
+};
+
+type EmployeeOption = {
+  id: string;
+  name: string;
+};
+
+type CustomerProfile = {
+  customer?: {
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+  } | null;
+  conversations?: unknown[];
+  leads?: Array<{ id: string }>;
+  followUps?: unknown[];
+};
+
+type CustomerTag = {
+  id: string;
+  tag: string;
+};
+
+type LeadScore = {
+  score: number;
+  category: string;
+};
+
 
 function ChannelIcon({ channel }: { channel:string }) {
 
-  const icons:any = {
+  const icons: Record<string, string> = {
     whatsapp:"🟢",
     facebook:"🔵",
     instagram:"🟣",
@@ -22,19 +66,19 @@ function ChannelIcon({ channel }: { channel:string }) {
 export default function MessagingPage() {
 
   const [conversations,setConversations] =
-    useState<any[]>([]);
+    useState<Conversation[]>([]);
 
   const [selected,setSelected] =
-    useState<any>(null);
+    useState<Conversation | null>(null);
 
   const [messages,setMessages] =
-    useState<any[]>([]);
+    useState<ConversationMessage[]>([]);
 
   const [text,setText] =
     useState("");
 
   const [employees,setEmployees] =
-    useState<any[]>([]);
+    useState<EmployeeOption[]>([]);
 
   const [search,setSearch] =
     useState("");
@@ -43,7 +87,7 @@ export default function MessagingPage() {
     useState("all");
 
   const [customerProfile,setCustomerProfile] =
-    useState<any>(null);
+    useState<CustomerProfile | null>(null);
 
   const [summary,setSummary] =
     useState("");
@@ -52,13 +96,13 @@ export default function MessagingPage() {
     useState(false);
 
   const [customerTags,setCustomerTags] =
-    useState<any[]>([]);
+    useState<CustomerTag[]>([]);
 
   const [newTag,setNewTag] =
     useState("");
 
   const [leadScore,setLeadScore] =
-    useState<any>(null);
+    useState<LeadScore | null>(null);
 
 
   useEffect(()=>{
@@ -84,7 +128,7 @@ export default function MessagingPage() {
 
 
 
-  async function openConversation(item:any){
+  async function openConversation(item: Conversation){
 
     setSelected(item);
 

@@ -677,7 +677,7 @@ export default function SalesWorkspace({
                     <div className="mt-4 rounded-xl bg-white/[0.04] p-3">
 
                       <p className="text-xs font-bold uppercase text-white/40">
-                        Kuba's Recommendation
+                        Kuba&apos;s Recommendation
                       </p>
 
                       <div className="mt-3 space-y-3 text-sm text-white/80">

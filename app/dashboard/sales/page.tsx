@@ -63,7 +63,46 @@ export default function SalesPage() {
   }
 
   useEffect(() => {
-    loadSales();
+    let cancelled = false;
+
+    async function loadInitialSales() {
+      try {
+        const response = await fetch("/api/leads");
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error || "Unable to load sales data.",
+          );
+        }
+
+        if (!cancelled) {
+          setData({
+            leads: result.leads || [],
+            followUps: result.followUps || [],
+            activities: result.activities || [],
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load sales data.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialSales();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

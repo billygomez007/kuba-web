@@ -23,6 +23,13 @@ type EmployeeDefinition = {
   icon: string;
 };
 
+type Activity = {
+  id: string;
+  title: string;
+  description: string | null;
+  type: string;
+};
+
 const employeeLibrary: EmployeeDefinition[] = [
   {
     name: "Kuba General Manager",
@@ -123,7 +130,7 @@ export default function WorkforcePage() {
   const [loading, setLoading] = useState(true);
 
   const [activities,setActivities] =
-    useState<any[]>([]);
+    useState<Activity[]>([]);
 
   async function loadEmployees() {
     try {
@@ -145,15 +152,42 @@ export default function WorkforcePage() {
   }
 
   useEffect(() => {
-    loadEmployees();
+    let cancelled = false;
 
-    fetch("/api/ai/activities")
-      .then(r=>r.json())
-      .then(data=>{
-        setActivities(
-          data.activities || []
-        );
-      });
+    async function loadInitialWorkforce() {
+      try {
+        const [employeesResponse, activitiesResponse] = await Promise.all([
+          fetch("/api/businesses", {
+            cache: "no-store",
+          }),
+          fetch("/api/ai/activities"),
+        ]);
+
+        if (!employeesResponse.ok) {
+          throw new Error("Unable to load workforce.");
+        }
+
+        const employeesData = await employeesResponse.json();
+        const activitiesData = await activitiesResponse.json();
+
+        if (!cancelled) {
+          setEmployees(employeesData.employees ?? []);
+          setActivities(activitiesData.activities || []);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialWorkforce();
+
+    return () => {
+      cancelled = true;
+    };
 
   }, []);
 

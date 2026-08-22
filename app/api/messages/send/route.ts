@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getChannelAdapter } from "@/lib/channels/router";
+import { ChannelType } from "@/lib/channels/types";
 import { routeConversation } from "@/lib/ai-routing/router";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
 import { getBusinessKnowledge } from "@/lib/ai/business-knowledge";
@@ -22,6 +23,24 @@ import {
   leads,
   followUps,
 } from "@/db/schema";
+
+const channelTypes: ChannelType[] = [
+  "whatsapp",
+  "facebook",
+  "instagram",
+  "telegram",
+  "email",
+  "sms",
+  "website",
+];
+
+function isChannelType(
+  value: string,
+): value is ChannelType {
+  return channelTypes.includes(
+    value as ChannelType,
+  );
+}
 
 
 export async function POST(
@@ -333,7 +352,19 @@ export async function POST(
 
 
   const channel =
-    conversation[0].integrationId as any;
+    conversation[0].integrationId;
+
+  if (!isChannelType(channel)) {
+    return NextResponse.json(
+      {
+        error:
+          "Unsupported conversation channel.",
+      },
+      {
+        status: 400,
+      },
+    );
+  }
 
   const adapter =
     getChannelAdapter(channel);

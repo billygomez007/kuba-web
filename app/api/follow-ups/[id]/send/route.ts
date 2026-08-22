@@ -11,6 +11,11 @@ import {
 } from "@/db/schema";
 
 import { sendWhatsAppMessageTool } from "@/mastra/tools/send-whatsapp-message";
+type SendWhatsAppToolContext = Parameters<
+  NonNullable<
+    typeof sendWhatsAppMessageTool.execute
+  >
+>[1];
 
 
 export async function POST(
@@ -127,7 +132,7 @@ export async function POST(
           phone: lead.phone,
           message,
         },
-        {} as any,
+          {} as SendWhatsAppToolContext,
       );
 
 

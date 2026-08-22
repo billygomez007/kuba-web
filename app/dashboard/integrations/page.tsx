@@ -11,23 +11,43 @@ import {
   FaGlobe,
 } from "react-icons/fa";
 
+type IntegrationRecord = {
+  provider: string;
+  status: string;
+};
+
 export default function IntegrationsPage() {
-  const [integrations, setIntegrations] = useState<any[]>([]);
-
-  async function loadIntegrations() {
-    const res = await fetch("/api/integrations", {
-      cache: "no-store",
-    });
-
-    const data = await res.json();
-
-    setIntegrations(
-      data.integrations || [],
-    );
-  }
+  const [integrations, setIntegrations] = useState<IntegrationRecord[]>([]);
 
   useEffect(() => {
-    loadIntegrations();
+    let cancelled = false;
+
+    async function loadInitialIntegrations() {
+      try {
+        const response = await fetch("/api/integrations", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setIntegrations(
+            data.integrations || [],
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Integration loading error:",
+          error,
+        );
+      }
+    }
+
+    void loadInitialIntegrations();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const items = [

@@ -32,29 +32,35 @@ export default function WhatsAppIntegrationPage() {
   const [error, setError] =
     useState("");
 
+  async function fetchIntegration() {
+    const response =
+      await fetch("/api/integrations");
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+          "Unable to load integrations.",
+      );
+    }
+
+    return (
+      data.integrations?.find(
+        (item: WhatsAppIntegration) =>
+          item.provider === "whatsapp",
+      ) || null
+    );
+  }
+
   async function loadIntegration() {
     try {
       setLoading(true);
       setError("");
 
-      const response =
-        await fetch("/api/integrations");
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "Unable to load integrations.",
-        );
-      }
-
       const whatsapp =
-        data.integrations?.find(
-          (item: WhatsAppIntegration) =>
-            item.provider === "whatsapp",
-        );
+        await fetchIntegration();
 
       setIntegration(
         whatsapp || null,
@@ -76,7 +82,41 @@ export default function WhatsAppIntegrationPage() {
   }
 
   useEffect(() => {
-    loadIntegration();
+    let cancelled = false;
+
+    async function loadInitialIntegration() {
+      try {
+        const whatsapp =
+          await fetchIntegration();
+
+        if (!cancelled) {
+          setIntegration(whatsapp);
+        }
+      } catch (err) {
+        console.error(
+          "WhatsApp integration loading error:",
+          err,
+        );
+
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load WhatsApp integration.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialIntegration();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function connect(

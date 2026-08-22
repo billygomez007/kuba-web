@@ -2,10 +2,19 @@
 
 import EmptyState from "../EmptyState";
 
+type Communication = {
+  id: string;
+  channel: string;
+  recipient: string;
+  status: string;
+  message: string;
+  provider?: string | null;
+};
+
 export default function CommunicationHistory({
   communications,
 }: {
-  communications: any[];
+  communications: Communication[];
 }) {
 
   return (

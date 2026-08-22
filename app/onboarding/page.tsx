@@ -19,34 +19,71 @@ const employees = [
 ];
 const draftKey = "superkuba:onboarding-business-draft";
 
+type OnboardingDraft = {
+  companyName: string;
+  industry: string;
+  businessSize: string;
+  goals: string[];
+};
+
+function readDraft(): OnboardingDraft {
+  if (typeof window === "undefined") {
+    return {
+      companyName: "",
+      industry: "",
+      businessSize: "",
+      goals: [],
+    };
+  }
+
+  const saved = window.localStorage.getItem(draftKey);
+
+  if (!saved) {
+    return {
+      companyName: "",
+      industry: "",
+      businessSize: "",
+      goals: [],
+    };
+  }
+
+  try {
+    const draft = JSON.parse(saved) as Partial<OnboardingDraft>;
+
+    return {
+      companyName: typeof draft.companyName === "string" ? draft.companyName : "",
+      industry: typeof draft.industry === "string" ? draft.industry : "",
+      businessSize: typeof draft.businessSize === "string" ? draft.businessSize : "",
+      goals: Array.isArray(draft.goals) ? draft.goals.filter((goal): goal is string => typeof goal === "string") : [],
+    };
+  } catch {
+    window.localStorage.removeItem(draftKey);
+
+    return {
+      companyName: "",
+      industry: "",
+      businessSize: "",
+      goals: [],
+    };
+  }
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const [initialDraft] = useState<OnboardingDraft>(readDraft);
   const [stage, setStage] = useState<Stage>("welcome");
   const [business, setBusiness] = useState<Business | null>(null);
   const [createdEmployee, setCreatedEmployee] = useState<Employee | null>(null);
-  const [companyName, setCompanyName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [businessSize, setBusinessSize] = useState("");
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [companyName, setCompanyName] = useState(initialDraft.companyName);
+  const [industry, setIndustry] = useState(initialDraft.industry);
+  const [businessSize, setBusinessSize] = useState(initialDraft.businessSize);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(initialDraft.goals);
   const [selectedEmployee, setSelectedEmployee] = useState("receptionist");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(draftKey);
-    if (saved) {
-      try {
-        const draft = JSON.parse(saved) as { companyName?: string; industry?: string; businessSize?: string; goals?: string[] };
-        setCompanyName(draft.companyName || "");
-        setIndustry(draft.industry || "");
-        setBusinessSize(draft.businessSize || "");
-        setSelectedGoals(Array.isArray(draft.goals) ? draft.goals : []);
-      } catch {
-        window.localStorage.removeItem(draftKey);
-      }
-    }
-
     async function loadProgress() {
       try {
         const response = await fetch("/api/businesses", { cache: "no-store" });

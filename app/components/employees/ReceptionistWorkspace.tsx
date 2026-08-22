@@ -7,6 +7,11 @@ type Message = {
   text: string;
 };
 
+type HistoryMessage = {
+  senderType: string;
+  content: string;
+};
+
 export default function ReceptionistWorkspace() {
   const [conversationId] = useState(() =>
     crypto.randomUUID(),
@@ -37,7 +42,7 @@ export default function ReceptionistWorkspace() {
 
         if (data.messages?.length) {
           setMessages(
-            data.messages.map((item: any) => ({
+            data.messages.map((item: HistoryMessage) => ({
               role:
                 item.senderType === "customer"
                   ? "customer"

@@ -13,6 +13,7 @@ import {
   conversationRouting,
 } from "@/db/schema";
 
+import { ConversationDepartment } from "@/lib/communications/routing";
 import { routeConversationToTeam } from "@/lib/communications/team-router";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
@@ -444,7 +445,7 @@ export async function POST(request: Request) {
 
         currentDepartment:
           existingRouting?.department as
-            | any
+            | ConversationDepartment
             | null,
 
         currentTeamId:

@@ -3,7 +3,6 @@
 import {
   FormEvent,
   Suspense,
-  useEffect,
   useState,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,15 +21,11 @@ function InviteForm() {
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!token) {
-      setError(
-        "This invitation link is missing its invitation token.",
-      );
-    }
-  }, [token]);
+  const [error, setError] = useState(() =>
+    token
+      ? ""
+      : "This invitation link is missing its invitation token.",
+  );
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -38,7 +33,9 @@ function InviteForm() {
     event.preventDefault();
 
     if (!token) {
-      setError("Invalid invitation link.");
+      setError(
+        "This invitation link is missing its invitation token.",
+      );
       return;
     }
 
