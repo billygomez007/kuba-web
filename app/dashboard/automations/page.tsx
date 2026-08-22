@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import EmptyState from "../../components/EmptyState";
 
 type Condition = {
   field: string;
@@ -1208,21 +1209,13 @@ export default function AutomationsPage() {
               Loading automations...
             </div>
           ) : automations.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-white/10 p-10 text-center">
-              <div className="text-3xl">
-                ⌁
-              </div>
-
-              <h3 className="mt-4 font-bold">
-                No automations yet
-              </h3>
-
-              <p className="mt-2 text-sm text-white/30">
-                Create your first workflow
-                and let Kuba handle repetitive
-                work automatically.
-              </p>
-            </div>
+            <EmptyState
+              icon="⌁"
+              title="Put repetitive work on autopilot"
+              description="Build intelligent workflows that react to business events, coordinate AI employees, and keep work moving around the clock."
+              actionLabel="Create Automation"
+              onAction={() => setShowBuilder(true)}
+            />
           ) : (
             <div className="space-y-3">
               {automations.map(
@@ -1344,20 +1337,14 @@ export default function AutomationsPage() {
               Loading automation history...
             </div>
           ) : runs.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-white/10 p-10 text-center">
-              <div className="text-3xl">
-                ◷
-              </div>
-
-              <h3 className="mt-4 font-bold">
-                No automation runs yet
-              </h3>
-
-              <p className="mt-2 text-sm text-white/30">
-                Once Kuba executes an automation,
-                the run will appear here.
-              </p>
-            </div>
+            <EmptyState
+              icon="◷"
+              title="Workflow activity will appear here"
+              description="Once an automation is active, SuperKuba records every run so you can monitor outcomes and troubleshoot with confidence."
+              actionLabel="Create Automation"
+              onAction={() => setShowBuilder(true)}
+              compact
+            />
           ) : (
             <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02]">
 

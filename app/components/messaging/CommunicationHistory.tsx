@@ -1,5 +1,7 @@
 "use client";
 
+import EmptyState from "../EmptyState";
+
 export default function CommunicationHistory({
   communications,
 }: {
@@ -21,9 +23,15 @@ export default function CommunicationHistory({
 
       {communications.length === 0 ? (
 
-        <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-white/40">
-          No communications recorded yet.
-        </div>
+        <EmptyState
+          icon="✦"
+          title="AI-powered outreach will be tracked here"
+          description="Once a channel is connected, SuperKuba records customer messages and follow-ups so your team has a complete communication history."
+          actionLabel="Connect Integration"
+          actionHref="/dashboard/integrations"
+          className="mt-6"
+          compact
+        />
 
       ) : (
 

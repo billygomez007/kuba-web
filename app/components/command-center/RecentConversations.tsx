@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import EmptyState from "../EmptyState";
 
 export default function RecentConversations() {
   const [messages, setMessages] = useState<any[]>([]);
@@ -31,9 +32,14 @@ export default function RecentConversations() {
       <div className="mt-5 space-y-3">
 
         {messages.length === 0 && (
-          <p className="text-sm text-white/40">
-            No conversations yet.
-          </p>
+          <EmptyState
+            icon="◌"
+            title="Customer conversations will appear here"
+            description="Connect a customer channel and your AI Receptionist can answer questions, capture enquiries, and keep your team informed."
+            actionLabel="Connect Customer Channel"
+            actionHref="/dashboard/integrations"
+            compact
+          />
         )}
 
         {messages.map((message) => (
