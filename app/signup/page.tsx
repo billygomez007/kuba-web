@@ -10,9 +10,6 @@ export default function SignupPage() {
   const router = useRouter();
 
   const [name, setName] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [website, setWebsite] = useState("");
-  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -37,16 +34,16 @@ export default function SignupPage() {
       return;
     }
 
-    const onboardingData = {
-      businessName,
-      website,
-      phone,
-    };
-
-    sessionStorage.setItem(
-      "kuba_onboarding_data",
-      JSON.stringify(onboardingData),
-    );
+    await fetch("/api/email/welcome", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        name,
+      }),
+    });
 
     router.push("/onboarding");
     router.refresh();
@@ -84,30 +81,6 @@ export default function SignupPage() {
               placeholder="Full name"
               value={name}
               onChange={(e)=>setName(e.target.value)}
-              className="w-full rounded-xl bg-white/10 px-4 py-3"
-            />
-
-            <input
-              required
-              placeholder="Business name"
-              value={businessName}
-              onChange={(e)=>setBusinessName(e.target.value)}
-              className="w-full rounded-xl bg-white/10 px-4 py-3"
-            />
-
-            <input
-              placeholder="Website (example.com)"
-              value={website}
-              onChange={(e)=>setWebsite(e.target.value)}
-              className="w-full rounded-xl bg-white/10 px-4 py-3"
-            />
-
-            <input
-              required
-              placeholder="Mobile number"
-              type="tel"
-              value={phone}
-              onChange={(e)=>setPhone(e.target.value)}
               className="w-full rounded-xl bg-white/10 px-4 py-3"
             />
 

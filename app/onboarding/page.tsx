@@ -1,136 +1,18 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-
-const africanCountries = [
-  "Algeria",
-  "Angola",
-  "Benin",
-  "Botswana",
-  "Burkina Faso",
-  "Burundi",
-  "Cabo Verde",
-  "Cameroon",
-  "Central African Republic",
-  "Chad",
-  "Comoros",
-  "Democratic Republic of the Congo",
-  "Republic of the Congo",
-  "Côte d'Ivoire",
-  "Djibouti",
-  "Egypt",
-  "Equatorial Guinea",
-  "Eritrea",
-  "Eswatini",
-  "Ethiopia",
-  "Gabon",
-  "The Gambia",
-  "Ghana",
-  "Guinea",
-  "Guinea-Bissau",
-  "Kenya",
-  "Lesotho",
-  "Liberia",
-  "Libya",
-  "Madagascar",
-  "Malawi",
-  "Mali",
-  "Mauritania",
-  "Mauritius",
-  "Morocco",
-  "Mozambique",
-  "Namibia",
-  "Niger",
-  "Nigeria",
-  "Rwanda",
-  "São Tomé and Príncipe",
-  "Senegal",
-  "Seychelles",
-  "Sierra Leone",
-  "Somalia",
-  "South Africa",
-  "South Sudan",
-  "Sudan",
-  "Tanzania",
-  "Togo",
-  "Tunisia",
-  "Uganda",
-  "Zambia",
-  "Zimbabwe",
-];
-
-const otherCountries = [
-  "Canada",
-  "United Kingdom",
-  "United States",
-  "Other",
-];
 
 export default function OnboardingPage() {
   const router = useRouter();
 
   const [businessName, setBusinessName] = useState("");
   const [website, setWebsite] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [country, setCountry] = useState("Ghana");
-  const [businessSize, setBusinessSize] = useState("");
-  const [countrySearch, setCountrySearch] = useState("");
-  const [countryOpen, setCountryOpen] = useState(false);
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem("kuba_onboarding_data");
-
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-
-        if (data.businessName) {
-          setBusinessName(data.businessName);
-        }
-
-        if (data.website) {
-          setWebsite(data.website);
-        }
-      } catch {
-        sessionStorage.removeItem("kuba_onboarding_data");
-      }
-    }
-  }, []);
-
-  const filteredAfricanCountries = useMemo(() => {
-    const search = countrySearch.trim().toLowerCase();
-
-    if (!search) {
-      return africanCountries;
-    }
-
-    return africanCountries.filter((name) =>
-      name.toLowerCase().includes(search),
-    );
-  }, [countrySearch]);
-
-  const filteredOtherCountries = useMemo(() => {
-    const search = countrySearch.trim().toLowerCase();
-
-    if (!search) {
-      return otherCountries;
-    }
-
-    return otherCountries.filter((name) =>
-      name.toLowerCase().includes(search),
-    );
-  }, [countrySearch]);
-
-  function selectCountry(name: string) {
-    setCountry(name);
-    setCountrySearch("");
-    setCountryOpen(false);
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,9 +29,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           businessName,
           website,
-          industry,
-          country,
-          businessSize,
+          phone,
         }),
       });
 
@@ -208,7 +88,7 @@ export default function OnboardingPage() {
             </h1>
 
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-white/45 sm:text-base">
-              Tell Kuba a little about your business. We&apos;ll use this
+              Tell SuperKuba a little about your business. We&apos;ll use this
               information to prepare the right AI workforce for your
               operations.
             </p>
@@ -247,187 +127,46 @@ export default function OnboardingPage() {
                 />
 
                 <p className="mt-2 text-xs text-white/25">
-                  This is the business Kuba will build the AI workforce for.
+                  This is the business SuperKuba will build the AI workforce for.
                 </p>
               </div>
 
-              {/* Industry */}
+              {/* Website */}
               <div>
                 <label
-                  htmlFor="industry"
+                  htmlFor="website"
                   className="mb-2 block text-sm font-semibold text-white/75"
                 >
-                  Industry
+                  Website <span className="font-normal text-white/30">(optional)</span>
                 </label>
 
-                <select
-                  id="industry"
-                  required
-                  value={industry}
-                  onChange={(event) => setIndustry(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-[#0b0b0f] px-4 py-3.5 text-sm text-white outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
-                >
-                  <option value="">Select your industry</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Retail">Retail</option>
-                  <option value="Hospitality">Hospitality</option>
-                  <option value="Healthcare">Healthcare</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Real Estate">Real Estate</option>
-                  <option value="Travel & Tourism">Travel & Tourism</option>
-                  <option value="Education">Education</option>
-                  <option value="Professional Services">
-                    Professional Services
-                  </option>
-                  <option value="Logistics">Logistics</option>
-                  <option value="Manufacturing">Manufacturing</option>
-                  <option value="Other">Other</option>
-                </select>
+                <input
+                  id="website"
+                  type="url"
+                  value={website}
+                  onChange={(event) => setWebsite(event.target.value)}
+                  placeholder="https://example.com"
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/25 transition focus:border-cyan-400/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-cyan-400/10"
+                />
               </div>
 
-              {/* Country + Business Size */}
-              <div className="grid gap-6 sm:grid-cols-2">
+              {/* Phone */}
+              <div>
+                <label
+                  htmlFor="phone"
+                  className="mb-2 block text-sm font-semibold text-white/75"
+                >
+                  Phone number <span className="font-normal text-white/30">(optional)</span>
+                </label>
 
-                {/* Country */}
-                <div className="relative">
-                  <label
-                    htmlFor="country"
-                    className="mb-2 block text-sm font-semibold text-white/75"
-                  >
-                    Country
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setCountryOpen((open) => !open)}
-                    className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3.5 text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
-                  >
-                    <span>{country || "Select your country"}</span>
-
-                    <span
-                      className={`text-white/40 transition-transform ${
-                        countryOpen ? "rotate-180" : ""
-                      }`}
-                    >
-                      ▾
-                    </span>
-                  </button>
-
-                  {countryOpen && (
-                    <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl shadow-black/60">
-
-                      {/* Search */}
-                      <div className="border-b border-white/[0.07] p-3">
-                        <input
-                          autoFocus
-                          type="text"
-                          value={countrySearch}
-                          onChange={(event) =>
-                            setCountrySearch(event.target.value)
-                          }
-                          placeholder="Search countries..."
-                          className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-3.5 py-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-cyan-400/50"
-                        />
-                      </div>
-
-                      {/* Country list */}
-                      <div className="max-h-64 overflow-y-auto p-2">
-
-                        {filteredAfricanCountries.length > 0 && (
-                          <>
-                            <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300/60">
-                              Africa
-                            </p>
-
-                            {filteredAfricanCountries.map((name) => (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => selectCountry(name)}
-                                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                                  country === name
-                                    ? "bg-cyan-400/10 text-cyan-300"
-                                    : "text-white/65 hover:bg-white/[0.06] hover:text-white"
-                                }`}
-                              >
-                                <span>{name}</span>
-
-                                {country === name && (
-                                  <span className="text-xs">✓</span>
-                                )}
-                              </button>
-                            ))}
-                          </>
-                        )}
-
-                        {filteredOtherCountries.length > 0 && (
-                          <>
-                            <div className="my-2 border-t border-white/[0.06]" />
-
-                            <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/25">
-                              Other countries
-                            </p>
-
-                            {filteredOtherCountries.map((name) => (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => selectCountry(name)}
-                                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                                  country === name
-                                    ? "bg-cyan-400/10 text-cyan-300"
-                                    : "text-white/65 hover:bg-white/[0.06] hover:text-white"
-                                }`}
-                              >
-                                <span>{name}</span>
-
-                                {country === name && (
-                                  <span className="text-xs">✓</span>
-                                )}
-                              </button>
-                            ))}
-                          </>
-                        )}
-
-                        {filteredAfricanCountries.length === 0 &&
-                          filteredOtherCountries.length === 0 && (
-                            <div className="px-3 py-8 text-center text-sm text-white/30">
-                              No country found.
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="mt-2 text-xs text-white/25">
-                    Where your business operates.
-                  </p>
-                </div>
-
-                {/* Business Size */}
-                <div>
-                  <label
-                    htmlFor="businessSize"
-                    className="mb-2 block text-sm font-semibold text-white/75"
-                  >
-                    Business size
-                  </label>
-
-                  <select
-                    id="businessSize"
-                    required
-                    value={businessSize}
-                    onChange={(event) => setBusinessSize(event.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-[#0b0b0f] px-4 py-3.5 text-sm text-white outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
-                  >
-                    <option value="">Select size</option>
-                    <option value="1-10">1–10 employees</option>
-                    <option value="11-50">11–50 employees</option>
-                    <option value="51-200">51–200 employees</option>
-                    <option value="201-500">201–500 employees</option>
-                    <option value="500+">500+ employees</option>
-                  </select>
-                </div>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="Your business phone number"
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/25 transition focus:border-cyan-400/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-cyan-400/10"
+                />
               </div>
 
               {/* Error */}
@@ -453,7 +192,7 @@ export default function OnboardingPage() {
           {/* Footer */}
           <div className="mt-7 text-center">
             <p className="text-xs leading-6 text-white/25">
-              You can update your business information later from your Kuba
+              You can update your business information later from your SuperKuba
               settings.
             </p>
 

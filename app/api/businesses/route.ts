@@ -8,6 +8,7 @@ import {
   businesses,
   businessUsers,
   aiEmployees,
+  users,
 } from "@/db/schema";
 
 export async function GET() {
@@ -80,13 +81,11 @@ export async function POST(request: Request) {
 
     const businessName = String(body.businessName || "").trim();
     const website = String(body.website || "").trim();
-    const industry = String(body.industry || "").trim();
-    const country = String(body.country || "").trim();
-    const businessSize = String(body.businessSize || "").trim();
+    const phone = String(body.phone || "").trim();
 
-    if (!businessName || !industry || !country || !businessSize) {
+    if (!businessName) {
       return NextResponse.json(
-        { error: "Please complete all business information." },
+        { error: "Business name is required." },
         { status: 400 },
       );
     }
@@ -107,9 +106,6 @@ export async function POST(request: Request) {
       name: businessName,
       slug,
       website: website || null,
-      industry,
-      country,
-      businessSize,
       plan: "starter",
       status: "active",
       createdAt: now,
@@ -123,6 +119,16 @@ export async function POST(request: Request) {
       role: "owner",
       createdAt: now,
     });
+
+    if (phone) {
+      await db
+        .update(users)
+        .set({
+          phone,
+          updatedAt: now,
+        })
+        .where(eq(users.id, session.user.id));
+    }
 
     return NextResponse.json(
       {
