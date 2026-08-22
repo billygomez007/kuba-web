@@ -4,7 +4,14 @@ import { db } from "../db";
 
 const PRODUCTION_URL = "https://superkuba.com";
 const isProduction = process.env.NODE_ENV === "production";
-const baseURL = process.env.BETTER_AUTH_URL || (isProduction ? PRODUCTION_URL : "http://localhost:3000");
+const vercelPreviewURL =
+  process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : null;
+const baseURL =
+  vercelPreviewURL ||
+  process.env.BETTER_AUTH_URL ||
+  (isProduction ? PRODUCTION_URL : "http://localhost:3000");
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -20,6 +27,7 @@ export const auth = betterAuth({
   trustedOrigins: [
     PRODUCTION_URL,
     "https://www.superkuba.com",
+    ...(vercelPreviewURL ? [vercelPreviewURL] : []),
     ...(!isProduction ? ["http://localhost:3000", "http://localhost:3001"] : []),
   ],
 
