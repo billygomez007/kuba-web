@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import BackNavigation from "../../components/BackNavigation";
 
 export default function BusinessTrainingPage() {
   const router = useRouter();
@@ -23,7 +24,9 @@ export default function BusinessTrainingPage() {
 
   return (
     <main className="min-h-screen bg-[#050507] px-6 py-10 text-white">
-      <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-white/[0.04] p-8">
+      <div className="mx-auto max-w-3xl">
+        <BackNavigation className="mb-8" label="Back" />
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8">
 
         <h1 className="text-3xl font-black">
           Teach Kuba About Your Business
@@ -56,6 +59,7 @@ export default function BusinessTrainingPage() {
 
         </form>
 
+        </div>
       </div>
     </main>
   );

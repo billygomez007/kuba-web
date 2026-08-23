@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import EmptyState from "../../components/EmptyState";
 
 type PipelineItem = {
   stage: string;
@@ -1572,17 +1573,15 @@ export default function AnalyticsPage() {
 
             ) : employeeAnalytics.length === 0 ? (
 
-              <div className="flex h-40 items-center justify-center px-6 text-center">
-                <div>
-                  <p className="text-sm font-bold">
-                    No AI employees yet
-                  </p>
-
-                  <p className="mt-1 text-xs text-white/30">
-                    Add AI employees to begin tracking workforce performance.
-                  </p>
-                </div>
-              </div>
+              <EmptyState
+                icon="✦"
+                title="Measure the impact of your AI workforce"
+                description="Create an AI employee to start tracking activity, outcomes, and operational performance."
+                actionLabel="Create AI Employee"
+                actionHref="/dashboard/workforce"
+                className="m-4"
+                compact
+              />
 
             ) : (
 
@@ -1805,9 +1804,14 @@ export default function AnalyticsPage() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
 
             {sales.pipeline.length === 0 ? (
-              <p className="py-8 text-center text-sm text-white/35">
-                No sales pipeline data yet.
-              </p>
+              <EmptyState
+                icon="↗"
+                title="See opportunities move through your pipeline"
+                description="Connect a channel or activate your AI Sales Assistant to capture and qualify demand."
+                actionLabel="Open Sales"
+                actionHref="/dashboard/sales"
+                compact
+              />
             ) : (
               <div className="space-y-5">
 
@@ -1928,9 +1932,14 @@ export default function AnalyticsPage() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
 
             {sales.leadSources.length === 0 ? (
-              <p className="py-8 text-center text-sm text-white/35">
-                No lead source data yet.
-              </p>
+              <EmptyState
+                icon="◎"
+                title="Discover which channels drive growth"
+                description="Connect customer channels to see where qualified leads and opportunities originate."
+                actionLabel="Connect Integration"
+                actionHref="/dashboard/integrations"
+                compact
+              />
             ) : (
               <div className="space-y-4">
 

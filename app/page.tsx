@@ -2,6 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import MarketingHeader from "./components/MarketingHeader";
+import SuperKubaAIWorkforceShowcase from "./components/SuperKubaAIWorkforceShowcase";
+import SuperKubaAnalyticsShowcase from "./components/SuperKubaAnalyticsShowcase";
+import SuperKubaAutomationShowcase from "./components/SuperKubaAutomationShowcase";
+import SuperKubaBusinessOperationsShowcase from "./components/SuperKubaBusinessOperationsShowcase";
+import SuperKubaCustomerOperationsShowcase from "./components/SuperKubaCustomerOperationsShowcase";
+import SuperKubaDashboardShowcase from "./components/SuperKubaDashboardShowcase";
 import {
   ArrowRight,
   Bot,
@@ -112,63 +119,7 @@ export default function KubaWebsite() {
           NAVIGATION
       ========================================================= */}
 
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/[0.06] bg-[#060609]/75 backdrop-blur-2xl">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
-          <Link href="/" className="flex items-center">
-  <img
-    src="/brand/kuba-logo-3d.png"
-    alt="Kuba AI"
-    className="h-auto w-[150px] sm:w-[175px]"
-  />
-</Link>
-
-          <nav className="hidden items-center gap-8 md:flex">
-            <a
-              href="#workforce"
-              className="text-sm font-medium text-white/60 transition hover:text-white"
-            >
-              AI Workforce
-            </a>
-
-            <a
-              href="#platform"
-              className="text-sm font-medium text-white/60 transition hover:text-white"
-            >
-              Platform
-            </a>
-
-            <a
-              href="#solutions"
-              className="text-sm font-medium text-white/60 transition hover:text-white"
-            >
-              Solutions
-            </a>
-
-            <a
-              href="#pricing"
-              className="text-sm font-medium text-white/60 transition hover:text-white"
-            >
-              Pricing
-            </a>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="hidden text-sm font-semibold text-white/70 transition hover:text-white sm:block"
-            >
-              Log in
-            </Link>
-
-            <Link
-              href="/signup"
-              className="rounded-full bg-white px-5 py-2.5 text-sm font-bold text-black transition hover:scale-105 hover:bg-white/90"
-            >
-              Get started
-            </Link>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader />
 
       {/* =========================================================
           HERO
@@ -349,6 +300,13 @@ export default function KubaWebsite() {
           </div>
         </div>
       </section>
+
+      <SuperKubaDashboardShowcase />
+      <SuperKubaAIWorkforceShowcase />
+      <SuperKubaCustomerOperationsShowcase />
+      <SuperKubaAnalyticsShowcase />
+      <SuperKubaAutomationShowcase />
+      <SuperKubaBusinessOperationsShowcase />
 
       {/* =========================================================
           INTRO
@@ -616,7 +574,7 @@ AI workforce solutions built around how your industry operates.
             </Link>
 
             <Link
-              href="/pricing"
+              href="/#pricing"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-8 py-4 font-semibold text-white/75 transition hover:bg-white/[0.08] hover:text-white"
             >
               View pricing
@@ -635,10 +593,12 @@ AI workforce solutions built around how your industry operates.
             {/* Brand */}
             <div className="md:col-span-2">
               <Link href="/" className="flex items-center">
-  <img
-    src="/brand/kuba-logo-3d.png"
-    alt="Kuba AI"
-    className="h-auto w-[170px]"
+  <Image
+    src="/brand/superkuba-logo.png"
+    alt="SuperKuba"
+    width={2131}
+    height={738}
+    className="h-auto w-[170px] object-contain"
   />
 </Link>
 
@@ -685,13 +645,13 @@ AI workforce solutions built around how your industry operates.
                   Get started
                 </Link>
 
-                <a className="block hover:text-white" href="#">
+                <Link className="block hover:text-white" href="/demo">
                   Contact
-                </a>
+                </Link>
 
-                <a className="block hover:text-white" href="#">
+                <Link className="block hover:text-white" href="/resources#documentation">
                   Documentation
-                </a>
+                </Link>
               </div>
             </div>
           </div>
