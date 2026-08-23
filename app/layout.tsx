@@ -20,11 +20,27 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "SuperKuba",
-    description: "SuperKuba AI workforce platform",
+    title: "Your Business Powered by an AI Workforce",
+    description:
+      "Build, deploy and manage AI employees that work alongside your human team.",
     url: "https://superkuba.com",
     siteName: "SuperKuba",
     type: "website",
+    images: [
+      {
+        url: "/brand/superkuba-og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Your Business Powered by an AI Workforce",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Your Business Powered by an AI Workforce",
+    description:
+      "Build, deploy and manage AI employees that work alongside your human team.",
+    images: ["/brand/superkuba-og-image.png"],
   },
 };
 

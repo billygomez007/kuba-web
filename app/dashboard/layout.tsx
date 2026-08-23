@@ -7,61 +7,101 @@ import { useEffect, useState } from "react";
 
 const navigation = [
   {
-    label: "Command Center",
+    section: "Business Operations",
+    label: "Overview",
     href: "/dashboard",
     icon: "⌂",
   },
   {
+    section: "Business Operations",
     label: "AI Workforce",
     href: "/dashboard/workforce",
     icon: "✦",
   },
   {
-    label: "Customers",
-    href: "/dashboard/customers",
-    icon: "◎",
+    section: "Business Operations",
+    label: "AI Employees",
+    href: "/dashboard/ai-employees",
+    icon: "♙",
   },
   {
-    label: "Messaging",
-    href: "/dashboard/messaging",
-    icon: "◌",
-  },
-  {
-    label: "Knowledge",
-    href: "/dashboard/knowledge",
-    icon: "🧠",
-  },
-  {
+    section: "Business Operations",
     label: "Automations",
     href: "/dashboard/automations",
     icon: "⌁",
   },
   {
-    label: "Tasks",
+    section: "Business Operations",
+    label: "Workflows",
     href: "/dashboard/tasks",
     icon: "✓",
   },
   {
+    section: "Business Operations",
+    label: "Knowledge Base",
+    href: "/dashboard/knowledge",
+    icon: "🧠",
+  },
+  {
+    section: "Business Operations",
     label: "Analytics",
     href: "/dashboard/analytics",
     icon: "▥",
   },
   {
+    section: "Customer Operations",
+    label: "Inbox",
+    href: "/dashboard/inbox",
+    icon: "◌",
+  },
+  {
+    section: "Customer Operations",
+    label: "Leads",
+    href: "/dashboard/sales",
+    icon: "↗",
+  },
+  {
+    section: "Customer Operations",
+    label: "Customers",
+    href: "/dashboard/customers",
+    icon: "◎",
+  },
+  {
+    section: "Customer Operations",
+    label: "Follow-ups",
+    href: "/dashboard/follow-ups",
+    icon: "◷",
+  },
+  {
+    section: "Administration",
     label: "Integrations",
     href: "/dashboard/integrations",
     icon: "⌘",
     permission: "integrations.view",
+  },
+  {
+    section: "Administration",
+    label: "Team Members",
+    href: "/dashboard/settings/team",
+    icon: "👥",
+  },
+  {
+    section: "Administration",
+    label: "Settings",
+    href: "/dashboard/settings",
+    icon: "⚙",
   },
 ];
 
 const navigationPermissions: Record<string, string> = {
   "/dashboard": "dashboard.view",
   "/dashboard/workforce": "workforce.view",
-  "/dashboard/customers": "customers.view",
-  "/dashboard/messaging": "messaging.view",
-  "/dashboard/knowledge": "knowledge.view",
+  "/dashboard/ai-employees": "workforce.view",
   "/dashboard/automations": "automations.view",
   "/dashboard/tasks": "tasks.view",
+  "/dashboard/customers": "customers.view",
+  "/dashboard/inbox": "messaging.view",
+  "/dashboard/knowledge": "knowledge.view",
   "/dashboard/analytics": "analytics.view",
   "/dashboard/integrations": "integrations.view",
 };
@@ -144,6 +184,21 @@ export default function DashboardLayout({
           return permissions.includes(required);
         });
 
+  const navigationSections = [
+    "Business Operations",
+    "Customer Operations",
+    "Administration",
+  ] as const;
+
+  const groupedNavigation = navigationSections
+    .map((section) => ({
+      section,
+      items: visibleNavigation.filter(
+        (item) => item.section === section,
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+
   return (
     <div className="min-h-screen bg-[#050507] text-white">
 
@@ -166,12 +221,15 @@ export default function DashboardLayout({
 
         {/* Workspace */}
         <div className="px-4 py-5">
-          <p className="px-3 text-[10px] font-bold uppercase tracking-[0.22em] text-white/20">
-            Workspace
-          </p>
+          <nav className="space-y-5">
+            {groupedNavigation.map((group) => (
+              <div key={group.section}>
+                <p className="px-3 text-[10px] font-bold uppercase tracking-[0.22em] text-white/20">
+                  {group.section}
+                </p>
 
-          <nav className="mt-3 space-y-1">
-            {visibleNavigation.map((item) => {
+                <div className="mt-3 space-y-1">
+                  {group.items.map((item) => {
               const active =
                 item.href === "/dashboard"
                   ? pathname === "/dashboard"
@@ -204,7 +262,10 @@ export default function DashboardLayout({
                   )}
                 </Link>
               );
-            })}
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
         </div>
 
