@@ -121,8 +121,16 @@ export default function WorkforcePage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [activities,setActivities] =
-    useState<any[]>([]);
+  type ActivityItem = {
+    id: string;
+    type: string;
+    title?: string;
+    description?: string;
+    message?: string;
+  };
+
+  const [activities, setActivities] =
+    useState<ActivityItem[]>([]);
 
   async function loadEmployees() {
     try {
@@ -144,15 +152,17 @@ export default function WorkforcePage() {
   }
 
   useEffect(() => {
-    loadEmployees();
+    const timer = window.setTimeout(() => {
+      void loadEmployees();
 
-    fetch("/api/ai/activities")
-      .then(r=>r.json())
-      .then(data=>{
-        setActivities(
-          data.activities || []
-        );
-      });
+      void fetch("/api/ai/activities")
+        .then((r) => r.json())
+        .then((data) => {
+          setActivities(data.activities || []);
+        });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
 
   }, []);
 

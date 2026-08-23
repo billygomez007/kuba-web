@@ -5,8 +5,15 @@ import { useEffect, useState } from "react";
 
 export default function ActionsPage(){
 
+  type ActionItem = {
+    id: string;
+    channel: string;
+    message: string;
+    recipient: string;
+  };
+
   const [actions,setActions] =
-    useState<any[]>([]);
+    useState<ActionItem[]>([]);
 
 
   useEffect(()=>{

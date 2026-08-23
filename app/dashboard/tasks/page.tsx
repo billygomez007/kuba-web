@@ -90,7 +90,11 @@ export default function TasksPage() {
   }
 
   useEffect(() => {
-    loadTasks();
+    const timer = window.setTimeout(() => {
+      void loadTasks();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function createTask(

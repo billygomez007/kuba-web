@@ -1,6 +1,15 @@
+type LeadScoreInput = {
+  intent?: string | null;
+  service?: string | null;
+  notes?: string | null;
+  budget?: number | string | null;
+  phone?: string | null;
+  email?: string | null;
+};
+
 export function calculateLeadScore(
-  lead:any,
-){
+  lead: LeadScoreInput,
+) {
 
   let score = 0;
 

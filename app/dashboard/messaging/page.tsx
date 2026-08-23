@@ -2,190 +2,143 @@
 
 import { useEffect, useState } from "react";
 
+type ConversationItem = {
+  id: string;
+  customerName?: string | null;
+  integrationId?: string | null;
+  status?: string;
+  aiMode?: string;
+  assignedEmployeeId?: string | null;
+  customerId?: string | null;
+};
 
-function ChannelIcon({ channel }: { channel:string }) {
+type MessageItem = {
+  id: string;
+  content?: string;
+  sender?: string;
+  direction?: string;
+  senderType?: string;
+  createdAt?: string;
+};
 
-  const icons:any = {
-    whatsapp:"🟢",
-    facebook:"🔵",
-    instagram:"🟣",
-    telegram:"✈️",
-    email:"✉️",
-    sms:"📱",
+type EmployeeItem = {
+  id: string;
+  name?: string;
+};
+
+type CustomerProfile = {
+  customer?: {
+    name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  } | null;
+  leads?: Array<{ id: string }> | null;
+  conversations?: unknown[] | null;
+  followUps?: unknown[] | null;
+};
+
+type CustomerTag = {
+  id: string;
+  tag: string;
+};
+
+type LeadScore = {
+  score: number;
+  category: string;
+} | null;
+
+function ChannelIcon({ channel }: { channel?: string | null }) {
+  const icons: Record<string, string> = {
+    whatsapp: "🟢",
+    facebook: "🔵",
+    instagram: "🟣",
+    telegram: "✈️",
+    email: "✉️",
+    sms: "📱",
   };
 
-  return icons[channel] || "🌐";
-
+  return icons[channel ?? ""] || "🌐";
 }
 
-
 export default function MessagingPage() {
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [selected, setSelected] = useState<ConversationItem | null>(null);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [text, setText] = useState("");
+  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [channelFilter, setChannelFilter] = useState("all");
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [summary, setSummary] = useState("");
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [customerTags, setCustomerTags] = useState<CustomerTag[]>([]);
+  const [newTag, setNewTag] = useState("");
+  const [leadScore, setLeadScore] = useState<LeadScore>(null);
 
-  const [conversations,setConversations] =
-    useState<any[]>([]);
+  useEffect(() => {
+    const loadInbox = async () => {
+      const inboxResponse = await fetch("/api/messages/inbox");
+      const inboxData = (await inboxResponse.json()) as { conversations?: ConversationItem[] };
+      setConversations(inboxData.conversations || []);
+    };
 
-  const [selected,setSelected] =
-    useState<any>(null);
+    const loadEmployees = async () => {
+      const employeesResponse = await fetch("/api/employees");
+      const employeesData = (await employeesResponse.json()) as { employees?: EmployeeItem[] };
+      setEmployees(employeesData.employees || []);
+    };
 
-  const [messages,setMessages] =
-    useState<any[]>([]);
+    void loadInbox();
+    void loadEmployees();
+  }, []);
 
-  const [text,setText] =
-    useState("");
-
-  const [employees,setEmployees] =
-    useState<any[]>([]);
-
-  const [search,setSearch] =
-    useState("");
-
-  const [channelFilter,setChannelFilter] =
-    useState("all");
-
-  const [customerProfile,setCustomerProfile] =
-    useState<any>(null);
-
-  const [summary,setSummary] =
-    useState("");
-
-  const [loadingSummary,setLoadingSummary] =
-    useState(false);
-
-  const [customerTags,setCustomerTags] =
-    useState<any[]>([]);
-
-  const [newTag,setNewTag] =
-    useState("");
-
-  const [leadScore,setLeadScore] =
-    useState<any>(null);
-
-
-  useEffect(()=>{
-
-    fetch("/api/messages/inbox")
-      .then(r=>r.json())
-      .then(data=>{
-        setConversations(
-          data.conversations || []
-        );
-      });
-
-
-    fetch("/api/employees")
-      .then(r=>r.json())
-      .then(data=>{
-        setEmployees(
-          data.employees || []
-        );
-      });
-
-  },[]);
-
-
-
-  async function openConversation(item:any){
-
+  async function openConversation(item: ConversationItem) {
     setSelected(item);
 
-    const response =
-      await fetch(
-        `/api/messages/conversation?id=${item.id}`
-      );
+    const response = await fetch(`/api/messages/conversation?id=${item.id}`);
+    const data = (await response.json()) as { messages?: MessageItem[] };
+    setMessages(data.messages || []);
 
-    const data =
-      await response.json();
+    if (item.customerId) {
+      const profileResponse = await fetch(`/api/customers/profile?id=${item.customerId}`);
+      const profileData = (await profileResponse.json()) as CustomerProfile;
+      setCustomerProfile(profileData);
 
-    setMessages(
-      data.messages || []
-    );
+      const tagsResponse = await fetch(`/api/customers/tags?customerId=${item.customerId}`);
+      const tagData = (await tagsResponse.json()) as { tags?: CustomerTag[] };
+      setCustomerTags(tagData.tags || []);
 
-
-    if(item.customerId){
-
-      const profile =
-        await fetch(
-          `/api/customers/profile?id=${item.customerId}`
-        );
-
-
-      const profileData =
-        await profile.json();
-
-
-      setCustomerProfile(
-        profileData
-      );
-
-
-      const tags =
-        await fetch(
-          `/api/customers/tags?customerId=${item.customerId}`
-        );
-
-
-      const tagData =
-        await tags.json();
-
-
-      setCustomerTags(
-        tagData.tags || []
-      );
-
-
-      if(profileData.leads?.[0]){
-
-        const score =
-          await fetch(
-            `/api/leads/score?id=${profileData.leads[0].id}`
-          );
-
-
-        const scoreData =
-          await score.json();
-
-
-        setLeadScore(
-          scoreData.score
-        );
-
+      if (profileData.leads?.[0]) {
+        const scoreResponse = await fetch(`/api/leads/score?id=${profileData.leads[0].id}`);
+        const scoreData = (await scoreResponse.json()) as { score?: LeadScore };
+        setLeadScore(scoreData.score ?? null);
       }
-
     }
-
   }
 
+  async function addTag() {
+    if (!selected?.customerId || !newTag) return;
 
-
-
-  async function addTag(){
-
-    if(!selected?.customerId || !newTag) return;
-
-
-    await fetch("/api/customers/tags",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
+    await fetch("/api/customers/tags", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-      body:JSON.stringify({
-        customerId:selected.customerId,
-        tag:newTag,
+      body: JSON.stringify({
+        customerId: selected.customerId,
+        tag: newTag,
       }),
     });
-
 
     setCustomerTags([
       ...customerTags,
       {
-        id:crypto.randomUUID(),
-        tag:newTag,
+        id: crypto.randomUUID(),
+        tag: newTag,
       },
     ]);
 
-
     setNewTag("");
-
   }
 
 

@@ -76,7 +76,11 @@ export default function WhatsAppIntegrationPage() {
   }
 
   useEffect(() => {
-    loadIntegration();
+    const timer = window.setTimeout(() => {
+      void loadIntegration();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function connect(

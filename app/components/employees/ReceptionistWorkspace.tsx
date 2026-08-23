@@ -37,12 +37,12 @@ export default function ReceptionistWorkspace() {
 
         if (data.messages?.length) {
           setMessages(
-            data.messages.map((item: any) => ({
+            data.messages.map((item: { senderType?: string; content?: string }) => ({
               role:
                 item.senderType === "customer"
                   ? "customer"
                   : "kuba",
-              text: item.content,
+              text: typeof item.content === "string" ? item.content : "",
             })),
           );
         } else {

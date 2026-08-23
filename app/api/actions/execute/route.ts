@@ -7,6 +7,7 @@ import {
 } from "@/db/schema";
 
 import { getChannelAdapter } from "@/lib/channels/router";
+import { type ChannelType } from "@/lib/channels/types";
 import { logAIActivity } from "@/lib/ai/activity-log";
 
 
@@ -48,7 +49,7 @@ export async function POST(
 
   const adapter =
     getChannelAdapter(
-      action[0].channel as any,
+      action[0].channel as ChannelType,
     );
 
 

@@ -39,7 +39,11 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
-    loadCustomers();
+    const timer = window.setTimeout(() => {
+      void loadCustomers();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const filteredCustomers = useMemo(() => {

@@ -30,6 +30,7 @@ export default function FollowUpsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [now, setNow] = useState<number>(() => Date.now());
 
   async function loadData() {
     try {
@@ -59,7 +60,19 @@ export default function FollowUpsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   const filteredItems = useMemo(() => {
@@ -99,7 +112,7 @@ export default function FollowUpsPage() {
 
     const time = new Date(followUp.dueAt).getTime();
 
-    return !Number.isNaN(time) && time < Date.now();
+    return !Number.isNaN(time) && time < now;
   });
 
   return (
@@ -209,6 +222,7 @@ export default function FollowUpsPage() {
                   <FollowUpCard
                     key={item.followUp.id}
                     item={item}
+                    now={now}
                     onStatusChange={async (id, status) => {
                       try {
                         const response = await fetch(
@@ -315,9 +329,11 @@ function Stat({
 function FollowUpCard({
   item,
   onStatusChange,
+  now,
 }: {
   item: FollowUpResult;
   onStatusChange: (id: string, status: string) => void;
+  now: number;
 }) {
   const { followUp, lead } = item;
 
@@ -326,7 +342,7 @@ function FollowUpCard({
   const isOverdue =
     followUp.status !== "completed" &&
     !Number.isNaN(date.getTime()) &&
-    date.getTime() < Date.now();
+    date.getTime() < now;
 
   return (
     <div className="flex flex-col justify-between gap-5 p-6 transition hover:bg-white/[0.02] lg:flex-row lg:items-center">

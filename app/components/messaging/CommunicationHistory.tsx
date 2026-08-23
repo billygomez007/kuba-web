@@ -3,7 +3,14 @@
 export default function CommunicationHistory({
   communications,
 }: {
-  communications: any[];
+  communications: Array<{
+    id: string;
+    channel: string;
+    recipient: string;
+    status: string;
+    message: string;
+    provider?: string;
+  }>;
 }) {
 
   return (

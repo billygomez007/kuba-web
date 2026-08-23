@@ -54,7 +54,7 @@ export default function SalesEmployeeChat({
 
         if (data.messages?.length) {
           setMessages(
-            data.messages.map((item: any) => ({
+            data.messages.map((item: { direction: "inbound" | "outbound"; content: string }) => ({
               role:
                 item.direction === "inbound"
                   ? "user"

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -71,8 +71,37 @@ const otherCountries = [
 export default function OnboardingPage() {
   const router = useRouter();
 
-  const [businessName, setBusinessName] = useState("");
-  const [website, setWebsite] = useState("");
+  function readSavedOnboardingData() {
+    if (typeof window === "undefined") {
+      return { businessName: "", website: "" };
+    }
+
+    try {
+      const saved = sessionStorage.getItem("kuba_onboarding_data");
+
+      if (!saved) {
+        return { businessName: "", website: "" };
+      }
+
+      const data = JSON.parse(saved);
+
+      return {
+        businessName:
+          typeof data.businessName === "string" ? data.businessName : "",
+        website: typeof data.website === "string" ? data.website : "",
+      };
+    } catch {
+      sessionStorage.removeItem("kuba_onboarding_data");
+      return { businessName: "", website: "" };
+    }
+  }
+
+  const [businessName, setBusinessName] = useState(
+    () => readSavedOnboardingData().businessName,
+  );
+  const [website, setWebsite] = useState(
+    () => readSavedOnboardingData().website,
+  );
   const [industry, setIndustry] = useState("");
   const [country, setCountry] = useState("Ghana");
   const [businessSize, setBusinessSize] = useState("");
@@ -80,26 +109,6 @@ export default function OnboardingPage() {
   const [countryOpen, setCountryOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem("kuba_onboarding_data");
-
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-
-        if (data.businessName) {
-          setBusinessName(data.businessName);
-        }
-
-        if (data.website) {
-          setWebsite(data.website);
-        }
-      } catch {
-        sessionStorage.removeItem("kuba_onboarding_data");
-      }
-    }
-  }, []);
 
   const filteredAfricanCountries = useMemo(() => {
     const search = countrySearch.trim().toLowerCase();

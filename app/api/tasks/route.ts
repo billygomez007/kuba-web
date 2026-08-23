@@ -426,7 +426,7 @@ export async function PATCH(
 
     await db
       .update(tasks)
-      .set(updates as any)
+      .set(updates as typeof updates)
       .where(
         and(
           eq(tasks.id, taskId),

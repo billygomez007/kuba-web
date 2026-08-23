@@ -47,7 +47,7 @@ async function getBusinessId() {
 }
 
 
-function validateAutomation(body: any) {
+function validateAutomation(body: Record<string, unknown>) {
   const name =
     String(body.name || "").trim();
 

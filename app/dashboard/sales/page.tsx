@@ -62,7 +62,11 @@ export default function SalesPage() {
   }
 
   useEffect(() => {
-    loadSales();
+    const timer = window.setTimeout(() => {
+      void loadSales();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (

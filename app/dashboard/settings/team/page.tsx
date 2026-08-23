@@ -378,7 +378,11 @@ export default function TeamPage() {
   }
 
   useEffect(() => {
-    loadTeam();
+    const timer = window.setTimeout(() => {
+      void loadTeam();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function toggleTeamAI(

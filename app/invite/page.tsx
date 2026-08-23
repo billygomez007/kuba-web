@@ -23,13 +23,9 @@ function InviteForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!token) {
-      setError(
-        "This invitation link is missing its invitation token.",
-      );
-    }
-  }, [token]);
+  const missingTokenError = !token
+    ? "This invitation link is missing its invitation token."
+    : "";
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -130,9 +126,9 @@ function InviteForm() {
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
 
-          {error && (
+          {(error || missingTokenError) && (
             <div className="mb-5 rounded-xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-300">
-              {error}
+              {error || missingTokenError}
             </div>
           )}
 

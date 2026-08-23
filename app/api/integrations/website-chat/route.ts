@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 
 import { routeConversationToTeam } from "@/lib/communications/team-router";
+import { type ConversationDepartment } from "@/lib/communications/routing";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
 
@@ -435,9 +436,9 @@ export async function POST(request: Request) {
         message,
 
         currentDepartment:
-          existingRouting?.department as
-            | any
-            | null,
+          typeof existingRouting?.department === "string"
+            ? existingRouting.department as ConversationDepartment
+            : null,
 
         currentTeamId:
           existingRouting?.teamId ??

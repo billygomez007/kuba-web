@@ -333,7 +333,14 @@ export async function POST(
 
 
   const channel =
-    conversation[0].integrationId as any;
+    conversation[0].integrationId as
+      | "whatsapp"
+      | "email"
+      | "website"
+      | "facebook"
+      | "instagram"
+      | "telegram"
+      | "sms";
 
   const adapter =
     getChannelAdapter(channel);

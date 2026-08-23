@@ -29,6 +29,22 @@ type Message = {
   content: string;
 };
 
+type ConversationMessage = {
+  direction: "inbound" | "outbound";
+  content: string;
+};
+
+type SalesBriefing = {
+  greeting?: string;
+  recommendation?: string;
+  summary?: {
+    totalLeads?: number;
+    qualifiedLeads?: number;
+    pendingFollowUps?: number;
+    overdueFollowUps?: number;
+  };
+};
+
 type SalesActivity = {
   id: string;
   type: string;
@@ -124,7 +140,7 @@ export default function KubaSalesPage() {
     },
   ]);
 
-  const [briefing, setBriefing] = useState<any>(null);
+  const [briefing, setBriefing] = useState<SalesBriefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
 
   const [memoryLoading, setMemoryLoading] = useState(true);
@@ -148,7 +164,7 @@ export default function KubaSalesPage() {
 
         if (data.messages?.length) {
           setMessages(
-            data.messages.map((item: any) => ({
+            data.messages.map((item: ConversationMessage) => ({
               role:
                 item.direction === "inbound"
                   ? "user"
@@ -553,7 +569,7 @@ export default function KubaSalesPage() {
                   </p>
 
                   <h2 className="mt-1 text-lg font-bold text-slate-950">
-                    Today's sales priorities
+                    Today&apos;s sales priorities
                   </h2>
 
                   <p className="mt-1 text-sm text-slate-500">

@@ -127,7 +127,7 @@ export async function POST(
           phone: lead.phone,
           message,
         },
-        {} as any,
+        {} as Parameters<NonNullable<typeof sendWhatsAppMessageTool.execute>>[1],
       );
 
 

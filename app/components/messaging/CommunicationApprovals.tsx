@@ -3,7 +3,12 @@
 export default function CommunicationApprovals({
   approvals,
 }: {
-  approvals: any[];
+  approvals: Array<{
+    id: string;
+    channel: string;
+    recipient: string;
+    message: string;
+  }>;
 }) {
 
   async function decide(
