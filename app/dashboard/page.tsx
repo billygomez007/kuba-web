@@ -167,7 +167,7 @@ export default function DashboardPage() {
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <Link
-                  href="/dashboard/ai-workforce"
+                  href="/dashboard/ai-employees"
                   className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 sm:px-5 sm:py-3 text-xs sm:text-sm font-semibold text-white/70 transition hover:bg-white/[0.08] hover:text-white text-center"
                 >
                   View Workforce
@@ -240,7 +240,7 @@ export default function DashboardPage() {
               </div>
 
               <Link
-                href="/dashboard/ai-workforce"
+                href="/dashboard/ai-employees"
                 className="shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white/60 transition hover:bg-white/[0.08] hover:text-white"
               >
                 View All Employees
@@ -420,7 +420,7 @@ export default function DashboardPage() {
                 </Link>
 
                 <Link
-                  href="/dashboard/workforce/builder"
+                  href="#workforce"
                   className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-bold text-white text-center transition hover:bg-white/[0.08]"
                 >
                   Create AI Employee
