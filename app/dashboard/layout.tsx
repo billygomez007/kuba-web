@@ -69,48 +69,12 @@ const navigationGroups: NavigationGroup[] = [
 
 
   {
+    title: "Business Operations",
     items: [
       {
         label: "Command Center",
         href: "/dashboard",
         icon: "⌂",
-      },
-      {
-        label: "AI Workforce",
-        href: "/dashboard/ai-workforce",
-        icon: "✦",
-      },
-      {
-        label: "HR",
-        href: "/dashboard/hr",
-        icon: "♙",
-      },
-      {
-        label: "AI Activity",
-        href: "/dashboard/ai-activity",
-        icon: "◉",
-      },
-      {
-        label: "AI Performance",
-        href: "/dashboard/ai-performance",
-        icon: "▥",
-        permission: "workforce.view",
-      },
-      {
-        label: "Customer Operations",
-        href: "/dashboard/customer-operations",
-        icon: "◎",
-      },
-      {
-        label: "Universal Inbox",
-        href: "/dashboard/inbox",
-        icon: "✉",
-        permission: "messaging.view",
-      },
-      {
-        label: "Business Operations",
-        href: "/dashboard/business-operations",
-        icon: "⌁",
       },
       {
         label: "Automation",
@@ -130,17 +94,63 @@ const navigationGroups: NavigationGroup[] = [
       },
     ],
   },
+  {
+    title: "Customer Operations",
+    items: [
+      {
+        label: "Inbox",
+        href: "/dashboard/inbox",
+        icon: "✉",
+        permission: "messaging.view",
+      },
+      {
+        label: "Customers",
+        href: "/dashboard/customers",
+        icon: "◎",
+        permission: "customers.view",
+      },
+      {
+        label: "Follow-ups",
+        href: "/dashboard/follow-ups",
+        icon: "◌",
+        permission: "followups.view",
+      },
+    ],
+  },
+  {
+    title: "AI Workforce",
+    items: [
+      {
+        label: "Employees",
+        href: "/dashboard/ai-employees",
+        icon: "✦",
+        permission: "workforce.view",
+      },
+      {
+        label: "Tasks",
+        href: "/dashboard/tasks",
+        icon: "✓",
+        permission: "tasks.view",
+      },
+      {
+        label: "Knowledge",
+        href: "/dashboard/knowledge",
+        icon: "▤",
+        permission: "knowledge.view",
+      },
+    ],
+  },
 ];
 
 const navigationPermissions: Record<string, string> = {
   "/dashboard": "dashboard.view",
-  "/dashboard/ai-workforce": "workforce.view",
-  "/dashboard/hr": "hr.dashboard.view",
-  "/dashboard/ai-activity": "workforce.view",
-  "/dashboard/ai-performance": "workforce.view",
-  "/dashboard/customer-operations": "customers.view",
+  "/dashboard/ai-employees": "workforce.view",
+  "/dashboard/workforce": "workforce.view",
   "/dashboard/inbox": "messaging.view",
-  "/dashboard/business-operations": "tasks.view",
+  "/dashboard/customers": "customers.view",
+  "/dashboard/follow-ups": "followups.view",
+  "/dashboard/tasks": "tasks.view",
+  "/dashboard/knowledge": "knowledge.view",
   "/dashboard/automations": "automations.view",
   "/dashboard/analytics": "analytics.view",
   "/dashboard/integrations": "integrations.view",
