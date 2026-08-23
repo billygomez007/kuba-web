@@ -6,7 +6,6 @@ import {
   useMemo,
   useState,
 } from "react";
-import EmptyState from "../../components/EmptyState";
 
 type Task = {
   id: string;
@@ -91,46 +90,11 @@ export default function TasksPage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void loadTasks();
+    }, 0);
 
-    async function loadInitialTasks() {
-      try {
-        const response =
-          await fetch("/api/tasks");
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              "Unable to load tasks.",
-          );
-        }
-
-        if (!cancelled) {
-          setTasks(data.tasks || []);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setError(
-            error instanceof Error
-              ? error.message
-              : "Unable to load tasks.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadInitialTasks();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function createTask(
@@ -543,16 +507,23 @@ export default function TasksPage() {
               Loading tasks...
             </div>
           ) : tasks.length === 0 ? (
-            <EmptyState
-              icon="✓"
-              title="Keep every priority moving"
-              description="Create work for your team or let SuperKuba generate tasks automatically from customer and business activity."
-              actionLabel="Create Task"
-              onAction={() => setShowCreate(true)}
-              secondaryLabel="Explore Automations"
-              secondaryHref="/dashboard/automations"
-              className="m-5"
-            />
+            <div className="p-12 text-center">
+
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-xl">
+                ✓
+              </div>
+
+              <p className="mt-4 text-sm font-bold">
+                No tasks yet
+              </p>
+
+              <p className="mt-2 text-xs text-white/25">
+                Create a task manually or let
+                Kuba create one through an
+                automation.
+              </p>
+
+            </div>
           ) : (
             <div className="divide-y divide-white/10">
 

@@ -7,26 +7,8 @@ import {
 } from "@/db/schema";
 
 import { getChannelAdapter } from "@/lib/channels/router";
-import { ChannelType } from "@/lib/channels/types";
+import { type ChannelType } from "@/lib/channels/types";
 import { logAIActivity } from "@/lib/ai/activity-log";
-
-const channelTypes: ChannelType[] = [
-  "whatsapp",
-  "facebook",
-  "instagram",
-  "telegram",
-  "email",
-  "sms",
-  "website",
-];
-
-function isChannelType(
-  value: string,
-): value is ChannelType {
-  return channelTypes.includes(
-    value as ChannelType,
-  );
-}
 
 
 export async function POST(
@@ -65,23 +47,9 @@ export async function POST(
   }
 
 
-  const channel = action[0].channel;
-
-  if (!isChannelType(channel)) {
-    return NextResponse.json(
-      {
-        error: "Unsupported channel.",
-      },
-      {
-        status: 400,
-      },
-    );
-  }
-
-
   const adapter =
     getChannelAdapter(
-      channel,
+      action[0].channel as ChannelType,
     );
 
 

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ActivateEmployeeButton from "../../components/ActivateEmployeeButton";
 import AIEmployeeAvatar from "../../components/employees/AIEmployeeAvatar";
-import EmptyState from "../../components/EmptyState";
 
 type Employee = {
   id: string;
@@ -21,13 +20,6 @@ type EmployeeDefinition = {
   category: string;
   description: string;
   icon: string;
-};
-
-type Activity = {
-  id: string;
-  title: string;
-  description: string | null;
-  type: string;
 };
 
 const employeeLibrary: EmployeeDefinition[] = [
@@ -129,8 +121,16 @@ export default function WorkforcePage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [activities,setActivities] =
-    useState<Activity[]>([]);
+  type ActivityItem = {
+    id: string;
+    type: string;
+    title?: string;
+    description?: string;
+    message?: string;
+  };
+
+  const [activities, setActivities] =
+    useState<ActivityItem[]>([]);
 
   async function loadEmployees() {
     try {
@@ -152,42 +152,17 @@ export default function WorkforcePage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void loadEmployees();
 
-    async function loadInitialWorkforce() {
-      try {
-        const [employeesResponse, activitiesResponse] = await Promise.all([
-          fetch("/api/businesses", {
-            cache: "no-store",
-          }),
-          fetch("/api/ai/activities"),
-        ]);
+      void fetch("/api/ai/activities")
+        .then((r) => r.json())
+        .then((data) => {
+          setActivities(data.activities || []);
+        });
+    }, 0);
 
-        if (!employeesResponse.ok) {
-          throw new Error("Unable to load workforce.");
-        }
-
-        const employeesData = await employeesResponse.json();
-        const activitiesData = await activitiesResponse.json();
-
-        if (!cancelled) {
-          setEmployees(employeesData.employees ?? []);
-          setActivities(activitiesData.activities || []);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadInitialWorkforce();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => window.clearTimeout(timer);
 
   }, []);
 
@@ -552,13 +527,22 @@ export default function WorkforcePage() {
                 (employee) => employee.type !== "general-manager",
               ).length === 0 ? (
 
-              <EmptyState
-                icon="✦"
-                title="Build your AI workforce"
-                description="Create your first specialized AI employee to support customers, grow sales, and automate everyday operations."
-                actionLabel="Create AI Employee"
-                onAction={() => document.getElementById("employee-library")?.scrollIntoView({ behavior: "smooth" })}
-              />
+              <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center">
+
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-xl">
+                  ✦
+                </div>
+
+                <h3 className="mt-5 text-lg font-bold">
+                  Your workforce is waiting.
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/35">
+                  Activate your first specialized AI employee below and
+                  start building your digital workforce.
+                </p>
+
+              </div>
 
             ) : (
 
@@ -1071,3 +1055,4 @@ function EmployeeLibraryCard({
     </div>
   );
 }
+

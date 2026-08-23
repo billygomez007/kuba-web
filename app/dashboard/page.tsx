@@ -1,11 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import ActivateEmployeeButton from "../components/ActivateEmployeeButton";
-import SalesEmployeeChat from "../components/SalesEmployeeChat";
-import KubaAssistantPanel from "../components/command-center/KubaAssistantPanel";
 import KubaExecutiveChat from "../components/command-center/KubaExecutiveChat";
 import BusinessHealthCards from "../components/command-center/BusinessHealthCards";
 import DepartmentIntelligence from "../components/command-center/DepartmentIntelligence";
@@ -14,6 +11,11 @@ import ExecutiveBriefing from "../components/command-center/ExecutiveBriefing";
 import ExecutiveActions from "../components/command-center/ExecutiveActions";
 import ExecutiveAIHub from "../components/command-center/ExecutiveAIHub";
 import RecentConversations from "../components/command-center/RecentConversations";
+import SuperKubaLoading from "../components/SuperKubaLoading";
+import SuperKubaErrorPage from "../components/SuperKubaErrorPage";
+import BusinessGreeting from "../components/business/BusinessGreeting";
+import ExecutiveIntelligencePanels from "../components/command-center/ExecutiveIntelligencePanels";
+import ExecutiveOperationsOverview from "../components/command-center/ExecutiveOperationsOverview";
 
 type Business = {
   id: string;
@@ -21,6 +23,7 @@ type Business = {
   industry: string;
   country: string;
   businessSize: string;
+  logoUrl: string | null;
   status: string;
 };
 
@@ -77,7 +80,10 @@ const employeeLibrary = [
 export default function DashboardPage() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [businessTimezone, setBusinessTimezone] = useState<string | null>(null);
+  const [userTimezone, setUserTimezone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -94,8 +100,12 @@ export default function DashboardPage() {
 
         setBusiness(data.business ?? data);
         setEmployees(data.employees ?? []);
+        setBusinessTimezone(data.profile?.timezone ?? null);
+        setUserTimezone(data.userTimezone ?? null);
+        setLoadFailed(false);
       } catch (error) {
         console.error(error);
+        setLoadFailed(true);
       } finally {
         setLoading(false);
       }
@@ -115,93 +125,87 @@ export default function DashboardPage() {
   );
 
   const activeCount = employees.length;
-  const availableCount = Math.max(employeeLibrary.length - activeCount, 0);
 
   if (loading) {
+    return <SuperKubaLoading message="Getting your workspace ready..." />;
+  }
+
+  if (loadFailed) {
     return (
-      <main className="min-h-screen bg-[#050507] text-white">
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-center">
-            <div className="relative mx-auto h-28 w-28">
-              <div className="absolute inset-0 animate-pulse rounded-[2rem] bg-cyan-400/10 blur-2xl" />
-              <Image
-                src="/brand/superkuba-logo.png"
-                alt="SuperKuba"
-                width={2131}
-                height={738}
-                priority
-                className="relative h-auto w-64 object-contain drop-shadow-[0_0_28px_rgba(0,200,255,0.22)]"
-              />
-            </div>
-
-            <p className="mt-6 text-sm font-medium tracking-wide text-white/50">
-              Loading your SuperKuba workspace...
-            </p>
-
-            <div className="mx-auto mt-3 h-1 w-24 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500" />
-            </div>
-          </div>
-        </div>
-      </main>
+      <SuperKubaErrorPage
+        title="Your workspace needs a moment."
+        description="Your AI workforce is still protected. Please try again."
+        primaryHref="/dashboard"
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
   return (
     <main className="min-h-screen bg-[#050507] text-white">
-      {/* Background */}
+      {/* Background Gradient Effects */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-48 -top-48 h-[600px] w-[600px] rounded-full bg-cyan-500/[0.07] blur-[160px]" />
         <div className="absolute right-[-200px] top-[20%] h-[600px] w-[600px] rounded-full bg-violet-600/[0.07] blur-[160px]" />
+        <div className="absolute bottom-[-200px] left-[50%] h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-cyan-500/[0.04] blur-[140px]" />
       </div>
 
       <div className="relative">
+        <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-14">
 
+          {/* Premium Dashboard Header */}
+          <section className="mb-10">
+            <div className="flex flex-col justify-between gap-5 sm:gap-7 lg:flex-row lg:items-end">
+              <BusinessGreeting
+                name={business?.name || "Your business"}
+                logoUrl={business?.logoUrl}
+                industry={business?.industry}
+                activeEmployeeCount={activeCount}
+                businessTimezone={businessTimezone}
+                userTimezone={userTimezone}
+              />
 
-        <div className="mx-auto max-w-[1600px] px-6 py-10 lg:px-10 lg:py-14">
-
-          {/* Hero */}
-          <section>
-            <div className="flex flex-col justify-between gap-7 lg:flex-row lg:items-end">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300/70">
-                  Kuba Business Command Center
-                </p>
-
-                <h1 className="mt-3 text-4xl font-black tracking-[-0.04em] sm:text-5xl">
-                  {business?.name
-                    ? `Welcome to ${business.name}.`
-                    : "Welcome to your Kuba workspace."}
-                </h1>
-
-                <p className="mt-4 max-w-2xl text-base leading-7 text-white/40">
-                  Your AI operating system for running your business.
-                  Monitor performance, understand every department, and
-                  work with intelligent AI employees that help your company grow.
-                </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <Link
+                  href="/dashboard/ai-workforce"
+                  className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 sm:px-5 sm:py-3 text-xs sm:text-sm font-semibold text-white/70 transition hover:bg-white/[0.08] hover:text-white text-center"
+                >
+                  View Workforce
+                </Link>
+                <Link
+                  href="#workforce"
+                  className="inline-flex items-center justify-center rounded-lg sm:rounded-xl bg-white px-4 py-2.5 sm:px-5 sm:py-3 text-xs sm:text-sm font-bold text-black transition hover:scale-[1.02] hover:bg-white/90"
+                >
+                  + Add AI Employee
+                </Link>
               </div>
-
-              <Link
-                href="#workforce"
-                className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-5 py-3.5 text-sm font-bold text-black transition hover:scale-[1.02] hover:bg-white/90"
-              >
-                + Add AI employee
-              </Link>
             </div>
           </section>
 
-          {/* CEO COMMAND CENTER */}
+          {/* Operations Overview */}
+          <ExecutiveOperationsOverview initialEmployees={employees} />
 
-          <section className="mt-10 space-y-8">
+          {/* CEO COMMAND CENTER */}
+          <section className="mt-12 space-y-8">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300/70">
+                Executive Intelligence
+              </p>
+              <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] sm:text-3xl">
+                Business Command Center
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/40">
+                Real-time insights into your business operations, AI workforce activity, and key performance metrics.
+              </p>
+            </div>
 
             <BusinessHealthCards />
 
+            <ExecutiveIntelligencePanels />
+
             <div className="grid gap-6 xl:grid-cols-2">
-
               <ExecutiveBriefing />
-
               <KubaExecutiveChat />
-
             </div>
 
             <ExecutiveAlerts />
@@ -213,72 +217,37 @@ export default function DashboardPage() {
             <RecentConversations />
 
             <DepartmentIntelligence />
-
           </section>
 
 
-          {/* Stats */}
-          <section className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              label="AI employees"
-              value={String(activeCount)}
-              description="Currently activated"
-              icon="✦"
-              accent="violet"
-            />
-
-            <StatCard
-              label="Available employees"
-              value={String(availableCount)}
-              description="Ready to activate"
-              icon="＋"
-              accent="cyan"
-            />
-
-            <StatCard
-              label="Customers"
-              value="0"
-              description="Ready for your first customer"
-              icon="◎"
-              accent="fuchsia"
-            />
-
-            <StatCard
-              label="Automations"
-              value="0"
-              description="Workflows currently running"
-              icon="⌁"
-              accent="emerald"
-            />
-          </section>
-
-          {/* Workforce */}
+          {/* AI Workforce Section */}
           <section id="workforce" className="mt-14">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div className="flex flex-col justify-between gap-4 sm:gap-6 lg:flex-row lg:items-end">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/30">
-                  Your workforce
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-300/70">
+                  Workforce Management
                 </p>
 
-                <h2 className="mt-2 text-2xl font-black tracking-tight">
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] sm:text-3xl">
                   Your AI Workforce
                 </h2>
 
-                <p className="mt-2 text-sm text-white/35">
-                  Activate, manage, and monitor your AI employees that
-                  support different areas of your business.
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/40">
+                  Activate, manage, and monitor your AI employees across sales, operations, 
+                  customer service, finance, and more. Each AI employee is a specialized team member 
+                  ready to help your business scale.
                 </p>
               </div>
 
-              <button
-                type="button"
-                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+              <Link
+                href="/dashboard/ai-workforce"
+                className="shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white/60 transition hover:bg-white/[0.08] hover:text-white"
               >
-                Explore library
-              </button>
+                View All Employees
+              </Link>
             </div>
 
-            <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {employeeLibrary.map((employee) => {
                 const active = activeEmployeeTypes.has(employee.type);
                 const activeEmployee = activeEmployeeMap.get(employee.type);
@@ -294,17 +263,17 @@ export default function DashboardPage() {
                     {active && activeEmployee ? (
                       <Link
                         href={`/dashboard/employees/${activeEmployee.id}`}
-                        className="mt-5 flex items-center justify-between rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-4 py-3 transition hover:bg-emerald-400/[0.1]"
+                        className="mt-6 flex items-center justify-between rounded-xl border border-emerald-400/30 bg-emerald-400/[0.08] px-4 py-3 transition hover:bg-emerald-400/[0.12]"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400" />
                           <span className="text-sm font-bold text-emerald-300">
-                            Active
+                            Active & Working
                           </span>
                         </div>
 
-                        <span className="text-xs text-white/35">
-                          Open employee →
+                        <span className="text-xs font-medium text-emerald-300/70">
+                          View →
                         </span>
                       </Link>
                     ) : (
@@ -320,71 +289,74 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Activity + Business */}
+          {/* Operational Status + Business Overview */}
           <section className="mt-14 grid gap-6 lg:grid-cols-3">
 
-            {/* Activity */}
+            {/* AI Activity Status */}
             <div className="rounded-3xl border border-white/10 bg-white/[0.025] p-6 lg:col-span-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/30">
-                    Activity
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300/70">
+                    Operational Activity
                   </p>
 
-                  <h2 className="mt-2 text-xl font-bold">
-                    Recent AI activity
+                  <h2 className="mt-3 text-2xl font-black">
+                    AI Workforce Status
                   </h2>
                 </div>
 
-                <span className="rounded-full bg-emerald-400/10 px-3 py-1.5 text-xs font-bold text-emerald-400">
-                  Live
-                </span>
+                <div className="flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1.5">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                  <span className="text-xs font-bold text-emerald-300">Live</span>
+                </div>
               </div>
 
-              <div className="mt-6">
-                <ActivityRow
-                  icon="↗"
-                  title="Kuba Sales"
-                  description="Waiting for your first lead"
-                  time="Now"
-                />
-
-                <ActivityRow
-                  icon="◎"
-                  title="Kuba Receptionist"
-                  description="No customer conversations yet"
-                  time="Now"
-                />
-
-                <ActivityRow
-                  icon="◈"
-                  title="Kuba Appointment"
-                  description="No appointments scheduled"
-                  time="Now"
-                />
-
-                <ActivityRow
-                  icon="✺"
-                  title="Kuba Marketing"
-                  description="No campaigns running yet"
-                  time="Now"
-                />
+              <div className="mt-6 rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.04] p-6">
+                {activeCount === 0 ? (
+                  <>
+                    <p className="font-bold text-cyan-100">Your AI workforce is ready to launch.</p>
+                    <p className="mt-2 text-sm leading-6 text-white/45">Create your first AI employee to start automating sales, customer service, and operations. Activity and insights will appear here once your AI team is active.</p>
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                      <Link href="/dashboard/workforce/builder" className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-bold text-black transition hover:bg-cyan-300">Create First Employee</Link>
+                      <Link href="/help" className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-white/60">Learn More</Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                        <p className="text-xs font-semibold text-white/40">Active Employees</p>
+                        <p className="mt-2 text-2xl font-black text-cyan-300">{activeCount}</p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                        <p className="text-xs font-semibold text-white/40">Status</p>
+                        <p className="mt-2 text-lg font-black text-emerald-300">Operational</p>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                        <p className="text-xs font-semibold text-white/40">Activity Level</p>
+                        <p className="mt-2 text-lg font-black text-violet-300">Active</p>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm leading-6 text-white/45">Your AI workforce is actively handling conversations, tasks, and business operations. Review detailed activity, conversations, and performance metrics in the AI Activity Center.</p>
+                    <Link href="/dashboard/ai-activity" className="mt-4 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-semibold text-white/75 transition hover:bg-white/[0.08]">View Activity Center</Link>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Business */}
+            {/* Business Workspace Overview */}
             <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-violet-500/[0.12] to-cyan-500/[0.04] p-6">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
-                Business overview
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-300/70">
+                Organization
               </p>
 
               <h2 className="mt-3 text-2xl font-black">
-                Your workspace
+                Workspace
               </h2>
 
-              <div className="mt-7 space-y-5">
+              <div className="mt-6 space-y-5">
                 <BusinessDetail
-                  label="Business status"
+                  label="Business Status"
                   value={business?.status || "Active"}
                 />
 
@@ -394,77 +366,86 @@ export default function DashboardPage() {
                 />
 
                 <BusinessDetail
-                  label="Country"
+                  label="Location"
                   value={business?.country || "Ghana"}
                 />
 
                 <BusinessDetail
-                  label="Business size"
+                  label="Organization Size"
                   value={business?.businessSize || "Not specified"}
                 />
               </div>
 
               <Link
                 href="/dashboard/settings"
-                className="mt-7 block rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm font-semibold text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+                className="mt-6 block w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm font-semibold text-white/60 transition hover:bg-white/[0.08] hover:text-white"
               >
-                Manage business settings
+                Update Settings
               </Link>
             </div>
           </section>
 
-          {/* Build CTA */}
-          <section className="relative mt-14 overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.025] p-8 sm:p-10">
+          {/* Premium CTA Section */}
+          <section className="relative mt-16 overflow-hidden rounded-2xl sm:rounded-[32px] border border-white/10 bg-white/[0.025] p-6 sm:p-10 lg:p-12">
             <div className="pointer-events-none absolute right-[-100px] top-[-120px] h-[400px] w-[400px] rounded-full bg-violet-600/15 blur-[110px]" />
             <div className="pointer-events-none absolute bottom-[-150px] left-[-100px] h-[350px] w-[350px] rounded-full bg-cyan-500/10 blur-[100px]" />
 
             <div className="relative max-w-3xl">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-400">
-                Build with Kuba
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-violet-300/70">
+                Scale Your Business
               </p>
 
-              <h2 className="mt-3 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+              <h2 className="mt-4 text-2xl font-black tracking-[-0.03em] sm:text-3xl lg:text-4xl">
                 Start with one AI employee.
-                <br />
-                <span className="text-white/30">
+                <br className="hidden sm:block" />
+                <span className="text-white/25">
                   Build an entire workforce.
                 </span>
               </h2>
 
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/40">
-                Start with the roles your business needs most, then expand
-                your workforce as Kuba learns how your business operates.
+              <p className="mt-4 sm:mt-6 max-w-2xl text-sm sm:text-base leading-6 sm:leading-7 text-white/40">
+                {`SuperKuba's AI workforce adapts to your business. Start with the roles that drive`}
+                <br /> 
+                {`the most value, then expand as your Kuba team learns your operations and scales`}
+                <br />
+                {`with your growth. From sales to operations to customer service—build your perfect team.`}
               </p>
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-6 sm:mt-8 flex flex-col gap-2 sm:flex-row sm:gap-3">
                 <Link
                   href="#workforce"
-                  className="rounded-xl bg-white px-5 py-3 text-center text-sm font-bold text-black transition hover:bg-white/90"
+                  className="rounded-lg sm:rounded-xl bg-white px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-bold text-black text-center transition hover:bg-white/90"
                 >
-                  Explore AI employees
+                  Browse AI Employees
                 </Link>
 
-                <button
-                  type="button"
-                  className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white transition hover:bg-white/[0.08]"
+                <Link
+                  href="/dashboard/workforce/builder"
+                  className="rounded-lg sm:rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-bold text-white text-center transition hover:bg-white/[0.08]"
                 >
-                  Create AI employee
-                </button>
+                  Create AI Employee
+                </Link>
               </div>
             </div>
           </section>
 
           {/* Footer */}
-          <footer className="mt-14 border-t border-white/[0.06] py-8">
-            <div className="flex flex-col gap-3 text-xs text-white/25 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                Kuba AI · Your Business, Powered by an AI Workforce.
+          <footer className="mt-12 sm:mt-16 border-t border-white/[0.06] py-8 sm:py-10">
+            <div className="flex flex-col gap-3 sm:gap-4 text-xs sm:text-sm text-white/25 sm:flex-row sm:items-center sm:justify-between">
+              <span className="font-medium">
+                SuperKuba AI · Your Business, Powered by an AI Workforce.
               </span>
 
               <span>
                 {business?.name || "Your business"}
               </span>
             </div>
+            <nav className="mt-6 flex flex-wrap gap-4 sm:gap-6 text-xs text-white/30" aria-label="Dashboard trust links">
+              <Link href="/help" className="transition hover:text-white/60">Help Center</Link>
+              <Link href="/security" className="transition hover:text-white/60">Security</Link>
+              <Link href="/privacy" className="transition hover:text-white/60">Privacy</Link>
+              <Link href="/dashboard/settings" className="transition hover:text-white/60">Settings</Link>
+            </nav>
           </footer>
         </div>
       </div>
@@ -525,56 +506,24 @@ function EmployeeCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="group rounded-3xl border border-white/10 bg-white/[0.025] p-6 transition duration-300 hover:-translate-y-1 hover:border-violet-400/25 hover:bg-white/[0.04]">
+    <div className="group rounded-3xl border border-white/10 bg-white/[0.025] p-6 transition duration-300 hover:-translate-y-2 hover:border-violet-400/30 hover:bg-white/[0.035] hover:shadow-xl hover:shadow-violet-600/10">
       <div className="flex items-start justify-between">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-lg">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-xl transition group-hover:bg-violet-500/10 group-hover:text-violet-300">
           {icon}
         </div>
 
-        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/30">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white/30 transition group-hover:border-violet-300/20 group-hover:bg-violet-300/[0.08] group-hover:text-violet-200">
           {category}
         </span>
       </div>
 
-      <h3 className="mt-6 text-xl font-bold">{title}</h3>
+      <h3 className="mt-6 text-lg font-bold tracking-tight">{title}</h3>
 
-      <p className="mt-3 min-h-[72px] text-sm leading-6 text-white/40">
+      <p className="mt-3 min-h-[60px] text-sm leading-6 text-white/40">
         {description}
       </p>
 
       {children}
-    </div>
-  );
-}
-
-function ActivityRow({
-  icon,
-  title,
-  description,
-  time,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-  time: string;
-}) {
-  return (
-    <div className="flex items-center gap-4 border-t border-white/[0.06] py-4 first:border-t-0">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-sm">
-        {icon}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold">{title}</p>
-
-        <p className="mt-1 truncate text-xs text-white/30">
-          {description}
-        </p>
-      </div>
-
-      <span className="text-[10px] font-semibold text-white/20">
-        {time}
-      </span>
     </div>
   );
 }

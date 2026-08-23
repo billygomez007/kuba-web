@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import EmptyState from "../../components/EmptyState";
 
 type Lead = {
   id: string;
@@ -31,7 +30,7 @@ export default function FollowUpsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
-  const [currentTime] = useState(() => Date.now());
+  const [now, setNow] = useState<number>(() => Date.now());
 
   async function loadData() {
     try {
@@ -61,44 +60,19 @@ export default function FollowUpsPage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
 
-    async function loadInitialData() {
-      try {
-        const [followUpsResponse, leadsResponse] = await Promise.all([
-          fetch("/api/follow-ups", {
-            cache: "no-store",
-          }),
-          fetch("/api/leads", {
-            cache: "no-store",
-          }),
-        ]);
+    return () => window.clearTimeout(timer);
+  }, []);
 
-        if (!followUpsResponse.ok || !leadsResponse.ok) {
-          throw new Error("Unable to load sales workflow.");
-        }
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
 
-        const followUpsData = await followUpsResponse.json();
-        const leadsData = await leadsResponse.json();
-
-        if (!cancelled) {
-          setLeads(leadsData.leads ?? []);
-          setItems(followUpsData.followUps ?? []);
-        }
-      } catch (error) {
-        console.error("Follow-up loading error:", error);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadInitialData();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => window.clearInterval(interval);
   }, []);
 
   const filteredItems = useMemo(() => {
@@ -138,7 +112,7 @@ export default function FollowUpsPage() {
 
     const time = new Date(followUp.dueAt).getTime();
 
-    return !Number.isNaN(time) && time < currentTime;
+    return !Number.isNaN(time) && time < now;
   });
 
   return (
@@ -221,23 +195,34 @@ export default function FollowUpsPage() {
                 Loading follow-ups...
               </div>
             ) : filteredItems.length === 0 ? (
-              <EmptyState
-                icon="↻"
-                title="Never let a promising customer go cold"
-                description="Schedule the next touchpoint or let your AI Sales Assistant keep every lead moving at the right time."
-                actionLabel="Create Follow-up"
-                onAction={() => setShowForm(true)}
-                secondaryLabel="View Sales"
-                secondaryHref="/dashboard/sales"
-                className="m-5"
-              />
+              <div className="p-14 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-xl">
+                  ✓
+                </div>
+
+                <h3 className="mt-5 text-lg font-bold">
+                  No follow-ups yet
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/30">
+                  Create a follow-up so Kuba knows what needs to happen next.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setShowForm(true)}
+                  className="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-black"
+                >
+                  Create follow-up
+                </button>
+              </div>
             ) : (
               <div className="divide-y divide-white/[0.06]">
                 {filteredItems.map((item) => (
                   <FollowUpCard
                     key={item.followUp.id}
                     item={item}
-                    currentTime={currentTime}
+                    now={now}
                     onStatusChange={async (id, status) => {
                       try {
                         const response = await fetch(
@@ -343,12 +328,12 @@ function Stat({
 
 function FollowUpCard({
   item,
-  currentTime,
   onStatusChange,
+  now,
 }: {
   item: FollowUpResult;
-  currentTime: number;
   onStatusChange: (id: string, status: string) => void;
+  now: number;
 }) {
   const { followUp, lead } = item;
 
@@ -357,7 +342,7 @@ function FollowUpCard({
   const isOverdue =
     followUp.status !== "completed" &&
     !Number.isNaN(date.getTime()) &&
-    date.getTime() < currentTime;
+    date.getTime() < now;
 
   return (
     <div className="flex flex-col justify-between gap-5 p-6 transition hover:bg-white/[0.02] lg:flex-row lg:items-center">

@@ -91,7 +91,7 @@ export async function GET(
       );
 
 
-  const customerFollowUps: never[] =
+  const customerFollowUps: Array<Record<string, unknown>> =
     [];
 
 

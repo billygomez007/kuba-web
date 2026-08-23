@@ -3,11 +3,11 @@
 import {
   FormEvent,
   Suspense,
+  useEffect,
   useState,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
 
 function InviteForm() {
@@ -21,11 +21,11 @@ function InviteForm() {
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(() =>
-    token
-      ? ""
-      : "This invitation link is missing its invitation token.",
-  );
+  const [error, setError] = useState("");
+
+  const missingTokenError = !token
+    ? "This invitation link is missing its invitation token."
+    : "";
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -33,9 +33,7 @@ function InviteForm() {
     event.preventDefault();
 
     if (!token) {
-      setError(
-        "This invitation link is missing its invitation token.",
-      );
+      setError("Invalid invitation link.");
       return;
     }
 
@@ -110,32 +108,27 @@ function InviteForm() {
       <div className="w-full max-w-md">
 
         <div className="mb-8 text-center">
-          <Link href="/" aria-label="SuperKuba homepage">
-            <Image
-              src="/brand/superkuba-logo.png"
-              alt="SuperKuba"
-              width={2131}
-              height={738}
-              priority
-              className="mx-auto h-auto w-[180px] object-contain sm:w-[200px]"
-            />
-          </Link>
+          <img
+            src="/brand/kuba-logo-3d.png"
+            alt="Kuba AI"
+            className="mx-auto w-[190px]"
+          />
 
           <h1 className="mt-8 text-3xl font-bold">
             Join your team
           </h1>
 
           <p className="mt-3 text-white/50">
-            Create your SuperKuba account and join the
+            Create your Kuba account and join the
             business you were invited to.
           </p>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
 
-          {error && (
+          {(error || missingTokenError) && (
             <div className="mb-5 rounded-xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-300">
-              {error}
+              {error || missingTokenError}
             </div>
           )}
 
@@ -224,7 +217,7 @@ function InviteForm() {
           )}
 
           <div className="mt-6 text-center text-sm text-white/40">
-            Already have a SuperKuba account?{" "}
+            Already have a Kuba account?{" "}
             <Link
               href="/login"
               className="text-cyan-300"

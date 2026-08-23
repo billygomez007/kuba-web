@@ -2,38 +2,39 @@
 
 import { useEffect, useState } from "react";
 
-type Conversation = {
+type ConversationItem = {
   id: string;
-  customerId: string | null;
-  customerName: string | null;
-  integrationId: string;
-  status: string;
-  assignedEmployeeId: string | null;
-  aiMode?: string | null;
+  customerName?: string | null;
+  integrationId?: string | null;
+  status?: string;
+  aiMode?: string;
+  assignedEmployeeId?: string | null;
+  customerId?: string | null;
 };
 
-type ConversationMessage = {
+type MessageItem = {
   id: string;
-  direction: string;
-  senderType: string;
-  content: string;
-  createdAt?: string | number | Date | null;
+  content?: string;
+  sender?: string;
+  direction?: string;
+  senderType?: string;
+  createdAt?: string;
 };
 
-type EmployeeOption = {
+type EmployeeItem = {
   id: string;
-  name: string;
+  name?: string;
 };
 
 type CustomerProfile = {
   customer?: {
-    name: string | null;
-    phone: string | null;
-    email: string | null;
+    name?: string | null;
+    phone?: string | null;
+    email?: string | null;
   } | null;
-  conversations?: unknown[];
-  leads?: Array<{ id: string }>;
-  followUps?: unknown[];
+  leads?: Array<{ id: string }> | null;
+  conversations?: unknown[] | null;
+  followUps?: unknown[] | null;
 };
 
 type CustomerTag = {
@@ -44,192 +45,100 @@ type CustomerTag = {
 type LeadScore = {
   score: number;
   category: string;
-};
+} | null;
 
-
-function ChannelIcon({ channel }: { channel:string }) {
-
+function ChannelIcon({ channel }: { channel?: string | null }) {
   const icons: Record<string, string> = {
-    whatsapp:"🟢",
-    facebook:"🔵",
-    instagram:"🟣",
-    telegram:"✈️",
-    email:"✉️",
-    sms:"📱",
+    whatsapp: "🟢",
+    facebook: "🔵",
+    instagram: "🟣",
+    telegram: "✈️",
+    email: "✉️",
+    sms: "📱",
   };
 
-  return icons[channel] || "🌐";
-
+  return icons[channel ?? ""] || "🌐";
 }
 
-
 export default function MessagingPage() {
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [selected, setSelected] = useState<ConversationItem | null>(null);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [text, setText] = useState("");
+  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [channelFilter, setChannelFilter] = useState("all");
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [summary, setSummary] = useState("");
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [customerTags, setCustomerTags] = useState<CustomerTag[]>([]);
+  const [newTag, setNewTag] = useState("");
+  const [leadScore, setLeadScore] = useState<LeadScore>(null);
 
-  const [conversations,setConversations] =
-    useState<Conversation[]>([]);
+  useEffect(() => {
+    const loadInbox = async () => {
+      const inboxResponse = await fetch("/api/messages/inbox");
+      const inboxData = (await inboxResponse.json()) as { conversations?: ConversationItem[] };
+      setConversations(inboxData.conversations || []);
+    };
 
-  const [selected,setSelected] =
-    useState<Conversation | null>(null);
+    const loadEmployees = async () => {
+      const employeesResponse = await fetch("/api/employees");
+      const employeesData = (await employeesResponse.json()) as { employees?: EmployeeItem[] };
+      setEmployees(employeesData.employees || []);
+    };
 
-  const [messages,setMessages] =
-    useState<ConversationMessage[]>([]);
+    void loadInbox();
+    void loadEmployees();
+  }, []);
 
-  const [text,setText] =
-    useState("");
-
-  const [employees,setEmployees] =
-    useState<EmployeeOption[]>([]);
-
-  const [search,setSearch] =
-    useState("");
-
-  const [channelFilter,setChannelFilter] =
-    useState("all");
-
-  const [customerProfile,setCustomerProfile] =
-    useState<CustomerProfile | null>(null);
-
-  const [summary,setSummary] =
-    useState("");
-
-  const [loadingSummary,setLoadingSummary] =
-    useState(false);
-
-  const [customerTags,setCustomerTags] =
-    useState<CustomerTag[]>([]);
-
-  const [newTag,setNewTag] =
-    useState("");
-
-  const [leadScore,setLeadScore] =
-    useState<LeadScore | null>(null);
-
-
-  useEffect(()=>{
-
-    fetch("/api/messages/inbox")
-      .then(r=>r.json())
-      .then(data=>{
-        setConversations(
-          data.conversations || []
-        );
-      });
-
-
-    fetch("/api/employees")
-      .then(r=>r.json())
-      .then(data=>{
-        setEmployees(
-          data.employees || []
-        );
-      });
-
-  },[]);
-
-
-
-  async function openConversation(item: Conversation){
-
+  async function openConversation(item: ConversationItem) {
     setSelected(item);
 
-    const response =
-      await fetch(
-        `/api/messages/conversation?id=${item.id}`
-      );
+    const response = await fetch(`/api/messages/conversation?id=${item.id}`);
+    const data = (await response.json()) as { messages?: MessageItem[] };
+    setMessages(data.messages || []);
 
-    const data =
-      await response.json();
+    if (item.customerId) {
+      const profileResponse = await fetch(`/api/customers/profile?id=${item.customerId}`);
+      const profileData = (await profileResponse.json()) as CustomerProfile;
+      setCustomerProfile(profileData);
 
-    setMessages(
-      data.messages || []
-    );
+      const tagsResponse = await fetch(`/api/customers/tags?customerId=${item.customerId}`);
+      const tagData = (await tagsResponse.json()) as { tags?: CustomerTag[] };
+      setCustomerTags(tagData.tags || []);
 
-
-    if(item.customerId){
-
-      const profile =
-        await fetch(
-          `/api/customers/profile?id=${item.customerId}`
-        );
-
-
-      const profileData =
-        await profile.json();
-
-
-      setCustomerProfile(
-        profileData
-      );
-
-
-      const tags =
-        await fetch(
-          `/api/customers/tags?customerId=${item.customerId}`
-        );
-
-
-      const tagData =
-        await tags.json();
-
-
-      setCustomerTags(
-        tagData.tags || []
-      );
-
-
-      if(profileData.leads?.[0]){
-
-        const score =
-          await fetch(
-            `/api/leads/score?id=${profileData.leads[0].id}`
-          );
-
-
-        const scoreData =
-          await score.json();
-
-
-        setLeadScore(
-          scoreData.score
-        );
-
+      if (profileData.leads?.[0]) {
+        const scoreResponse = await fetch(`/api/leads/score?id=${profileData.leads[0].id}`);
+        const scoreData = (await scoreResponse.json()) as { score?: LeadScore };
+        setLeadScore(scoreData.score ?? null);
       }
-
     }
-
   }
 
+  async function addTag() {
+    if (!selected?.customerId || !newTag) return;
 
-
-
-  async function addTag(){
-
-    if(!selected?.customerId || !newTag) return;
-
-
-    await fetch("/api/customers/tags",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
+    await fetch("/api/customers/tags", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-      body:JSON.stringify({
-        customerId:selected.customerId,
-        tag:newTag,
+      body: JSON.stringify({
+        customerId: selected.customerId,
+        tag: newTag,
       }),
     });
-
 
     setCustomerTags([
       ...customerTags,
       {
-        id:crypto.randomUUID(),
-        tag:newTag,
+        id: crypto.randomUUID(),
+        tag: newTag,
       },
     ]);
 
-
     setNewTag("");
-
   }
 
 

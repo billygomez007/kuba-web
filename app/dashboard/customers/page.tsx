@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import EmptyState from "../../components/EmptyState";
 
 type Customer = {
   id: string;
@@ -40,37 +39,11 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void loadCustomers();
+    }, 0);
 
-    async function loadInitialCustomers() {
-      try {
-        const response = await fetch("/api/customers", {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          throw new Error("Unable to load customers.");
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setCustomers(data.customers ?? []);
-        }
-      } catch (error) {
-        console.error("Customer loading error:", error);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadInitialCustomers();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => window.clearTimeout(timer);
   }, []);
 
   const filteredCustomers = useMemo(() => {
@@ -376,16 +349,33 @@ function EmptyCustomers({
   onAdd: () => void;
 }) {
   return (
-    <EmptyState
-      icon="◎"
-      title={hasSearch ? "Try another customer search" : "Build a complete view of every customer"}
-      description={hasSearch ? "Search by another name, email address, phone number, or source." : "Add your first customer so SuperKuba can organize conversations, sales activity, and follow-ups in one intelligent profile."}
-      actionLabel={hasSearch ? undefined : "Add First Customer"}
-      onAction={hasSearch ? undefined : onAdd}
-      secondaryLabel={hasSearch ? undefined : "Connect Customer Channel"}
-      secondaryHref={hasSearch ? undefined : "/dashboard/integrations"}
-      className="m-5"
-    />
+    <div className="p-12 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-xl">
+        ◎
+      </div>
+
+      <h3 className="mt-5 text-lg font-bold">
+        {hasSearch
+          ? "No customers found."
+          : "Your customer database is empty."}
+      </h3>
+
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/35">
+        {hasSearch
+          ? "Try a different name, email address, or phone number."
+          : "Add your first customer and start building Kuba's shared customer intelligence."}
+      </p>
+
+      {!hasSearch && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-white/90"
+        >
+          + Add first customer
+        </button>
+      )}
+    </div>
   );
 }
 

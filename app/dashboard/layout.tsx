@@ -5,103 +5,143 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const navigation = [
+type NavigationItem = {
+  label: string;
+  href: string;
+  icon: string;
+  ownerOnly?: boolean;
+  permission?: string;
+};
+
+type NavigationGroup = {
+  title?: string;
+  items: NavigationItem[];
+};
+
+const navigationGroups: NavigationGroup[] = [
+
   {
-    section: "Business Operations",
-    label: "Overview",
-    href: "/dashboard",
-    icon: "⌂",
+    title: "Super Admin",
+
+    items: [
+      {
+        label: "Admin Command Center",
+        href: "/dashboard/admin",
+        icon: "⌂",
+      },
+      {
+        label: "Businesses",
+        href: "/dashboard/admin/businesses",
+        icon: "▣",
+      },
+      {
+        label: "Users",
+        href: "/dashboard/admin/users",
+        icon: "♙",
+      },
+      {
+        label: "AI Workforce",
+        href: "/dashboard/admin/workforce",
+        icon: "✦",
+      },
+      {
+        label: "Billing",
+        href: "/dashboard/admin/billing",
+        icon: "$",
+      },
+      {
+        label: "Revenue Analytics",
+        href: "/dashboard/admin/revenue",
+        icon: "▥",
+      },
+      {
+        label: "Security",
+        href: "/dashboard/admin/security",
+        icon: "⚠",
+      },
+      {
+        label: "Platform Settings",
+        href: "/dashboard/admin/settings",
+        icon: "⚙",
+      },
+    ],
   },
+
+
   {
-    section: "Business Operations",
-    label: "AI Workforce",
-    href: "/dashboard/workforce",
-    icon: "✦",
-  },
-  {
-    section: "Business Operations",
-    label: "AI Employees",
-    href: "/dashboard/ai-employees",
-    icon: "♙",
-  },
-  {
-    section: "Business Operations",
-    label: "Automations",
-    href: "/dashboard/automations",
-    icon: "⌁",
-  },
-  {
-    section: "Business Operations",
-    label: "Workflows",
-    href: "/dashboard/tasks",
-    icon: "✓",
-  },
-  {
-    section: "Business Operations",
-    label: "Knowledge Base",
-    href: "/dashboard/knowledge",
-    icon: "🧠",
-  },
-  {
-    section: "Business Operations",
-    label: "Analytics",
-    href: "/dashboard/analytics",
-    icon: "▥",
-  },
-  {
-    section: "Customer Operations",
-    label: "Inbox",
-    href: "/dashboard/inbox",
-    icon: "◌",
-  },
-  {
-    section: "Customer Operations",
-    label: "Leads",
-    href: "/dashboard/sales",
-    icon: "↗",
-  },
-  {
-    section: "Customer Operations",
-    label: "Customers",
-    href: "/dashboard/customers",
-    icon: "◎",
-  },
-  {
-    section: "Customer Operations",
-    label: "Follow-ups",
-    href: "/dashboard/follow-ups",
-    icon: "◷",
-  },
-  {
-    section: "Administration",
-    label: "Integrations",
-    href: "/dashboard/integrations",
-    icon: "⌘",
-    permission: "integrations.view",
-  },
-  {
-    section: "Administration",
-    label: "Team Members",
-    href: "/dashboard/settings/team",
-    icon: "👥",
-  },
-  {
-    section: "Administration",
-    label: "Settings",
-    href: "/dashboard/settings",
-    icon: "⚙",
+    items: [
+      {
+        label: "Command Center",
+        href: "/dashboard",
+        icon: "⌂",
+      },
+      {
+        label: "AI Workforce",
+        href: "/dashboard/ai-workforce",
+        icon: "✦",
+      },
+      {
+        label: "HR",
+        href: "/dashboard/hr",
+        icon: "♙",
+      },
+      {
+        label: "AI Activity",
+        href: "/dashboard/ai-activity",
+        icon: "◉",
+      },
+      {
+        label: "AI Performance",
+        href: "/dashboard/ai-performance",
+        icon: "▥",
+        permission: "workforce.view",
+      },
+      {
+        label: "Customer Operations",
+        href: "/dashboard/customer-operations",
+        icon: "◎",
+      },
+      {
+        label: "Universal Inbox",
+        href: "/dashboard/inbox",
+        icon: "✉",
+        permission: "messaging.view",
+      },
+      {
+        label: "Business Operations",
+        href: "/dashboard/business-operations",
+        icon: "⌁",
+      },
+      {
+        label: "Automation",
+        href: "/dashboard/automations",
+        icon: "⚙",
+      },
+      {
+        label: "Analytics",
+        href: "/dashboard/analytics",
+        icon: "▥",
+      },
+      {
+        label: "Integrations",
+        href: "/dashboard/integrations",
+        icon: "⌘",
+        permission: "integrations.view",
+      },
+    ],
   },
 ];
 
 const navigationPermissions: Record<string, string> = {
   "/dashboard": "dashboard.view",
-  "/dashboard/workforce": "workforce.view",
-  "/dashboard/ai-employees": "workforce.view",
-  "/dashboard/automations": "automations.view",
-  "/dashboard/tasks": "tasks.view",
-  "/dashboard/customers": "customers.view",
+  "/dashboard/ai-workforce": "workforce.view",
+  "/dashboard/hr": "hr.dashboard.view",
+  "/dashboard/ai-activity": "workforce.view",
+  "/dashboard/ai-performance": "workforce.view",
+  "/dashboard/customer-operations": "customers.view",
   "/dashboard/inbox": "messaging.view",
-  "/dashboard/knowledge": "knowledge.view",
+  "/dashboard/business-operations": "tasks.view",
+  "/dashboard/automations": "automations.view",
   "/dashboard/analytics": "analytics.view",
   "/dashboard/integrations": "integrations.view",
 };
@@ -114,7 +154,14 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
 
-  const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [permissions, setPermissions] =
+    useState<string[] | null>(null);
+
+  const [role, setRole] =
+    useState<string | null>(null);
+
+  const [platformRole, setPlatformRole] =
+    useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,6 +187,14 @@ export default function DashboardLayout({
             : [];
 
           setPermissions(userPermissions);
+
+          setRole(
+            data.membership?.role || null,
+          );
+
+          setPlatformRole(
+            data.user?.platformRole || null,
+          );
 
           const matchedRoute = Object.keys(
             navigationPermissions,
@@ -172,115 +227,178 @@ export default function DashboardLayout({
     };
   }, []);
 
-  const visibleNavigation =
-    permissions === null
-      ? navigation
-      : navigation.filter((item) => {
-          const required =
-            navigationPermissions[item.href];
+  const visibleNavigation = navigationGroups.flatMap((group) =>
+    group.items.filter((item) => {
 
-          if (!required) return true;
+      if (
+        group.title === "Super Admin" &&
+        platformRole !== "super_admin"
+      ) {
+        return false;
+      }
 
-          return permissions.includes(required);
-        });
 
-  const navigationSections = [
-    "Business Operations",
-    "Customer Operations",
-    "Administration",
-  ] as const;
+      if (
+        group.title !== "Super Admin" &&
+        platformRole === "super_admin"
+      ) {
+        return true;
+      }
 
-  const groupedNavigation = navigationSections
-    .map((section) => ({
-      section,
-      items: visibleNavigation.filter(
-        (item) => item.section === section,
-      ),
-    }))
-    .filter((group) => group.items.length > 0);
+
+      if (
+        item.ownerOnly &&
+        role !== "owner"
+      ) {
+        return false;
+      }
+
+
+      const required =
+        navigationPermissions[item.href];
+
+      if (!required) return true;
+
+      return permissions === null ||
+        permissions.includes(required);
+
+    })
+  );
 
   return (
     <div className="min-h-screen bg-[#050507] text-white">
 
       {/* Desktop Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[250px] border-r border-white/[0.07] bg-[#07070A]/95 lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[260px] border-r border-white/[0.07] bg-[#07070A]/95 backdrop-blur-sm lg:flex lg:flex-col">
 
-        {/* Logo */}
+        {/* Logo & Branding */}
         <div className="flex h-20 items-center border-b border-white/[0.07] px-6">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href="/" className="flex items-center" aria-label="SuperKuba homepage">
             <Image
               src="/brand/superkuba-logo.png"
               alt="SuperKuba"
-              width={2131}
-              height={738}
+              width={2103}
+              height={748}
               priority
-              className="h-auto w-[145px] object-contain"
+              className="h-auto w-[140px] object-contain"
             />
           </Link>
         </div>
 
-        {/* Workspace */}
-        <div className="px-4 py-5">
-          <nav className="space-y-5">
-            {groupedNavigation.map((group) => (
-              <div key={group.section}>
-                <p className="px-3 text-[10px] font-bold uppercase tracking-[0.22em] text-white/20">
-                  {group.section}
-                </p>
+        {/* Navigation Workspace */}
+        <nav className="flex-1 overflow-y-auto px-4 py-6">
+          {navigationGroups.map((group) => {
 
-                <div className="mt-3 space-y-1">
-                  {group.items.map((item) => {
-              const active =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname.startsWith(item.href);
+            if (
+              group.title === "Super Admin" &&
+              platformRole !== "super_admin"
+            ) {
+              return null;
+            }
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                    active
-                      ? "bg-white/[0.08] text-white"
-                      : "text-white/40 hover:bg-white/[0.04] hover:text-white/80"
-                  }`}
-                >
-                  <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm ${
-                      active
-                        ? "bg-gradient-to-br from-cyan-400/20 to-violet-500/20 text-cyan-300"
-                        : "bg-white/[0.03] text-white/30 group-hover:text-white/60"
-                    }`}
-                  >
-                    {item.icon}
-                  </span>
+            const items = group.items.filter((item) => {
 
-                  <span>{item.label}</span>
+              if (
+                item.ownerOnly &&
+                role !== "owner"
+              ) {
+                return false;
+              }
 
-                  {active && (
-                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cyan-300" />
-                  )}
-                </Link>
-              );
+              const required =
+                navigationPermissions[item.href];
+
+              if (!required) return true;
+
+              return permissions === null ||
+                permissions.includes(required);
+
+            });
+
+
+            if (items.length === 0) return null;
+
+
+            return (
+
+              <div key={group.title || "main"} className="mb-6">
+
+                {group.title && (
+                  <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-white/20">
+                    {group.title}
+                  </p>
+                )}
+
+
+                <div className="space-y-1.5">
+
+                  {items.map((item) => {
+
+                    const active =
+                      item.href === "/dashboard"
+                        ? pathname === "/dashboard"
+                        : pathname.startsWith(item.href);
+
+
+                    return (
+
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          active
+                            ? "bg-white/[0.08] text-white shadow-lg shadow-white/5"
+                            : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
+                        }`}
+                      >
+
+                        <span
+                          className={`flex h-8 w-8 items-center justify-center rounded-md text-base font-semibold transition ${
+                            active
+                              ? "bg-gradient-to-br from-cyan-400/25 to-violet-500/25 text-cyan-300 shadow-lg shadow-cyan-400/10"
+                              : "bg-white/[0.04] text-white/40 group-hover:bg-white/[0.08] group-hover:text-white/60"
+                          }`}
+                        >
+                          {item.icon}
+                        </span>
+
+
+                        <span className="flex-1 truncate">{item.label}</span>
+
+
+                        {active && (
+                          <>
+                            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/50" />
+                          </>
+                        )}
+
+                      </Link>
+
+                    );
+
                   })}
-                </div>
-              </div>
-            ))}
-          </nav>
-        </div>
 
-        {/* Bottom */}
-        <div className="mt-auto border-t border-white/[0.07] p-4">
+                </div>
+
+              </div>
+
+            );
+
+          })}
+        </nav>
+
+        {/* Bottom Sidebar Section */}
+        <div className="border-t border-white/[0.07] p-4">
 
           <Link
             href="/dashboard/settings"
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
               pathname.startsWith("/dashboard/settings")
                 ? "bg-white/[0.08] text-white"
-                : "text-white/40 hover:bg-white/[0.04] hover:text-white/80"
+                : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
             }`}
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.03] text-sm text-white/40">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-base text-white/40">
               ⚙
             </span>
 
@@ -289,61 +407,82 @@ export default function DashboardLayout({
 
           <Link
             href="/dashboard/settings/team"
-            className={`mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+            className={`mt-1.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
               pathname.startsWith("/dashboard/settings/team")
                 ? "bg-white/[0.08] text-white"
-                : "text-white/40 hover:bg-white/[0.04] hover:text-white/80"
+                : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
             }`}
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.03] text-white/40">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-base text-white/40">
               👥
             </span>
 
-            <span>Team & Staff</span>
+            <span>Team</span>
           </Link>
 
-          <div className="mt-3 rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.04] p-3">
+          <Link
+            href="/help"
+            className="mt-1.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white/70"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-base text-white/40">
+              ?
+            </span>
+
+            <span>Help</span>
+          </Link>
+
+          {/* AI Workforce Status */}
+          <div className="mt-4 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] p-3">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
 
               <span className="text-xs font-semibold text-emerald-300">
-                Kuba is active
+                Kuba Active
               </span>
             </div>
 
-            <p className="mt-2 text-[10px] leading-4 text-white/25">
-              Your AI workforce is ready to work.
+            <p className="mt-2 text-[11px] leading-4 text-white/35">
+              AI workforce ready
             </p>
           </div>
         </div>
       </aside>
-
       {/* Mobile Header */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#050507]/90 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#050507]/90 backdrop-blur-lg lg:hidden">
         <div className="flex h-16 items-center justify-between px-5">
-          <Link href="/dashboard">
+          <Link href="/" aria-label="SuperKuba homepage">
             <Image
               src="/brand/superkuba-logo.png"
               alt="SuperKuba"
-              width={2131}
-              height={738}
+              width={2103}
+              height={748}
               priority
               className="h-auto w-[125px] object-contain"
             />
           </Link>
 
-          <Link
-            href="/dashboard/settings"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-sm text-white/50"
-          >
-            ⚙
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/help"
+              aria-label="Help and Support"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] text-sm font-semibold text-white/50 transition hover:bg-white/[0.08]"
+            >
+              ?
+            </Link>
+            <Link
+              href="/dashboard/settings"
+              aria-label="Dashboard settings"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] text-sm text-white/50 transition hover:bg-white/[0.08]"
+            >
+              ⚙
+            </Link>
+          </div>
         </div>
 
-        {/* Mobile navigation */}
-        <div className="overflow-x-auto border-t border-white/[0.05] px-4 py-2">
-          <nav className="flex min-w-max gap-1">
-            {navigation.map((item) => {
+        {/* Mobile Navigation Tabs */}
+        <div className="overflow-x-auto border-t border-white/[0.05]">
+          <nav className="flex min-w-max gap-1 px-4 py-2">
+            {visibleNavigation.slice(0, 6).map((item) => {
               const active =
                 item.href === "/dashboard"
                   ? pathname === "/dashboard"
@@ -353,10 +492,10 @@ export default function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     active
                       ? "bg-white/[0.08] text-white"
-                      : "text-white/35 hover:text-white"
+                      : "text-white/40 hover:bg-white/[0.04] hover:text-white/60"
                   }`}
                 >
                   {item.label}
@@ -367,10 +506,11 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="lg:pl-[250px]">
+      {/* Main Content Area */}
+      <div className="lg:pl-[260px]">
         {children}
       </div>
     </div>
   );
 }
+

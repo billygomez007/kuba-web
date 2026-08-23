@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import EmptyState from "../../components/EmptyState";
 
 type Lead = {
   id: string;
@@ -63,46 +62,11 @@ export default function SalesPage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void loadSales();
+    }, 0);
 
-    async function loadInitialSales() {
-      try {
-        const response = await fetch("/api/leads");
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            result.error || "Unable to load sales data.",
-          );
-        }
-
-        if (!cancelled) {
-          setData({
-            leads: result.leads || [],
-            followUps: result.followUps || [],
-            activities: result.activities || [],
-          });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setError(
-            error instanceof Error
-              ? error.message
-              : "Unable to load sales data.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadInitialSales();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
@@ -174,16 +138,9 @@ export default function SalesPage() {
               </div>
 
               {data.leads.length === 0 ? (
-                <EmptyState
-                  icon="↗"
-                  title="Turn customer interest into revenue"
-                  description="Your AI Sales Assistant will capture, qualify, and follow up with leads from every connected customer channel."
-                  actionLabel="Create AI Sales Assistant"
-                  actionHref="/dashboard/workforce"
-                  secondaryLabel="Connect Customer Channel"
-                  secondaryHref="/dashboard/integrations"
-                  className="m-5"
-                />
+                <div className="p-10 text-center text-sm text-white/30">
+                  No leads yet.
+                </div>
               ) : (
                 <div className="divide-y divide-white/10">
                   {data.leads.map((lead) => (

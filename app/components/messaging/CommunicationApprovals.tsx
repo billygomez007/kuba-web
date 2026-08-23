@@ -1,16 +1,14 @@
 "use client";
 
-type Approval = {
-  id: string;
-  channel: string;
-  recipient: string;
-  message: string;
-};
-
 export default function CommunicationApprovals({
   approvals,
 }: {
-  approvals: Approval[];
+  approvals: Array<{
+    id: string;
+    channel: string;
+    recipient: string;
+    message: string;
+  }>;
 }) {
 
   async function decide(

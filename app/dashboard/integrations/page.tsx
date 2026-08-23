@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   FaWhatsapp,
@@ -13,41 +14,24 @@ import {
 
 type IntegrationRecord = {
   provider: string;
-  status: string;
+  status?: string;
 };
 
 export default function IntegrationsPage() {
+  const router = useRouter();
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
+    const loadIntegrations = async () => {
+      const res = await fetch("/api/integrations", {
+        cache: "no-store",
+      });
 
-    async function loadInitialIntegrations() {
-      try {
-        const response = await fetch("/api/integrations", {
-          cache: "no-store",
-        });
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setIntegrations(
-            data.integrations || [],
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Integration loading error:",
-          error,
-        );
-      }
-    }
-
-    void loadInitialIntegrations();
-
-    return () => {
-      cancelled = true;
+      const data = (await res.json()) as { integrations?: IntegrationRecord[] };
+      setIntegrations(data.integrations || []);
     };
+
+    void loadIntegrations();
   }, []);
 
   const items = [
@@ -94,17 +78,13 @@ export default function IntegrationsPage() {
 
   return (
     <main className="min-h-screen bg-[#050507] px-6 py-10 text-white">
-
-      <h1 className="text-4xl font-black">
-        Integrations
-      </h1>
+      <h1 className="text-4xl font-black">Integrations</h1>
 
       <p className="mt-3 text-white/50">
         Connect Kuba with your business channels.
       </p>
 
       <div className="mt-10 grid gap-5 md:grid-cols-2">
-
         {items.map((item) => {
           const connected = integrations.some(
             (integration) =>
@@ -117,66 +97,41 @@ export default function IntegrationsPage() {
               key={item.provider}
               className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
             >
-              <div className="text-white">
-                {item.icon}
-              </div>
+              <div className="text-white">{item.icon}</div>
 
-              <h2 className="mt-4 text-xl font-bold">
-                {item.name}
-              </h2>
+              <h2 className="mt-4 text-xl font-bold">{item.name}</h2>
 
-              <p className="mt-2 text-sm text-white/50">
-                {item.description}
-              </p>
+              <p className="mt-2 text-sm text-white/50">{item.description}</p>
 
               <div className="mt-5 flex items-center justify-between">
-
                 <span className="text-xs uppercase text-white/40">
-                  {connected
-                    ? "Connected"
-                    : "Not connected"}
+                  {connected ? "Connected" : "Not connected"}
                 </span>
 
                 <button
                   onClick={() => {
-                    if (item.provider === "whatsapp") {
-                      window.location.href =
-                        "/dashboard/integrations/whatsapp";
-                    }
+                    const routeMap: Record<string, string> = {
+                      whatsapp: "/dashboard/integrations/whatsapp",
+                      website: "/dashboard/integrations/website-chat",
+                      meta: "/dashboard/integrations/meta",
+                      telegram: "/dashboard/integrations/telegram",
+                      email: "/dashboard/integrations/email",
+                    };
 
-                    if (item.provider === "website") {
-                      window.location.href =
-                        "/dashboard/integrations/website-chat";
-                    }
-
-                    if (item.provider === "meta") {
-                      window.location.href =
-                        "/dashboard/integrations/meta";
-                    }
-
-                    if (item.provider === "telegram") {
-                      window.location.href =
-                        "/dashboard/integrations/telegram";
-                    }
-
-                    if (item.provider === "email") {
-                      window.location.href =
-                        "/dashboard/integrations/email";
+                    const nextRoute = routeMap[item.provider];
+                    if (nextRoute) {
+                      router.push(nextRoute);
                     }
                   }}
                   className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black"
                 >
                   {connected ? "Manage" : "Connect"}
                 </button>
-
               </div>
-
             </div>
           );
         })}
-
       </div>
-
     </main>
   );
 }
