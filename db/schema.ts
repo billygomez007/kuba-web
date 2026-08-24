@@ -4,6 +4,7 @@ import {
   text,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 export const session = sqliteTable(
@@ -1090,3 +1091,1154 @@ export const knowledgeSources = sqliteTable(
     }).notNull(),
   },
 );
+
+/**
+ * HR core, attendance/leave, and payroll tables.
+ *
+ * These tables already exist in the deployed database but were missing
+ * from this file. The HR core and attendance/leave definitions below are
+ * recovered verbatim (column-for-column and index-for-index verified
+ * against the live schema) from a locally-recovered historical version of
+ * this file. The payroll definitions have no recovered source; they are
+ * generated directly from the live database's column types, defaults,
+ * nullability, indexes, and check constraints. No columns, indexes, or
+ * foreign keys were invented — this block only documents what is already
+ * deployed.
+ */
+
+export const hrDepartments = sqliteTable(
+  "hr_departments",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    parentDepartmentId: text("parent_department_id"),
+    managerEmployeeId: text("manager_employee_id"),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_departments_business_code_uidx").on(
+      table.businessId,
+      table.code,
+    ),
+    index("hr_departments_business_status_idx").on(
+      table.businessId,
+      table.status,
+    ),
+    index("hr_departments_business_parent_idx").on(
+      table.businessId,
+      table.parentDepartmentId,
+    ),
+    index("hr_departments_business_manager_idx").on(
+      table.businessId,
+      table.managerEmployeeId,
+    ),
+  ],
+);
+
+export const hrPositions = sqliteTable(
+  "hr_positions",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    departmentId: text("department_id"),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    grade: text("grade"),
+    employmentType: text("employment_type"),
+    reportsToPositionId: text("reports_to_position_id"),
+    headcountLimit: integer("headcount_limit"),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_positions_business_code_uidx").on(
+      table.businessId,
+      table.code,
+    ),
+    index("hr_positions_business_department_status_idx").on(
+      table.businessId,
+      table.departmentId,
+      table.status,
+    ),
+    index("hr_positions_business_reports_to_idx").on(
+      table.businessId,
+      table.reportsToPositionId,
+    ),
+    index("hr_positions_business_status_idx").on(
+      table.businessId,
+      table.status,
+    ),
+  ],
+);
+
+export const hrEmployees = sqliteTable(
+  "hr_employees",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    businessUserId: text("business_user_id"),
+    employeeNumber: text("employee_number").notNull(),
+    displayName: text("display_name").notNull(),
+    departmentId: text("department_id"),
+    positionId: text("position_id"),
+    managerEmployeeId: text("manager_employee_id"),
+    branchId: text("branch_id"),
+    workEmail: text("work_email"),
+    workPhone: text("work_phone"),
+    hireDate: integer("hire_date", { mode: "timestamp" }).notNull(),
+    employmentType: text("employment_type").notNull(),
+    employmentStatus: text("employment_status").notNull().default("active"),
+    terminationDate: integer("termination_date", { mode: "timestamp" }),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_employees_business_number_uidx").on(
+      table.businessId,
+      table.employeeNumber,
+    ),
+    uniqueIndex("hr_employees_business_user_uidx").on(
+      table.businessId,
+      table.businessUserId,
+    ),
+    index("hr_employees_business_status_idx").on(
+      table.businessId,
+      table.employmentStatus,
+    ),
+    index("hr_employees_business_department_status_idx").on(
+      table.businessId,
+      table.departmentId,
+      table.employmentStatus,
+    ),
+    index("hr_employees_business_position_idx").on(
+      table.businessId,
+      table.positionId,
+    ),
+    index("hr_employees_business_manager_idx").on(
+      table.businessId,
+      table.managerEmployeeId,
+    ),
+    index("hr_employees_business_branch_idx").on(
+      table.businessId,
+      table.branchId,
+    ),
+  ],
+);
+
+export const hrEmployeeProfiles = sqliteTable(
+  "hr_employee_profiles",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    legalFirstName: text("legal_first_name").notNull(),
+    legalMiddleName: text("legal_middle_name"),
+    legalLastName: text("legal_last_name").notNull(),
+    preferredName: text("preferred_name"),
+    dateOfBirth: integer("date_of_birth", { mode: "timestamp" }),
+    gender: text("gender"),
+    nationality: text("nationality"),
+    personalEmail: text("personal_email"),
+    personalPhone: text("personal_phone"),
+    address: text("address"),
+    emergencyContactName: text("emergency_contact_name"),
+    emergencyContactRelationship: text("emergency_contact_relationship"),
+    emergencyContactPhone: text("emergency_contact_phone"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_employee_profiles_business_employee_uidx").on(
+      table.businessId,
+      table.employeeId,
+    ),
+    index("hr_employee_profiles_business_name_idx").on(
+      table.businessId,
+      table.legalLastName,
+      table.legalFirstName,
+    ),
+  ],
+);
+
+export const hrContracts = sqliteTable(
+  "hr_contracts",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    positionId: text("position_id"),
+    contractNumber: text("contract_number").notNull(),
+    contractType: text("contract_type").notNull(),
+    status: text("status").notNull().default("draft"),
+    startDate: integer("start_date", { mode: "timestamp" }).notNull(),
+    endDate: integer("end_date", { mode: "timestamp" }),
+    probationEndDate: integer("probation_end_date", { mode: "timestamp" }),
+    workLocation: text("work_location"),
+    hoursPerWeek: integer("hours_per_week"),
+    termsSummary: text("terms_summary"),
+    approvalRequestId: text("approval_request_id"),
+    signedAt: integer("signed_at", { mode: "timestamp" }),
+    approvedAt: integer("approved_at", { mode: "timestamp" }),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_contracts_business_number_uidx").on(
+      table.businessId,
+      table.contractNumber,
+    ),
+    index("hr_contracts_business_employee_status_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.status,
+    ),
+    index("hr_contracts_business_status_end_idx").on(
+      table.businessId,
+      table.status,
+      table.endDate,
+    ),
+    index("hr_contracts_business_approval_idx").on(
+      table.businessId,
+      table.approvalRequestId,
+    ),
+    index("hr_contracts_business_position_idx").on(
+      table.businessId,
+      table.positionId,
+    ),
+  ],
+);
+
+export const hrEmployeeDocuments = sqliteTable(
+  "hr_employee_documents",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    contractId: text("contract_id"),
+    documentType: text("document_type").notNull(),
+    title: text("title").notNull(),
+    storageProvider: text("storage_provider").notNull(),
+    storageKey: text("storage_key").notNull(),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    checksum: text("checksum"),
+    visibility: text("visibility").notNull().default("hr_only"),
+    status: text("status").notNull().default("active"),
+    expiresAt: integer("expires_at", { mode: "timestamp" }),
+    uploadedByUserId: text("uploaded_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_employee_documents_business_storage_uidx").on(
+      table.businessId,
+      table.storageKey,
+    ),
+    index("hr_employee_documents_business_employee_type_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.documentType,
+    ),
+    index("hr_employee_documents_business_contract_idx").on(
+      table.businessId,
+      table.contractId,
+    ),
+    index("hr_employee_documents_business_status_expiry_idx").on(
+      table.businessId,
+      table.status,
+      table.expiresAt,
+    ),
+  ],
+);
+
+export const hrEmploymentStatusHistory = sqliteTable(
+  "hr_employment_status_history",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    previousStatus: text("previous_status"),
+    newStatus: text("new_status").notNull(),
+    reason: text("reason"),
+    effectiveAt: integer("effective_at", { mode: "timestamp" }).notNull(),
+    changedByUserId: text("changed_by_user_id").notNull(),
+    approvalRequestId: text("approval_request_id"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("hr_employment_status_history_business_employee_effective_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.effectiveAt,
+    ),
+    index("hr_employment_status_history_business_status_effective_idx").on(
+      table.businessId,
+      table.newStatus,
+      table.effectiveAt,
+    ),
+    index("hr_employment_status_history_business_approval_idx").on(
+      table.businessId,
+      table.approvalRequestId,
+    ),
+  ],
+);
+
+export const hrAttendancePolicies = sqliteTable(
+  "hr_attendance_policies",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    timezone: text("timezone").notNull(),
+    gracePeriodMinutes: integer("grace_period_minutes").notNull().default(0),
+    absenceAfterMinutes: integer("absence_after_minutes"),
+    minimumWorkMinutes: integer("minimum_work_minutes"),
+    roundingIntervalMinutes: integer("rounding_interval_minutes")
+      .notNull()
+      .default(1),
+    allowRemoteCheckIn: integer("allow_remote_check_in").notNull().default(0),
+    requireLocation: integer("require_location").notNull().default(0),
+    requireCorrectionApproval: integer("require_correction_approval")
+      .notNull()
+      .default(1),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_attendance_policies_business_code_uidx").on(
+      table.businessId,
+      table.code,
+    ),
+    index("hr_attendance_policies_business_status_idx").on(
+      table.businessId,
+      table.status,
+    ),
+  ],
+);
+
+export const hrWorkSchedules = sqliteTable(
+  "hr_work_schedules",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    attendancePolicyId: text("attendance_policy_id").notNull(),
+    employeeId: text("employee_id"),
+    departmentId: text("department_id"),
+    positionId: text("position_id"),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    timezone: text("timezone").notNull(),
+    scheduleRules: text("schedule_rules").notNull(),
+    effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull(),
+    effectiveTo: integer("effective_to", { mode: "timestamp" }),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_work_schedules_business_code_uidx").on(
+      table.businessId,
+      table.code,
+    ),
+    index("hr_work_schedules_business_employee_effective_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.effectiveFrom,
+      table.effectiveTo,
+    ),
+    index("hr_work_schedules_business_department_status_idx").on(
+      table.businessId,
+      table.departmentId,
+      table.status,
+    ),
+    index("hr_work_schedules_business_position_status_idx").on(
+      table.businessId,
+      table.positionId,
+      table.status,
+    ),
+    index("hr_work_schedules_business_policy_idx").on(
+      table.businessId,
+      table.attendancePolicyId,
+    ),
+    index("hr_work_schedules_business_status_effective_idx").on(
+      table.businessId,
+      table.status,
+      table.effectiveFrom,
+      table.effectiveTo,
+    ),
+  ],
+);
+
+export const hrAttendanceRecords = sqliteTable(
+  "hr_attendance_records",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    attendancePolicyId: text("attendance_policy_id"),
+    workScheduleId: text("work_schedule_id"),
+    workDate: integer("work_date", { mode: "timestamp" }).notNull(),
+    expectedCheckInAt: integer("expected_check_in_at", { mode: "timestamp" }),
+    expectedCheckOutAt: integer("expected_check_out_at", { mode: "timestamp" }),
+    checkedInAt: integer("checked_in_at", { mode: "timestamp" }),
+    checkedOutAt: integer("checked_out_at", { mode: "timestamp" }),
+    workedMinutes: integer("worked_minutes").notNull().default(0),
+    lateMinutes: integer("late_minutes").notNull().default(0),
+    overtimeMinutes: integer("overtime_minutes").notNull().default(0),
+    status: text("status").notNull(),
+    checkInSource: text("check_in_source"),
+    checkOutSource: text("check_out_source"),
+    checkInLocation: text("check_in_location"),
+    checkOutLocation: text("check_out_location"),
+    notes: text("notes"),
+    lockedAt: integer("locked_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_attendance_records_business_employee_date_uidx").on(
+      table.businessId,
+      table.employeeId,
+      table.workDate,
+    ),
+    index("hr_attendance_records_business_date_status_idx").on(
+      table.businessId,
+      table.workDate,
+      table.status,
+    ),
+    index("hr_attendance_records_business_employee_date_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.workDate,
+    ),
+    index("hr_attendance_records_business_schedule_date_idx").on(
+      table.businessId,
+      table.workScheduleId,
+      table.workDate,
+    ),
+    index("hr_attendance_records_business_late_date_idx").on(
+      table.businessId,
+      table.lateMinutes,
+      table.workDate,
+    ),
+  ],
+);
+
+export const hrAttendanceCorrections = sqliteTable(
+  "hr_attendance_corrections",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    attendanceRecordId: text("attendance_record_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    requestedByUserId: text("requested_by_user_id").notNull(),
+    requestedCheckInAt: integer("requested_check_in_at", { mode: "timestamp" }),
+    requestedCheckOutAt: integer("requested_check_out_at", {
+      mode: "timestamp",
+    }),
+    requestedStatus: text("requested_status"),
+    reason: text("reason").notNull(),
+    approvalRequestId: text("approval_request_id"),
+    status: text("status").notNull().default("pending"),
+    decidedByUserId: text("decided_by_user_id"),
+    decisionNote: text("decision_note"),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    appliedAt: integer("applied_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("hr_attendance_corrections_business_record_idx").on(
+      table.businessId,
+      table.attendanceRecordId,
+    ),
+    index("hr_attendance_corrections_business_employee_status_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.status,
+    ),
+    index("hr_attendance_corrections_business_status_created_idx").on(
+      table.businessId,
+      table.status,
+      table.createdAt,
+    ),
+    uniqueIndex("hr_attendance_corrections_business_approval_uidx").on(
+      table.businessId,
+      table.approvalRequestId,
+    ),
+  ],
+);
+
+export const hrLeaveTypes = sqliteTable(
+  "hr_leave_types",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    unit: text("unit").notNull().default("days"),
+    isPaid: integer("is_paid").notNull().default(1),
+    requiresApproval: integer("requires_approval").notNull().default(1),
+    allowNegativeBalance: integer("allow_negative_balance").notNull().default(0),
+    accrualMethod: text("accrual_method").notNull(),
+    defaultEntitlementMinutes: integer("default_entitlement_minutes")
+      .notNull()
+      .default(0),
+    maximumCarryoverMinutes: integer("maximum_carryover_minutes"),
+    minimumNoticeDays: integer("minimum_notice_days").notNull().default(0),
+    maximumConsecutiveDays: integer("maximum_consecutive_days"),
+    requiresDocument: integer("requires_document").notNull().default(0),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_leave_types_business_code_uidx").on(
+      table.businessId,
+      table.code,
+    ),
+    index("hr_leave_types_business_status_idx").on(
+      table.businessId,
+      table.status,
+    ),
+  ],
+);
+
+export const hrLeaveBalances = sqliteTable(
+  "hr_leave_balances",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    leaveTypeId: text("leave_type_id").notNull(),
+    periodStart: integer("period_start", { mode: "timestamp" }).notNull(),
+    periodEnd: integer("period_end", { mode: "timestamp" }).notNull(),
+    openingMinutes: integer("opening_minutes").notNull().default(0),
+    accruedMinutes: integer("accrued_minutes").notNull().default(0),
+    carriedOverMinutes: integer("carried_over_minutes").notNull().default(0),
+    adjustedMinutes: integer("adjusted_minutes").notNull().default(0),
+    pendingMinutes: integer("pending_minutes").notNull().default(0),
+    usedMinutes: integer("used_minutes").notNull().default(0),
+    updatedByUserId: text("updated_by_user_id"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("hr_leave_balances_business_employee_type_period_uidx").on(
+      table.businessId,
+      table.employeeId,
+      table.leaveTypeId,
+      table.periodStart,
+      table.periodEnd,
+    ),
+    index("hr_leave_balances_business_employee_period_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.periodStart,
+      table.periodEnd,
+    ),
+    index("hr_leave_balances_business_type_period_idx").on(
+      table.businessId,
+      table.leaveTypeId,
+      table.periodStart,
+      table.periodEnd,
+    ),
+  ],
+);
+
+export const hrLeaveRequests = sqliteTable(
+  "hr_leave_requests",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    leaveTypeId: text("leave_type_id").notNull(),
+    leaveBalanceId: text("leave_balance_id"),
+    requestedByUserId: text("requested_by_user_id").notNull(),
+    startDate: integer("start_date", { mode: "timestamp" }).notNull(),
+    endDate: integer("end_date", { mode: "timestamp" }).notNull(),
+    startSegment: text("start_segment").notNull().default("full_day"),
+    endSegment: text("end_segment").notNull().default("full_day"),
+    requestedMinutes: integer("requested_minutes").notNull(),
+    reason: text("reason"),
+    handoverNotes: text("handover_notes"),
+    emergencyContact: text("emergency_contact"),
+    approvalRequestId: text("approval_request_id"),
+    status: text("status").notNull().default("draft"),
+    submittedAt: integer("submitted_at", { mode: "timestamp" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    cancelledAt: integer("cancelled_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("hr_leave_requests_business_employee_status_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.status,
+      table.startDate,
+    ),
+    index("hr_leave_requests_business_status_start_idx").on(
+      table.businessId,
+      table.status,
+      table.startDate,
+    ),
+    index("hr_leave_requests_business_type_status_idx").on(
+      table.businessId,
+      table.leaveTypeId,
+      table.status,
+    ),
+    index("hr_leave_requests_business_balance_idx").on(
+      table.businessId,
+      table.leaveBalanceId,
+    ),
+    uniqueIndex("hr_leave_requests_business_approval_uidx").on(
+      table.businessId,
+      table.approvalRequestId,
+    ),
+  ],
+);
+
+export const hrLeaveHistory = sqliteTable(
+  "hr_leave_history",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    leaveTypeId: text("leave_type_id").notNull(),
+    leaveRequestId: text("leave_request_id"),
+    leaveBalanceId: text("leave_balance_id"),
+    actorType: text("actor_type").notNull(),
+    actorUserId: text("actor_user_id"),
+    eventType: text("event_type").notNull(),
+    minutesDelta: integer("minutes_delta").notNull().default(0),
+    balanceBeforeMinutes: integer("balance_before_minutes"),
+    balanceAfterMinutes: integer("balance_after_minutes"),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status"),
+    reason: text("reason"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("hr_leave_history_business_employee_created_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.createdAt,
+    ),
+    index("hr_leave_history_business_request_created_idx").on(
+      table.businessId,
+      table.leaveRequestId,
+      table.createdAt,
+    ),
+    index("hr_leave_history_business_balance_created_idx").on(
+      table.businessId,
+      table.leaveBalanceId,
+      table.createdAt,
+    ),
+    index("hr_leave_history_business_type_event_idx").on(
+      table.businessId,
+      table.leaveTypeId,
+      table.eventType,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const payrollAllowanceTypes = sqliteTable(
+  "payroll_allowance_types",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    calculationMethod: text("calculation_method").notNull(),
+    isTaxable: integer("is_taxable").notNull().default(1),
+    isPensionable: integer("is_pensionable").notNull().default(0),
+    isRecurring: integer("is_recurring").notNull().default(1),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_allowance_types_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_allowance_types_business_code_uidx").on(table.businessId, table.code),
+  ],
+);
+
+export const payrollBonusAwards = sqliteTable(
+  "payroll_bonus_awards",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    earningTypeId: text("earning_type_id"),
+    payrollPeriodId: text("payroll_period_id"),
+    currencyCode: text("currency_code").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    reason: text("reason").notNull(),
+    approvalRequestId: text("approval_request_id"),
+    status: text("status").notNull().default("draft"),
+    awardedByUserId: text("awarded_by_user_id").notNull(),
+    approvedByUserId: text("approved_by_user_id"),
+    approvedAt: integer("approved_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_bonus_awards_business_earning_idx").on(table.businessId, table.earningTypeId),
+    uniqueIndex("payroll_bonus_awards_business_approval_uidx").on(table.businessId, table.approvalRequestId),
+    index("payroll_bonus_awards_business_status_idx").on(table.businessId, table.status),
+    index("payroll_bonus_awards_business_employee_period_idx").on(table.businessId, table.employeeId, table.payrollPeriodId),
+  ],
+);
+
+export const payrollDeductionTypes = sqliteTable(
+  "payroll_deduction_types",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    calculationMethod: text("calculation_method").notNull(),
+    deductionCategory: text("deduction_category").notNull(),
+    isPreTax: integer("is_pre_tax").notNull().default(0),
+    isStatutory: integer("is_statutory").notNull().default(0),
+    isRecurring: integer("is_recurring").notNull().default(1),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_deduction_types_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_deduction_types_business_code_uidx").on(table.businessId, table.code),
+  ],
+);
+
+export const payrollEarningTypes = sqliteTable(
+  "payroll_earning_types",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    calculationMethod: text("calculation_method").notNull(),
+    isTaxable: integer("is_taxable").notNull().default(1),
+    isPensionable: integer("is_pensionable").notNull().default(1),
+    isRecurring: integer("is_recurring").notNull().default(1),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_earning_types_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_earning_types_business_code_uidx").on(table.businessId, table.code),
+  ],
+);
+
+export const payrollEmployeeCompensationProfiles = sqliteTable(
+  "payroll_employee_compensation_profiles",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    salaryStructureId: text("salary_structure_id").notNull(),
+    jurisdictionSettingId: text("jurisdiction_setting_id").notNull(),
+    statutoryRuleSetId: text("statutory_rule_set_id"),
+    currencyCode: text("currency_code").notNull(),
+    payFrequency: text("pay_frequency").notNull(),
+    baseAmountMinor: integer("base_amount_minor").notNull(),
+    effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull(),
+    effectiveTo: integer("effective_to", { mode: "timestamp" }),
+    approvalRequestId: text("approval_request_id"),
+    status: text("status").notNull().default("draft"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    approvedByUserId: text("approved_by_user_id"),
+    approvedAt: integer("approved_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("payroll_employee_compensation_profiles_business_approval_uidx").on(table.businessId, table.approvalRequestId),
+    index("payroll_employee_compensation_profiles_business_jurisdiction_idx").on(table.businessId, table.jurisdictionSettingId),
+    index("payroll_employee_compensation_profiles_business_structure_idx").on(table.businessId, table.salaryStructureId),
+    index("payroll_employee_compensation_profiles_business_employee_status_idx").on(table.businessId, table.employeeId, table.status),
+    uniqueIndex("payroll_employee_compensation_profiles_business_employee_effective_uidx").on(table.businessId, table.employeeId, table.effectiveFrom),
+  ],
+);
+
+export const payrollEmployeeComponents = sqliteTable(
+  "payroll_employee_components",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    employeeCompensationProfileId: text("employee_compensation_profile_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    componentType: text("component_type").notNull(),
+    earningTypeId: text("earning_type_id"),
+    allowanceTypeId: text("allowance_type_id"),
+    deductionTypeId: text("deduction_type_id"),
+    calculationMethod: text("calculation_method").notNull(),
+    amountMinor: integer("amount_minor"),
+    rateBasisPoints: integer("rate_basis_points"),
+    quantity: integer("quantity"),
+    isTaxable: integer("is_taxable").notNull().default(0),
+    isPensionable: integer("is_pensionable").notNull().default(0),
+    effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull(),
+    effectiveTo: integer("effective_to", { mode: "timestamp" }),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_employee_components_business_deduction_idx").on(table.businessId, table.deductionTypeId),
+    index("payroll_employee_components_business_allowance_idx").on(table.businessId, table.allowanceTypeId),
+    index("payroll_employee_components_business_earning_idx").on(table.businessId, table.earningTypeId),
+    index("payroll_employee_components_business_profile_idx").on(table.businessId, table.employeeCompensationProfileId),
+    index("payroll_employee_components_business_employee_effective_idx").on(table.businessId, table.employeeId, table.status, table.effectiveFrom, table.effectiveTo),
+  ],
+);
+
+export const payrollJurisdictionSettings = sqliteTable(
+  "payroll_jurisdiction_settings",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    countryCode: text("country_code").notNull(),
+    currencyCode: text("currency_code").notNull(),
+    timezone: text("timezone").notNull(),
+    taxYearStartMonth: integer("tax_year_start_month").notNull().default(1),
+    payFrequency: text("pay_frequency").notNull(),
+    effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull(),
+    effectiveTo: integer("effective_to", { mode: "timestamp" }),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_jurisdiction_settings_business_effective_idx").on(table.businessId, table.effectiveFrom, table.effectiveTo),
+    index("payroll_jurisdiction_settings_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_jurisdiction_settings_business_country_currency_uidx").on(table.businessId, table.countryCode, table.currencyCode, table.effectiveFrom),
+  ],
+);
+
+export const payrollOvertimeCalculations = sqliteTable(
+  "payroll_overtime_calculations",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    payrollRunId: text("payroll_run_id").notNull(),
+    payrollRunEmployeeId: text("payroll_run_employee_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    attendanceRecordId: text("attendance_record_id"),
+    overtimeRuleId: text("overtime_rule_id").notNull(),
+    workDate: integer("work_date", { mode: "timestamp" }).notNull(),
+    eligibleMinutes: integer("eligible_minutes").notNull(),
+    approvedMinutes: integer("approved_minutes").notNull(),
+    hourlyRateMinor: integer("hourly_rate_minor").notNull(),
+    multiplierBasisPoints: integer("multiplier_basis_points").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    approvalRequestId: text("approval_request_id"),
+    status: text("status").notNull().default("calculated"),
+    calculationSnapshot: text("calculation_snapshot").notNull(),
+    calculatedAt: integer("calculated_at", { mode: "timestamp" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_overtime_calculations_business_status_idx").on(table.businessId, table.status),
+    index("payroll_overtime_calculations_business_rule_idx").on(table.businessId, table.overtimeRuleId),
+    index("payroll_overtime_calculations_business_employee_date_idx").on(table.businessId, table.employeeId, table.workDate),
+    uniqueIndex("payroll_overtime_calculations_business_run_attendance_uidx").on(table.businessId, table.payrollRunId, table.attendanceRecordId),
+  ],
+);
+
+export const payrollOvertimeRules = sqliteTable(
+  "payroll_overtime_rules",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    jurisdictionSettingId: text("jurisdiction_setting_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    dayType: text("day_type").notNull(),
+    minimumMinutes: integer("minimum_minutes").notNull().default(0),
+    maximumMinutes: integer("maximum_minutes"),
+    multiplierBasisPoints: integer("multiplier_basis_points").notNull(),
+    roundingIntervalMinutes: integer("rounding_interval_minutes").notNull().default(1),
+    requiresApproval: integer("requires_approval").notNull().default(1),
+    effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull(),
+    effectiveTo: integer("effective_to", { mode: "timestamp" }),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_overtime_rules_business_jurisdiction_idx").on(table.businessId, table.jurisdictionSettingId, table.effectiveFrom, table.effectiveTo),
+    index("payroll_overtime_rules_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_overtime_rules_business_code_uidx").on(table.businessId, table.code),
+  ],
+);
+
+export const payrollPayslips = sqliteTable(
+  "payroll_payslips",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    payrollRunId: text("payroll_run_id").notNull(),
+    payrollRunEmployeeId: text("payroll_run_employee_id").notNull(),
+    payrollPeriodId: text("payroll_period_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    documentNumber: text("document_number").notNull(),
+    storageProvider: text("storage_provider").notNull(),
+    storageKey: text("storage_key").notNull(),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    checksum: text("checksum"),
+    status: text("status").notNull().default("generated"),
+    generatedAt: integer("generated_at", { mode: "timestamp" }).notNull(),
+    publishedAt: integer("published_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_payslips_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_payslips_business_storage_uidx").on(table.businessId, table.storageKey),
+    index("payroll_payslips_business_employee_period_idx").on(table.businessId, table.employeeId, table.payrollPeriodId),
+    uniqueIndex("payroll_payslips_business_run_employee_uidx").on(table.businessId, table.payrollRunEmployeeId),
+  ],
+);
+
+export const payrollPeriods = sqliteTable(
+  "payroll_periods",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    jurisdictionSettingId: text("jurisdiction_setting_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    taxYear: integer("tax_year").notNull(),
+    periodNumber: integer("period_number").notNull(),
+    startDate: integer("start_date", { mode: "timestamp" }).notNull(),
+    endDate: integer("end_date", { mode: "timestamp" }).notNull(),
+    paymentDate: integer("payment_date", { mode: "timestamp" }).notNull(),
+    status: text("status").notNull().default("open"),
+    lockedAt: integer("locked_at", { mode: "timestamp" }),
+    lockedByUserId: text("locked_by_user_id"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_periods_business_status_dates_idx").on(table.businessId, table.status, table.startDate, table.endDate),
+    uniqueIndex("payroll_periods_business_tax_year_number_uidx").on(table.businessId, table.jurisdictionSettingId, table.taxYear, table.periodNumber),
+    uniqueIndex("payroll_periods_business_code_uidx").on(table.businessId, table.code),
+  ],
+);
+
+export const payrollRunEmployees = sqliteTable(
+  "payroll_run_employees",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    payrollRunId: text("payroll_run_id").notNull(),
+    payrollPeriodId: text("payroll_period_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    compensationProfileId: text("compensation_profile_id").notNull(),
+    employeeNumberSnapshot: text("employee_number_snapshot").notNull(),
+    employeeNameSnapshot: text("employee_name_snapshot").notNull(),
+    currencyCode: text("currency_code").notNull(),
+    baseAmountMinor: integer("base_amount_minor").notNull().default(0),
+    grossAmountMinor: integer("gross_amount_minor").notNull().default(0),
+    taxableAmountMinor: integer("taxable_amount_minor").notNull().default(0),
+    taxAmountMinor: integer("tax_amount_minor").notNull().default(0),
+    deductionAmountMinor: integer("deduction_amount_minor").notNull().default(0),
+    netAmountMinor: integer("net_amount_minor").notNull().default(0),
+    status: text("status").notNull().default("pending"),
+    calculationSnapshot: text("calculation_snapshot").notNull(),
+    calculatedAt: integer("calculated_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_run_employees_business_run_status_idx").on(table.businessId, table.payrollRunId, table.status),
+    index("payroll_run_employees_business_employee_idx").on(table.businessId, table.employeeId, table.payrollPeriodId),
+    uniqueIndex("payroll_run_employees_business_run_employee_uidx").on(table.businessId, table.payrollRunId, table.employeeId),
+  ],
+);
+
+export const payrollRunEvents = sqliteTable(
+  "payroll_run_events",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    payrollRunId: text("payroll_run_id").notNull(),
+    payrollRunEmployeeId: text("payroll_run_employee_id"),
+    eventType: text("event_type").notNull(),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status"),
+    actorType: text("actor_type").notNull(),
+    actorUserId: text("actor_user_id"),
+    approvalRequestId: text("approval_request_id"),
+    reason: text("reason"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_run_events_business_actor_created_idx").on(table.businessId, table.actorUserId, table.createdAt),
+    index("payroll_run_events_business_employee_created_idx").on(table.businessId, table.payrollRunEmployeeId, table.createdAt),
+    index("payroll_run_events_business_run_created_idx").on(table.businessId, table.payrollRunId, table.createdAt),
+  ],
+);
+
+export const payrollRunItems = sqliteTable(
+  "payroll_run_items",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    payrollRunId: text("payroll_run_id").notNull(),
+    payrollRunEmployeeId: text("payroll_run_employee_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+    itemType: text("item_type").notNull(),
+    sourceType: text("source_type").notNull(),
+    sourceId: text("source_id"),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    quantity: integer("quantity"),
+    rateBasisPoints: integer("rate_basis_points"),
+    amountMinor: integer("amount_minor").notNull(),
+    taxableAmountMinor: integer("taxable_amount_minor").notNull().default(0),
+    pensionableAmountMinor: integer("pensionable_amount_minor").notNull().default(0),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_run_items_business_employee_code_idx").on(table.businessId, table.employeeId, table.code),
+    index("payroll_run_items_business_source_idx").on(table.businessId, table.sourceType, table.sourceId),
+    index("payroll_run_items_business_run_type_idx").on(table.businessId, table.payrollRunId, table.itemType),
+    index("payroll_run_items_business_run_employee_idx").on(table.businessId, table.payrollRunEmployeeId),
+  ],
+);
+
+export const payrollRuns = sqliteTable(
+  "payroll_runs",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    payrollPeriodId: text("payroll_period_id").notNull(),
+    jurisdictionSettingId: text("jurisdiction_setting_id").notNull(),
+    statutoryRuleSetId: text("statutory_rule_set_id").notNull(),
+    runNumber: integer("run_number").notNull(),
+    currencyCode: text("currency_code").notNull(),
+    status: text("status").notNull().default("draft"),
+    employeeCount: integer("employee_count").notNull().default(0),
+    grossAmountMinor: integer("gross_amount_minor").notNull().default(0),
+    taxAmountMinor: integer("tax_amount_minor").notNull().default(0),
+    deductionAmountMinor: integer("deduction_amount_minor").notNull().default(0),
+    netAmountMinor: integer("net_amount_minor").notNull().default(0),
+    approvalRequestId: text("approval_request_id"),
+    preparedByUserId: text("prepared_by_user_id").notNull(),
+    preparedAt: integer("prepared_at", { mode: "timestamp" }).notNull(),
+    approvedByUserId: text("approved_by_user_id"),
+    approvedAt: integer("approved_at", { mode: "timestamp" }),
+    finalizedByUserId: text("finalized_by_user_id"),
+    finalizedAt: integer("finalized_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_runs_business_preparer_idx").on(table.businessId, table.preparedByUserId, table.createdAt),
+    index("payroll_runs_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_runs_business_approval_uidx").on(table.businessId, table.approvalRequestId),
+    index("payroll_runs_business_period_status_idx").on(table.businessId, table.payrollPeriodId, table.status),
+    uniqueIndex("payroll_runs_business_period_number_uidx").on(table.businessId, table.payrollPeriodId, table.runNumber),
+    check("payroll_runs_approved_ne_prepared", sql`${table.approvedByUserId} IS NULL OR ${table.approvedByUserId} <> ${table.preparedByUserId}`),
+    check("payroll_runs_finalized_ne_prepared", sql`${table.finalizedByUserId} IS NULL OR ${table.finalizedByUserId} <> ${table.preparedByUserId}`),
+    check("payroll_runs_finalized_ne_approved", sql`${table.finalizedByUserId} IS NULL OR ${table.approvedByUserId} IS NULL OR ${table.finalizedByUserId} <> ${table.approvedByUserId}`),
+  ],
+);
+
+export const payrollSalaryStructures = sqliteTable(
+  "payroll_salary_structures",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    jurisdictionSettingId: text("jurisdiction_setting_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    currencyCode: text("currency_code").notNull(),
+    payFrequency: text("pay_frequency").notNull(),
+    minimumBaseAmountMinor: integer("minimum_base_amount_minor"),
+    maximumBaseAmountMinor: integer("maximum_base_amount_minor"),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("payroll_salary_structures_business_frequency_idx").on(table.businessId, table.payFrequency, table.status),
+    index("payroll_salary_structures_business_jurisdiction_idx").on(table.businessId, table.jurisdictionSettingId),
+    index("payroll_salary_structures_business_status_idx").on(table.businessId, table.status),
+    uniqueIndex("payroll_salary_structures_business_code_uidx").on(table.businessId, table.code),
+  ],
+);
+
+export const payrollStatutoryRuleSets = sqliteTable(
+  "payroll_statutory_rule_sets",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    jurisdictionSettingId: text("jurisdiction_setting_id").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    version: text("version").notNull(),
+    effectiveFrom: integer("effective_from", { mode: "timestamp" }).notNull(),
+    effectiveTo: integer("effective_to", { mode: "timestamp" }),
+    rules: text("rules").notNull(),
+    sourceReference: text("source_reference"),
+    checksum: text("checksum").notNull(),
+    status: text("status").notNull().default("draft"),
+    publishedByUserId: text("published_by_user_id"),
+    publishedAt: integer("published_at", { mode: "timestamp" }),
+    createdByUserId: text("created_by_user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("payroll_statutory_rule_sets_business_checksum_uidx").on(table.businessId, table.checksum),
+    index("payroll_statutory_rule_sets_business_status_idx").on(table.businessId, table.status),
+    index("payroll_statutory_rule_sets_business_effective_idx").on(table.businessId, table.jurisdictionSettingId, table.effectiveFrom, table.effectiveTo),
+    uniqueIndex("payroll_statutory_rule_sets_business_code_version_uidx").on(table.businessId, table.jurisdictionSettingId, table.code, table.version),
+  ],
+);
+
