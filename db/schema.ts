@@ -2242,3 +2242,454 @@ export const payrollStatutoryRuleSets = sqliteTable(
   ],
 );
 
+
+/**
+ * Identity/permissions/approvals, notification, and skills/website-widget
+ * tables. These already exist in the deployed database but had no
+ * db/schema.ts definitions. Recovered verbatim (column-for-column and
+ * index-for-index verified against the live schema) from the same
+ * locally-recovered historical schema.ts snapshot used for the HR/payroll
+ * recovery, except:
+ *  - employeeSkills: the recovered source had extra `status`/`installedAt`
+ *    columns and a `.references()` FK not present live; both were dropped
+ *    to match the deployed table exactly.
+ *  - websiteWidgets: the recovered source had an extra
+ *    `website_widgets_business_status_idx` index not present live; dropped
+ *    to match the deployed table exactly.
+ * `legacy_ai_employee_teams_pre_0001` (an archival rename target from a
+ * canonical-branch migration, zero rows, zero application references) and
+ * `__drizzle_migrations` (drizzle-kit's own bookkeeping table) are
+ * intentionally not modeled here.
+ */
+
+export const aiEmployeeScopes = sqliteTable(
+  "ai_employee_scopes",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    aiEmployeeId: text("ai_employee_id").notNull(),
+    scope: text("scope").notNull(),
+    effect: text("effect").notNull().default("allow"),
+    status: text("status").notNull().default("active"),
+    grantedByUserId: text("granted_by_user_id").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("ai_employee_scopes_business_employee_scope_uidx").on(
+      table.businessId,
+      table.aiEmployeeId,
+      table.scope,
+    ),
+    index("ai_employee_scopes_business_scope_status_idx").on(
+      table.businessId,
+      table.scope,
+      table.status,
+    ),
+    index("ai_employee_scopes_business_employee_status_idx").on(
+      table.businessId,
+      table.aiEmployeeId,
+      table.status,
+    ),
+  ],
+);
+
+export const approvalEvents = sqliteTable(
+  "approval_events",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    approvalRequestId: text("approval_request_id").notNull(),
+    approvalStepId: text("approval_step_id"),
+    actorType: text("actor_type").notNull(),
+    actorUserId: text("actor_user_id"),
+    actorAiEmployeeId: text("actor_ai_employee_id"),
+    eventType: text("event_type").notNull(),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("approval_events_business_request_created_idx").on(
+      table.businessId,
+      table.approvalRequestId,
+      table.createdAt,
+    ),
+    index("approval_events_business_actor_created_idx").on(
+      table.businessId,
+      table.actorUserId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const approvalRequests = sqliteTable(
+  "approval_requests",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    approvalType: text("approval_type").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id"),
+    requestedByType: text("requested_by_type").notNull(),
+    requestedByUserId: text("requested_by_user_id"),
+    requestedByAiEmployeeId: text("requested_by_ai_employee_id"),
+    title: text("title").notNull(),
+    description: text("description"),
+    payload: text("payload").notNull(),
+    requiredPermission: text("required_permission").notNull(),
+    status: text("status").notNull().default("pending"),
+    priority: text("priority").notNull().default("normal"),
+    currentStep: integer("current_step").notNull().default(1),
+    totalSteps: integer("total_steps").notNull().default(1),
+    idempotencyKey: text("idempotency_key"),
+    legacyActionApprovalId: text("legacy_action_approval_id"),
+    expiresAt: integer("expires_at", { mode: "timestamp" }),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    completedAt: integer("completed_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("approval_requests_business_status_created_idx").on(
+      table.businessId,
+      table.status,
+      table.createdAt,
+    ),
+    index("approval_requests_business_type_status_idx").on(
+      table.businessId,
+      table.approvalType,
+      table.status,
+    ),
+    index("approval_requests_business_resource_idx").on(
+      table.businessId,
+      table.resourceType,
+      table.resourceId,
+    ),
+    index("approval_requests_business_requester_idx").on(
+      table.businessId,
+      table.requestedByUserId,
+      table.createdAt,
+    ),
+    uniqueIndex("approval_requests_business_idempotency_uidx").on(
+      table.businessId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("approval_requests_legacy_action_uidx").on(
+      table.legacyActionApprovalId,
+    ),
+  ],
+);
+
+export const approvalSteps = sqliteTable(
+  "approval_steps",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    approvalRequestId: text("approval_request_id").notNull(),
+    stepNumber: integer("step_number").notNull(),
+    approverUserId: text("approver_user_id"),
+    requiredRole: text("required_role"),
+    requiredPermission: text("required_permission").notNull(),
+    status: text("status").notNull().default("pending"),
+    decision: text("decision"),
+    decisionNote: text("decision_note"),
+    decidedByUserId: text("decided_by_user_id"),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("approval_steps_request_step_uidx").on(
+      table.businessId,
+      table.approvalRequestId,
+      table.stepNumber,
+    ),
+    index("approval_steps_business_status_idx").on(
+      table.businessId,
+      table.status,
+      table.createdAt,
+    ),
+    index("approval_steps_business_approver_status_idx").on(
+      table.businessId,
+      table.approverUserId,
+      table.status,
+    ),
+  ],
+);
+
+export const businessModules = sqliteTable(
+  "business_modules",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    moduleKey: text("module_key").notNull(),
+    status: text("status").notNull().default("active"),
+    activatedAt: integer("activated_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("business_modules_business_module_uidx").on(
+      table.businessId,
+      table.moduleKey,
+    ),
+    index("business_modules_business_idx").on(table.businessId),
+    index("business_modules_business_status_idx").on(
+      table.businessId,
+      table.status,
+    ),
+  ],
+);
+
+export const notificationDeliveries = sqliteTable(
+  "notification_deliveries",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    notificationId: text("notification_id").notNull(),
+    templateId: text("template_id"),
+    channel: text("channel").notNull(),
+    recipient: text("recipient").notNull(),
+    status: text("status").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    provider: text("provider"),
+    providerMessageId: text("provider_message_id"),
+    idempotencyKey: text("idempotency_key"),
+    scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+    lastAttemptAt: integer("last_attempt_at", { mode: "timestamp" }),
+    sentAt: integer("sent_at", { mode: "timestamp" }),
+    deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+    failedAt: integer("failed_at", { mode: "timestamp" }),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("notification_deliveries_business_status_scheduled_idx").on(
+      table.businessId,
+      table.status,
+      table.scheduledAt,
+    ),
+    index("notification_deliveries_business_notification_idx").on(
+      table.businessId,
+      table.notificationId,
+    ),
+    uniqueIndex("notification_deliveries_business_idempotency_uidx").on(
+      table.businessId,
+      table.idempotencyKey,
+    ),
+    index("notification_deliveries_business_provider_message_idx").on(
+      table.businessId,
+      table.provider,
+      table.providerMessageId,
+    ),
+  ],
+);
+
+export const notificationTemplates = sqliteTable(
+  "notification_templates",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    templateKey: text("template_key").notNull(),
+    channel: text("channel").notNull(),
+    locale: text("locale").notNull().default("en"),
+    name: text("name").notNull(),
+    subjectTemplate: text("subject_template"),
+    bodyTemplate: text("body_template").notNull(),
+    allowedVariables: text("allowed_variables"),
+    status: text("status").notNull().default("active"),
+    createdByUserId: text("created_by_user_id"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("notification_templates_business_key_channel_locale_uidx").on(
+      table.businessId,
+      table.templateKey,
+      table.channel,
+      table.locale,
+    ),
+    index("notification_templates_business_status_idx").on(
+      table.businessId,
+      table.status,
+    ),
+  ],
+);
+
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    recipientUserId: text("recipient_user_id").notNull(),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    resourceType: text("resource_type"),
+    resourceId: text("resource_id"),
+    actionUrl: text("action_url"),
+    priority: text("priority").notNull().default("normal"),
+    metadata: text("metadata"),
+    readAt: integer("read_at", { mode: "timestamp" }),
+    archivedAt: integer("archived_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("notifications_business_recipient_read_idx").on(
+      table.businessId,
+      table.recipientUserId,
+      table.readAt,
+      table.createdAt,
+    ),
+    index("notifications_business_recipient_created_idx").on(
+      table.businessId,
+      table.recipientUserId,
+      table.createdAt,
+    ),
+    index("notifications_business_resource_idx").on(
+      table.businessId,
+      table.resourceType,
+      table.resourceId,
+    ),
+  ],
+);
+
+export const skills = sqliteTable(
+  "skills",
+  {
+    id: text("id").primaryKey(),
+
+    name: text("name")
+      .notNull(),
+
+    slug: text("slug")
+      .notNull()
+      .unique(),
+
+    description: text("description"),
+
+    category: text("category")
+      .notNull(),
+
+    type: text("type")
+      .notNull()
+      .default("kuba_official"),
+
+    version: text("version")
+      .notNull()
+      .default("1.0"),
+
+    instructions: text("instructions"),
+
+    tools: text("tools"),
+
+    status: text("status")
+      .notNull()
+      .default("active"),
+
+    publisher: text("publisher")
+      .notNull()
+      .default("Kuba"),
+
+    icon: text("icon"),
+
+    isMarketplace: integer("is_marketplace", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(true),
+
+    price: integer("price")
+      .notNull()
+      .default(0),
+
+    rating: integer("rating")
+      .notNull()
+      .default(5),
+
+    installCount: integer("install_count")
+      .notNull()
+      .default(0),
+
+    createdAt: integer("created_at", {
+      mode: "timestamp",
+    }).notNull(),
+
+    updatedAt: integer("updated_at", {
+      mode: "timestamp",
+    }).notNull(),
+  },
+);
+
+export const websiteWidgets = sqliteTable(
+  "website_widgets",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id")
+      .notNull(),
+
+    name: text("name")
+      .notNull(),
+
+    websiteUrl: text("website_url"),
+
+    employeeId: text("employee_id"),
+
+    publicKey: text("public_key")
+      .notNull()
+      .unique(),
+
+    status: text("status")
+      .notNull()
+      .default("active"),
+
+    welcomeMessage: text("welcome_message"),
+
+    position: text("position")
+      .notNull()
+      .default("bottom-right"),
+
+    createdAt: integer("created_at", {
+      mode: "timestamp",
+    }).notNull(),
+
+    updatedAt: integer("updated_at", {
+      mode: "timestamp",
+    }).notNull(),
+  },
+);
+
+export const employeeSkills = sqliteTable(
+  "employee_skills",
+  {
+    id: text("id").primaryKey(),
+
+    employeeId: text("employee_id")
+      .notNull(),
+
+    skillId: text("skill_id")
+      .notNull(),
+
+    createdAt: integer("created_at", {
+      mode: "timestamp",
+    }).notNull(),
+
+    updatedAt: integer("updated_at", {
+      mode: "timestamp",
+    }).notNull(),
+  },
+  (table) => [
+    index("employeeSkills_employeeId_idx")
+      .on(table.employeeId),
+
+    index("employeeSkills_skillId_idx")
+      .on(table.skillId),
+  ],
+);
