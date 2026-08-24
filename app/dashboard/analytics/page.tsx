@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import EmptyState from "../../components/EmptyState";
+import WorkforceAnalyticsCenter from "../../components/dashboard/WorkforceAnalyticsCenter";
 
 type PipelineItem = {
   stage: string;
@@ -838,6 +839,8 @@ export default function AnalyticsPage() {
   return (
     <main className="p-6 lg:p-8">
       <div className="mx-auto max-w-7xl">
+
+        <WorkforceAnalyticsCenter />
 
         {/* HEADER */}
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { aiBusinessSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { requireBusinessId } from "./business-context";
 
 
 export const getBusinessKnowledgeTool = createTool({
@@ -14,20 +15,12 @@ export const getBusinessKnowledgeTool = createTool({
     "Retrieve the company's business profile, products, customers, FAQs, instructions, and communication style. Use this before giving business-specific recommendations.",
 
 
-  inputSchema: z.object({
-
-    businessId:
-      z.string()
-      .describe(
-        "The current business ID.",
-      ),
-
-  }),
+  inputSchema: z.object({}),
 
 
-  execute: async ({
-    businessId,
-  }) => {
+  execute: async (_input, { requestContext }) => {
+
+    const businessId = requireBusinessId(requestContext);
 
     const result =
       await db

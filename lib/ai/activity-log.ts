@@ -2,6 +2,7 @@ import { db } from "@/db";
 import {
   aiEmployeeActivities,
 } from "@/db/schema";
+import { runAutomationTrigger } from "@/lib/automations/engine";
 
 
 export async function logAIActivity({
@@ -11,6 +12,7 @@ export async function logAIActivity({
   type,
   title,
   description,
+  status = "completed",
 
 }:{
 
@@ -19,6 +21,7 @@ export async function logAIActivity({
   type:string;
   title:string;
   description?:string;
+  status?:string;
 
 }){
 
@@ -40,12 +43,28 @@ export async function logAIActivity({
       description:
         description || null,
 
-      status:
-        "completed",
+      status,
 
       createdAt:
         new Date(),
 
     });
+
+    if (status === "completed") {
+      try {
+        await runAutomationTrigger({
+          businessId,
+          trigger: "ai_employee.action_completed",
+          data: {
+            employeeId,
+            type,
+            title,
+            description: description || null,
+          },
+        });
+      } catch (automationError) {
+        console.error("AI activity automation error:", automationError);
+      }
+    }
 
 }

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { leads, followUps } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const salesPipelineSummaryTool = createTool({
   id: "sales-pipeline-summary",
@@ -11,13 +12,10 @@ export const salesPipelineSummaryTool = createTool({
   description:
     "Analyze the current sales pipeline for the business. Use this when the user asks for a pipeline summary, sales overview, lead breakdown, opportunities, or which leads need attention.",
 
-  inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the business whose sales pipeline should be analyzed."),
-  }),
+  inputSchema: z.object({}),
 
-  execute: async ({ businessId }) => {
+  execute: async (_input, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const businessLeads = await db
       .select({
         id: leads.id,

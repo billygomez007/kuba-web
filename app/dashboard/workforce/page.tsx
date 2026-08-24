@@ -231,12 +231,12 @@ export default function WorkforcePage() {
             </p>
           </div>
 
-          <button
-            type="button"
+          <Link
+            href="/dashboard/ai-employees/create"
             className="shrink-0 rounded-xl bg-white px-5 py-3.5 text-sm font-bold text-black transition hover:scale-[1.02] hover:bg-white/90"
           >
             + Create AI employee
-          </button>
+          </Link>
         </section>
 
         {/* Executive Team + Priorities */}

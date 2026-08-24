@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
+import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
@@ -192,6 +193,7 @@ ${message}
             resource: session.user.id,
             thread: `customer-support-${employee.id}`,
           },
+          requestContext: new RequestContext([["businessId", business.id]]),
         },
       );
 

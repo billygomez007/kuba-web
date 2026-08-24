@@ -219,6 +219,20 @@ export async function PATCH(
       permissions?: string | null;
       branchId?: string | null;
     } = {};
+    let emailChanged = false;
+
+    if (typeof body.email === "string") {
+      const email = body.email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+      }
+      const duplicate = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+      if (duplicate[0] && duplicate[0].id !== member.userId) {
+        return NextResponse.json({ error: "That email address is already in use." }, { status: 409 });
+      }
+      await db.update(users).set({ email, emailVerified: false, updatedAt: new Date() }).where(eq(users.id, member.userId));
+      emailChanged = true;
+    }
 
     if (
       typeof body.role === "string"
@@ -309,7 +323,8 @@ export async function PATCH(
 
     if (
       Object.keys(updates)
-        .length === 0
+        .length === 0 &&
+      !emailChanged
     ) {
       return NextResponse.json(
         {

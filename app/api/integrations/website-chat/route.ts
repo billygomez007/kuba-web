@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
+import { RequestContext } from "@mastra/core/request-context";
 
 import { db } from "@/db";
 
@@ -17,6 +18,7 @@ import { routeConversationToTeam } from "@/lib/communications/team-router";
 import { type ConversationDepartment } from "@/lib/communications/routing";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
+import { runAutomationTrigger } from "@/lib/automations/engine";
 
 
 export async function GET() {
@@ -713,6 +715,9 @@ Answer naturally, helpfully and professionally.
     const response =
       await selectedAgent.generate(
         businessContext,
+        {
+          requestContext: new RequestContext([["businessId", business.id]]),
+        },
       );
 
     const responseText =
@@ -764,6 +769,21 @@ Answer naturally, helpfully and professionally.
         createdAt:
           new Date(),
       });
+
+    try {
+      await runAutomationTrigger({
+        businessId: business.id,
+        trigger: "customer.message_received",
+        data: {
+          conversationId,
+          customerName: "Website Visitor",
+          message,
+          channel: "website",
+        },
+      });
+    } catch (automationError) {
+      console.error("Website message automation error:", automationError);
+    }
 
     /**
      * Keep the conversation assigned to the

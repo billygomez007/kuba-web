@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { followUps, leads } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const getFollowUpsTool = createTool({
   id: "get-follow-ups",
@@ -12,10 +13,6 @@ export const getFollowUpsTool = createTool({
     "Retrieve follow-ups belonging to the current business. Use this when the user asks to see, list, review, or check pending, completed, or overdue follow-ups.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the business whose follow-ups should be retrieved."),
-
     status: z
       .string()
       .optional()
@@ -24,7 +21,8 @@ export const getFollowUpsTool = createTool({
       ),
   }),
 
-  execute: async ({ businessId, status }) => {
+  execute: async ({ status }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const conditions = status
       ? and(
           eq(followUps.businessId, businessId),

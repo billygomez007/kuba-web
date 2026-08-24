@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
+    "bootstrap:super-admin": "node scripts/bootstrap-super-admin.mjs",
     "lint": "eslint"
   },
   "dependencies": {

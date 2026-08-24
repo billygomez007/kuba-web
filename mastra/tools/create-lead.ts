@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { leads, aiEmployees } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { requireBusinessId } from "./business-context";
 
 export const createLeadTool = createTool({
   id: "create-lead",
@@ -12,10 +13,6 @@ export const createLeadTool = createTool({
     "Create a new lead for the current business. Use this when the user asks to add, create, save, or register a new lead.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the business that owns the lead."),
-
     name: z
       .string()
       .min(1)
@@ -41,12 +38,12 @@ export const createLeadTool = createTool({
   }),
 
   execute: async ({
-    businessId,
     name,
     email,
     phone,
     source,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const leadId = crypto.randomUUID();
     const now = new Date();
 

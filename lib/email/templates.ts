@@ -153,6 +153,30 @@ export function verificationEmailTemplate({ name, actionUrl }: ActionTemplateOpt
   };
 }
 
+export function emailChangeConfirmationTemplate({
+  name,
+  newEmail,
+  actionUrl,
+}: RecipientTemplateOptions & { newEmail: string; actionUrl: string }): EmailTemplate {
+  const subject = "Confirm your new SuperKuba email address";
+  return {
+    subject,
+    ...renderBrandedEmail({
+      preheader: `Confirm the change to ${newEmail} on your SuperKuba account.`,
+      eyebrow: "Account security",
+      title: "Confirm your new email address",
+      greeting: `Hello ${name},`,
+      body: [
+        `Someone signed into your SuperKuba account requested to change the login email to ${newEmail}.`,
+        "Use the secure link below to confirm this change. Your login email will remain unchanged until verification is completed.",
+      ],
+      ctaLabel: "Confirm Email Address",
+      ctaUrl: actionUrl,
+      notice: "If you did not request this change, you can ignore this email and your current login email will stay the same.",
+    }),
+  };
+}
+
 export function teamInvitationEmailTemplate(
   options: ActionTemplateOptions & { businessName: string; inviterName: string },
 ): EmailTemplate {

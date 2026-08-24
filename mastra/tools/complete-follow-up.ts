@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { followUps, leads } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const completeFollowUpTool = createTool({
   id: "complete-follow-up",
@@ -12,10 +13,6 @@ export const completeFollowUpTool = createTool({
     "Mark a pending follow-up belonging to the current business as completed. ONLY use this tool when the user explicitly confirms that the follow-up was actually completed, such as saying they called, messaged, emailed, spoke with, contacted, or otherwise completed the follow-up. NEVER use this tool merely because the user says 'do it', 'go ahead', 'handle it', or approves a recommended action. Those phrases do not prove that the customer interaction occurred.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the business that owns the follow-up."),
-
     followUpId: z
       .string()
       .optional()
@@ -30,10 +27,10 @@ export const completeFollowUpTool = createTool({
   }),
 
   execute: async ({
-    businessId,
     followUpId,
     leadName,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     let targetFollowUpId = followUpId;
 
     if (!targetFollowUpId && leadName) {

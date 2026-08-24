@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import Link from "next/link";
 import EmptyState from "../../components/EmptyState";
 
 type Condition = {
@@ -48,17 +49,62 @@ type AutomationRun = {
 
 const triggerOptions = [
   {
+    value: "customer.message_received",
+    label: "Customer message received",
+  },
+  {
     value: "lead.created",
     label: "New lead created",
   },
   {
-    value: "lead.updated",
-    label: "Lead updated",
+    value: "lead.status_changed",
+    label: "Lead status changed",
+  },
+  {
+    value: "conversation.escalated",
+    label: "Conversation escalated",
+  },
+  {
+    value: "task.created",
+    label: "Task created",
+  },
+  {
+    value: "appointment.created",
+    label: "Appointment created",
+  },
+  {
+    value: "customer.inactive",
+    label: "Customer inactive",
+  },
+  {
+    value: "ai_employee.action_completed",
+    label: "AI employee action completed",
   },
   {
     value: "follow_up.due",
     label: "Follow-up becomes due",
   },
+];
+
+const actionOptions = [
+  ["send_message", "Send message"],
+  ["create_lead", "Create lead"],
+  ["update_lead_status", "Update lead status"],
+  ["create_task", "Create task"],
+  ["assign_conversation", "Assign conversation"],
+  ["notify_team_member", "Notify team member"],
+  ["escalate_to_human", "Escalate to human"],
+  ["run_ai_employee", "Run AI employee"],
+  ["assign_employee", "Assign AI employee"],
+  ["create_follow_up", "Create follow-up"],
+];
+
+const conditionFields = [
+  ["customer.type", "Customer type"],
+  ["lead.stage", "Lead stage"],
+  ["message.content", "Message content"],
+  ["business.hours", "Business hours"],
+  ["employee.available", "Employee availability"],
 ];
 
 const employeeOptions = [
@@ -490,6 +536,13 @@ export default function AutomationsPage() {
             + Create Automation
           </button>
 
+          <Link
+            href="/dashboard/automations/templates"
+            className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-5 py-3 text-center text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/[0.1]"
+          >
+            Browse Templates
+          </Link>
+
         </div>
 
 
@@ -627,49 +680,29 @@ export default function AutomationsPage() {
                           key={index}
                           className="grid gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 sm:grid-cols-[1fr_1fr_1fr_auto]"
                         >
-                          <input
-                            value={
-                              condition.field
-                            }
-                            onChange={(
-                              event,
-                            ) =>
-                              updateCondition(
-                                index,
-                                "field",
-                                event.target
-                                  .value,
-                              )
-                            }
-                            placeholder="lead.stage"
-                            className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
-                          />
-
                           <select
-                            value={
-                              condition.operator
-                            }
-                            onChange={(
-                              event,
-                            ) =>
-                              updateCondition(
-                                index,
-                                "operator",
-                                event.target
-                                  .value,
-                              )
+                            value={condition.field}
+                            onChange={(event) =>
+                              updateCondition(index, "field", event.target.value)
                             }
                             className="rounded-lg border border-white/10 bg-[#0b0b0f] px-3 py-2 text-sm outline-none"
                           >
-                            <option value="equals">
-                              equals
-                            </option>
-                            <option value="not_equals">
-                              does not equal
-                            </option>
-                            <option value="contains">
-                              contains
-                            </option>
+                            {conditionFields.map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+
+                          <select
+                            value={condition.operator}
+                            onChange={(event) =>
+                              updateCondition(index, "operator", event.target.value)
+                            }
+                            className="rounded-lg border border-white/10 bg-[#0b0b0f] px-3 py-2 text-sm outline-none"
+                          >
+                            <option value="equals">equals</option>
+                            <option value="not_equals">does not equal</option>
+                            <option value="contains">contains</option>
+                            <option value="exists">exists</option>
                           </select>
 
                           <input
@@ -798,17 +831,9 @@ export default function AutomationsPage() {
                             }}
                             className="rounded-lg border border-white/10 bg-[#0b0b0f] px-3 py-2 text-sm outline-none"
                           >
-                            <option value="assign_employee">
-                              Assign AI employee
-                            </option>
-
-                            <option value="create_follow_up">
-                              Create follow-up
-                            </option>
-
-                            <option value="create_task">
-                              Create task
-                            </option>
+                            {actionOptions.map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
                           </select>
 
                           <button
@@ -1230,9 +1255,12 @@ export default function AutomationsPage() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-3">
                           <h3 className="font-bold">
-                            {
-                              automation.name
-                            }
+                            <a
+                              href={`/dashboard/automations/${automation.id}`}
+                              className="transition hover:text-cyan-300"
+                            >
+                              {automation.name}
+                            </a>
                           </h3>
 
                           <span

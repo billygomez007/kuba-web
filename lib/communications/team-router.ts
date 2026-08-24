@@ -21,6 +21,15 @@ export async function routeConversationToTeam(
   const initial =
     routeConversation(context);
 
+  /*
+   * routeConversation already preserved a human's
+   * existing ownership of this conversation. Don't let
+   * team routing override that back to AI/team below.
+   */
+  if (context.currentAssignedUserId) {
+    return initial;
+  }
+
   const teams =
     await db
       .select({

@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 
 import { db } from "@/db";
 import { customers } from "@/db/schema";
+import { requireBusinessId } from "@/mastra/tools/business-context";
 
 
 export const findCustomerTool = createTool({
@@ -14,16 +15,15 @@ export const findCustomerTool = createTool({
     "Find an existing customer using email or phone number.",
 
   inputSchema: z.object({
-    businessId: z.string(),
     email: z.string().optional(),
     phone: z.string().optional(),
   }),
 
   execute: async ({
-    businessId,
     email,
     phone,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
 
     if (!email && !phone) {
       throw new Error(
@@ -82,9 +82,6 @@ export const createCustomerTool = createTool({
 
   inputSchema: z.object({
 
-    businessId:
-      z.string(),
-
     name:
       z.string(),
 
@@ -101,12 +98,12 @@ export const createCustomerTool = createTool({
 
 
   execute: async ({
-    businessId,
     name,
     email,
     phone,
     source = "AI Receptionist",
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
 
     const id =
       crypto.randomUUID();

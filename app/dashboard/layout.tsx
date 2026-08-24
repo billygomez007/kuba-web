@@ -26,43 +26,13 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       {
         label: "Admin Command Center",
-        href: "/dashboard/admin",
+        href: "/admin",
         icon: "⌂",
       },
       {
         label: "Businesses",
-        href: "/dashboard/admin/businesses",
+        href: "/admin/businesses",
         icon: "▣",
-      },
-      {
-        label: "Users",
-        href: "/dashboard/admin/users",
-        icon: "♙",
-      },
-      {
-        label: "AI Workforce",
-        href: "/dashboard/admin/workforce",
-        icon: "✦",
-      },
-      {
-        label: "Billing",
-        href: "/dashboard/admin/billing",
-        icon: "$",
-      },
-      {
-        label: "Revenue Analytics",
-        href: "/dashboard/admin/revenue",
-        icon: "▥",
-      },
-      {
-        label: "Security",
-        href: "/dashboard/admin/security",
-        icon: "⚠",
-      },
-      {
-        label: "Platform Settings",
-        href: "/dashboard/admin/settings",
-        icon: "⚙",
       },
     ],
   },
@@ -77,9 +47,63 @@ const navigationGroups: NavigationGroup[] = [
         icon: "⌂",
       },
       {
+        label: "Workforce Command Center",
+        href: "/dashboard/workforce-command-center",
+        icon: "◉",
+        permission: "workforce.view",
+      },
+      {
+        label: "AI Workforce Control Center",
+        href: "/dashboard/workforce/control-center",
+        icon: "▣",
+        permission: "workforce.view",
+      },
+      {
+        label: "Workforce Team",
+        href: "/dashboard/workforce/team",
+        icon: "♙",
+        permission: "workforce.view",
+      },
+      {
+        label: "Orchestration",
+        href: "/dashboard/workforce/orchestration",
+        icon: "⇄",
+        permission: "workforce.view",
+      },
+      {
+        label: "Simulator",
+        href: "/dashboard/workforce/simulator",
+        icon: "◌",
+        permission: "workforce.view",
+      },
+      {
+        label: "Certification",
+        href: "/dashboard/workforce/certification",
+        icon: "✓",
+        permission: "workforce.view",
+      },
+      {
+        label: "Monitoring",
+        href: "/dashboard/workforce/monitoring",
+        icon: "◉",
+        permission: "workforce.view",
+      },
+      {
         label: "Automation",
         href: "/dashboard/automations",
         icon: "⚙",
+      },
+      {
+        label: "Billing & Usage",
+        href: "/dashboard/billing",
+        icon: "$",
+        permission: "workforce.view",
+      },
+      {
+        label: "Approvals",
+        href: "/dashboard/approvals",
+        icon: "✓",
+        permission: "messaging.manage",
       },
       {
         label: "Analytics",
@@ -127,6 +151,12 @@ const navigationGroups: NavigationGroup[] = [
         permission: "workforce.view",
       },
       {
+        label: "Approvals",
+        href: "/dashboard/approvals",
+        icon: "✓",
+        permission: "messaging.manage",
+      },
+      {
         label: "Tasks",
         href: "/dashboard/tasks",
         icon: "✓",
@@ -138,6 +168,36 @@ const navigationGroups: NavigationGroup[] = [
         icon: "▤",
         permission: "knowledge.view",
       },
+      {
+        label: "Business Brain",
+        href: "/dashboard/business-brain",
+        icon: "◈",
+        permission: "knowledge.view",
+      },
+      {
+        label: "Memory & Learning",
+        href: "/dashboard/business-brain/memory",
+        icon: "◉",
+        permission: "knowledge.view",
+      },
+      {
+        label: "Workforce Marketplace",
+        href: "/dashboard/workforce-marketplace",
+        icon: "✺",
+        permission: "workforce.view",
+      },
+      {
+        label: "Marketplace",
+        href: "/dashboard/marketplace",
+        icon: "◫",
+        permission: "workforce.view",
+      },
+      {
+        label: "Ecosystem Marketplace",
+        href: "/dashboard/ecosystem",
+        icon: "◇",
+        permission: "workforce.view",
+      },
     ],
   },
 ];
@@ -145,12 +205,24 @@ const navigationGroups: NavigationGroup[] = [
 const navigationPermissions: Record<string, string> = {
   "/dashboard": "dashboard.view",
   "/dashboard/ai-employees": "workforce.view",
+  "/dashboard/approvals": "messaging.manage",
   "/dashboard/workforce": "workforce.view",
+  "/dashboard/workforce/control-center": "workforce.view",
+  "/dashboard/workforce/orchestration": "workforce.view",
+  "/dashboard/workforce/simulator": "workforce.view",
+  "/dashboard/workforce/certification": "workforce.view",
+  "/dashboard/workforce/monitoring": "workforce.view",
+  "/dashboard/workforce/operations": "workforce.view",
+  "/dashboard/marketplace": "workforce.view",
+  "/dashboard/marketplace/install": "workforce.view",
+  "/dashboard/marketplace/installations": "workforce.view",
+  "/dashboard/ecosystem": "workforce.view",
   "/dashboard/inbox": "messaging.view",
   "/dashboard/customers": "customers.view",
   "/dashboard/follow-ups": "followups.view",
   "/dashboard/tasks": "tasks.view",
   "/dashboard/knowledge": "knowledge.view",
+  "/dashboard/business-brain": "knowledge.view",
   "/dashboard/automations": "automations.view",
   "/dashboard/analytics": "analytics.view",
   "/dashboard/integrations": "integrations.view",
@@ -447,7 +519,7 @@ export default function DashboardLayout({
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
 
               <span className="text-xs font-semibold text-emerald-300">
-                Kuba Active
+                SuperKuba Active
               </span>
             </div>
 

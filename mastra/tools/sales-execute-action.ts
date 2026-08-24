@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { leads, followUps, salesActivities } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { requireBusinessId } from "./business-context";
 
 export const salesExecuteActionTool = createTool({
   id: "sales-execute-action",
@@ -12,7 +13,6 @@ export const salesExecuteActionTool = createTool({
     "Execute one approved Sales action for the current business. Use only when the requested action is explicitly permitted.",
 
   inputSchema: z.object({
-    businessId: z.string(),
     action: z.enum([
       "update_lead_stage",
       "complete_follow_up",
@@ -29,7 +29,6 @@ export const salesExecuteActionTool = createTool({
   }),
 
   execute: async ({
-    businessId,
     action,
     leadId,
     followUpId,
@@ -37,7 +36,8 @@ export const salesExecuteActionTool = createTool({
     title,
     description,
     activityType,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     if (action === "update_lead_stage") {
       if (!leadId || !stage) {
         return {

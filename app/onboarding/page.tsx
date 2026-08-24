@@ -1,474 +1,193 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-const africanCountries = [
-  "Algeria",
-  "Angola",
-  "Benin",
-  "Botswana",
-  "Burkina Faso",
-  "Burundi",
-  "Cabo Verde",
-  "Cameroon",
-  "Central African Republic",
-  "Chad",
-  "Comoros",
-  "Democratic Republic of the Congo",
-  "Republic of the Congo",
-  "Côte d'Ivoire",
-  "Djibouti",
-  "Egypt",
-  "Equatorial Guinea",
-  "Eritrea",
-  "Eswatini",
-  "Ethiopia",
-  "Gabon",
-  "The Gambia",
-  "Ghana",
-  "Guinea",
-  "Guinea-Bissau",
-  "Kenya",
-  "Lesotho",
-  "Liberia",
-  "Libya",
-  "Madagascar",
-  "Malawi",
-  "Mali",
-  "Mauritania",
-  "Mauritius",
-  "Morocco",
-  "Mozambique",
-  "Namibia",
-  "Niger",
-  "Nigeria",
-  "Rwanda",
-  "São Tomé and Príncipe",
-  "Senegal",
-  "Seychelles",
-  "Sierra Leone",
-  "Somalia",
-  "South Africa",
-  "South Sudan",
-  "Sudan",
-  "Tanzania",
-  "Togo",
-  "Tunisia",
-  "Uganda",
-  "Zambia",
-  "Zimbabwe",
+type Role = { type: string; name: string; description: string };
+const roles: Role[] = [
+  { type: "receptionist", name: "AI Receptionist", description: "Customer enquiries, appointments, and phone calls." },
+  { type: "sales", name: "AI Sales Assistant", description: "Lead qualification and sales follow-up." },
+  { type: "customer-support", name: "AI Customer Support", description: "Customer issues, troubleshooting, and escalation." },
+  { type: "general-manager", name: "AI Executive Assistant", description: "Internal productivity and operational priorities." },
 ];
-
-const otherCountries = [
-  "Canada",
-  "United Kingdom",
-  "United States",
-  "Other",
-];
+const steps = ["Welcome", "Business information", "Setup choice", "First AI employee", "Business training", "Channels", "Voice setup", "Automations", "Test employee", "Ready to deploy"];
 
 export default function OnboardingPage() {
   const router = useRouter();
-
-  function readSavedOnboardingData() {
-    if (typeof window === "undefined") {
-      return { businessName: "", website: "" };
-    }
-
-    try {
-      const saved = sessionStorage.getItem("kuba_onboarding_data");
-
-      if (!saved) {
-        return { businessName: "", website: "" };
-      }
-
-      const data = JSON.parse(saved);
-
-      return {
-        businessName:
-          typeof data.businessName === "string" ? data.businessName : "",
-        website: typeof data.website === "string" ? data.website : "",
-      };
-    } catch {
-      sessionStorage.removeItem("kuba_onboarding_data");
-      return { businessName: "", website: "" };
-    }
-  }
-
-  const [businessName, setBusinessName] = useState(
-    () => readSavedOnboardingData().businessName,
-  );
-  const [website, setWebsite] = useState(
-    () => readSavedOnboardingData().website,
-  );
-  const [industry, setIndustry] = useState("");
-  const [country, setCountry] = useState("Ghana");
-  const [businessSize, setBusinessSize] = useState("");
-  const [countrySearch, setCountrySearch] = useState("");
-  const [countryOpen, setCountryOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const filteredAfricanCountries = useMemo(() => {
-    const search = countrySearch.trim().toLowerCase();
-
-    if (!search) {
-      return africanCountries;
-    }
-
-    return africanCountries.filter((name) =>
-      name.toLowerCase().includes(search),
-    );
-  }, [countrySearch]);
-
-  const filteredOtherCountries = useMemo(() => {
-    const search = countrySearch.trim().toLowerCase();
-
-    if (!search) {
-      return otherCountries;
-    }
-
-    return otherCountries.filter((name) =>
-      name.toLowerCase().includes(search),
-    );
-  }, [countrySearch]);
-
-  function selectCountry(name: string) {
-    setCountry(name);
-    setCountrySearch("");
-    setCountryOpen(false);
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setError("");
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/businesses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          businessName,
-          website,
-          industry,
-          country,
-          businessSize,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Unable to create your business.");
-      }
-
-      router.push("/onboarding/business-training");
-      router.refresh();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to create your business.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [step, setStep] = useState(1); const [businessName, setBusinessName] = useState(""); const [industry, setIndustry] = useState("Professional Services"); const [country, setCountry] = useState("Ghana"); const [location, setLocation] = useState(""); const [website, setWebsite] = useState(""); const [description, setDescription] = useState(""); const [products, setProducts] = useState(""); const [customers, setCustomers] = useState(""); const [role, setRole] = useState(roles[0]); const [employeeId, setEmployeeId] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  async function createBusiness() { const response = await fetch("/api/businesses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessName, website, industry, country, businessSize: "Solo", goals: ["Automate customer support"], location }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to save business profile."); }
+  async function saveBrain() { const form = new FormData(); form.set("businessDescription", `${description}${location ? ` Location: ${location}.` : ""}`); form.set("productsAndServices", products); form.set("targetCustomers", customers); form.set("frequentlyAskedQuestions", ""); form.set("aiInstructions", ""); form.set("tone", "professional"); const response = await fetch("/api/businesses/ai-settings", { method: "POST", body: form, redirect: "manual" }); if (!response.ok && response.status !== 307) throw new Error("Unable to save Business Brain."); }
+  async function createEmployee() { const response = await fetch("/api/ai-employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Kuba ${role.name.replace("AI ", "")}`, type: role.type, description: role.description, templateId: role.type }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to create AI employee."); if (data.employee?.id) { setEmployeeId(data.employee.id); const settings = new FormData(); settings.set("employeeId", data.employee.id); settings.set("responsibilities", role.description); settings.set("communicationStyle", "Professional and helpful"); settings.set("roleInstructions", "Use Business Brain and approved tools. Escalate when human support is needed."); await fetch("/api/ai-employees/settings", { method: "POST", body: settings }); } }
+  async function next() { setError(""); if (step === 2 && !businessName.trim()) { setError("Business name is required."); return; } setLoading(true); try { if (step === 2) await createBusiness(); if (step === 5) await saveBrain(); if (step === 4) await createEmployee(); if (step === 3) { setStep(4); setLoading(false); return; } setStep((current) => Math.min(10, current + 1)); } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "Unable to continue setup."); } finally { setLoading(false); } }
+  function skip() { router.push("/dashboard"); }
+  async function deploy() { if (!employeeId) { setError("Create an AI employee before deploying."); return; } setLoading(true); const response = await fetch("/api/workforce/deployment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId }) }); const data = await response.json(); if (!response.ok) setError(data.error || "Complete the readiness steps before deploying."); else router.push("/dashboard"); setLoading(false); }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050507] text-white">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-[550px] w-[550px] rounded-full bg-cyan-500/10 blur-[160px]" />
-        <div className="absolute -right-40 top-10 h-[550px] w-[550px] rounded-full bg-violet-600/10 blur-[160px]" />
-        <div className="absolute bottom-[-300px] left-1/2 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-blue-600/5 blur-[170px]" />
-      </div>
+    <main className="min-h-screen bg-[#050507] text-white">
+      <div className="mx-auto max-w-4xl px-6 py-10">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="text-sm text-cyan-300 hover:text-cyan-200">
+            Back to SuperKuba
+          </Link>
 
-      <div className="relative min-h-screen px-6 py-10 sm:py-14">
-        <div className="mx-auto w-full max-w-2xl">
+          <button
+            type="button"
+            onClick={skip}
+            className="text-sm text-white/70 hover:text-white"
+          >
+            Skip for now
+          </button>
+        </div>
 
-          {/* Kuba Brand */}
-          <div className="mb-10 flex justify-center">
-            <Link href="/" className="group">
-              <img
-                src="/brand/kuba-logo-3d.png"
-                alt="Kuba AI"
-                className="h-auto w-[210px] object-contain transition duration-300 group-hover:scale-[1.02]"
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <p className="text-xs uppercase tracking-[0.2em] text-white/50">
+            Step {step} of {steps.length}
+          </p>
+
+          <Heading title={steps[step - 1]} />
+
+          {step === 1 && (
+            <div className="mt-5">
+              <p className="text-white/70">
+                Welcome to SuperKuba. This quick setup helps you create your business workspace and first AI employee.
+              </p>
+
+              <Checklist
+                items={[
+                  "Create your business workspace",
+                  "Set up your first AI employee",
+                  "Connect channels later from dashboard",
+                ]}
               />
-            </Link>
-          </div>
+            </div>
+          )}
 
-          {/* Introduction */}
-          <div className="mb-9 text-center">
-            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-300/70">
-              Welcome to Kuba
-            </p>
+          {step === 2 && (
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <Field label="Business name" value={businessName} onChange={setBusinessName} />
+              <Field label="Industry" value={industry} onChange={setIndustry} />
+              <Field label="Country" value={country} onChange={setCountry} />
+              <Field label="Location (optional)" value={location} onChange={setLocation} />
+              <Field label="Website (optional)" value={website} onChange={setWebsite} />
+            </div>
+          )}
 
-            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Let&apos;s build your AI workforce.
-            </h1>
+          {step === 3 && (
+            <div className="mt-6 space-y-4">
+              <p className="text-white/70">
+                Continue with guided setup or skip directly to your dashboard and configure later.
+              </p>
 
-            <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-white/45 sm:text-base">
-              Tell Kuba a little about your business. We&apos;ll use this
-              information to prepare the right AI workforce for your
-              operations.
-            </p>
-          </div>
-
-          {/* Progress */}
-          <div className="mb-5 flex items-center gap-3 px-1">
-            <div className="h-1.5 flex-1 rounded-full bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500" />
-
-            <span className="text-[11px] font-semibold text-white/30">
-              Step 1 of 1
-            </span>
-          </div>
-
-          {/* Form Card */}
-          <div className="rounded-3xl border border-white/[0.09] bg-white/[0.035] p-6 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-9">
-            <form onSubmit={handleSubmit} className="space-y-6">
-
-              {/* Business Name */}
-              <div>
-                <label
-                  htmlFor="businessName"
-                  className="mb-2 block text-sm font-semibold text-white/75"
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={next}
+                  className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-black"
                 >
-                  Business name
-                </label>
+                  Guided setup
+                </button>
 
-                <input
-                  id="businessName"
-                  type="text"
-                  required
-                  value={businessName}
-                  onChange={(event) => setBusinessName(event.target.value)}
-                  placeholder="Your company name"
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/25 transition focus:border-cyan-400/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-cyan-400/10"
-                />
-
-                <p className="mt-2 text-xs text-white/25">
-                  This is the business Kuba will build the AI workforce for.
-                </p>
+                <button
+                  type="button"
+                  onClick={skip}
+                  className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold"
+                >
+                  Skip onboarding
+                </button>
               </div>
+            </div>
+          )}
 
-              {/* Industry */}
-              <div>
-                <label
-                  htmlFor="industry"
-                  className="mb-2 block text-sm font-semibold text-white/75"
-                >
-                  Industry
-                </label>
+          {step === 4 && (
+            <div className="mt-6 space-y-4">
+              <p className="text-white/70">Select your first AI employee role.</p>
 
-                <select
-                  id="industry"
-                  required
-                  value={industry}
-                  onChange={(event) => setIndustry(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-[#0b0b0f] px-4 py-3.5 text-sm text-white outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
-                >
-                  <option value="">Select your industry</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Retail">Retail</option>
-                  <option value="Hospitality">Hospitality</option>
-                  <option value="Healthcare">Healthcare</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Real Estate">Real Estate</option>
-                  <option value="Travel & Tourism">Travel & Tourism</option>
-                  <option value="Education">Education</option>
-                  <option value="Professional Services">
-                    Professional Services
-                  </option>
-                  <option value="Logistics">Logistics</option>
-                  <option value="Manufacturing">Manufacturing</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              {/* Country + Business Size */}
-              <div className="grid gap-6 sm:grid-cols-2">
-
-                {/* Country */}
-                <div className="relative">
-                  <label
-                    htmlFor="country"
-                    className="mb-2 block text-sm font-semibold text-white/75"
-                  >
-                    Country
-                  </label>
-
+              <div className="grid gap-3 sm:grid-cols-2">
+                {roles.map((candidate) => (
                   <button
+                    key={candidate.type}
                     type="button"
-                    onClick={() => setCountryOpen((open) => !open)}
-                    className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.045] px-4 py-3.5 text-left text-sm text-white outline-none transition hover:bg-white/[0.06] focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
+                    onClick={() => setRole(candidate)}
+                    className={`rounded-xl border p-4 text-left ${role.type === candidate.type ? "border-cyan-300 bg-cyan-300/10" : "border-white/15 bg-black/20"}`}
                   >
-                    <span>{country || "Select your country"}</span>
-
-                    <span
-                      className={`text-white/40 transition-transform ${
-                        countryOpen ? "rotate-180" : ""
-                      }`}
-                    >
-                      ▾
-                    </span>
+                    <p className="font-semibold">{candidate.name}</p>
+                    <p className="mt-1 text-sm text-white/60">{candidate.description}</p>
                   </button>
-
-                  {countryOpen && (
-                    <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0f] shadow-2xl shadow-black/60">
-
-                      {/* Search */}
-                      <div className="border-b border-white/[0.07] p-3">
-                        <input
-                          autoFocus
-                          type="text"
-                          value={countrySearch}
-                          onChange={(event) =>
-                            setCountrySearch(event.target.value)
-                          }
-                          placeholder="Search countries..."
-                          className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-3.5 py-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-cyan-400/50"
-                        />
-                      </div>
-
-                      {/* Country list */}
-                      <div className="max-h-64 overflow-y-auto p-2">
-
-                        {filteredAfricanCountries.length > 0 && (
-                          <>
-                            <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300/60">
-                              Africa
-                            </p>
-
-                            {filteredAfricanCountries.map((name) => (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => selectCountry(name)}
-                                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                                  country === name
-                                    ? "bg-cyan-400/10 text-cyan-300"
-                                    : "text-white/65 hover:bg-white/[0.06] hover:text-white"
-                                }`}
-                              >
-                                <span>{name}</span>
-
-                                {country === name && (
-                                  <span className="text-xs">✓</span>
-                                )}
-                              </button>
-                            ))}
-                          </>
-                        )}
-
-                        {filteredOtherCountries.length > 0 && (
-                          <>
-                            <div className="my-2 border-t border-white/[0.06]" />
-
-                            <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/25">
-                              Other countries
-                            </p>
-
-                            {filteredOtherCountries.map((name) => (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => selectCountry(name)}
-                                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                                  country === name
-                                    ? "bg-cyan-400/10 text-cyan-300"
-                                    : "text-white/65 hover:bg-white/[0.06] hover:text-white"
-                                }`}
-                              >
-                                <span>{name}</span>
-
-                                {country === name && (
-                                  <span className="text-xs">✓</span>
-                                )}
-                              </button>
-                            ))}
-                          </>
-                        )}
-
-                        {filteredAfricanCountries.length === 0 &&
-                          filteredOtherCountries.length === 0 && (
-                            <div className="px-3 py-8 text-center text-sm text-white/30">
-                              No country found.
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="mt-2 text-xs text-white/25">
-                    Where your business operates.
-                  </p>
-                </div>
-
-                {/* Business Size */}
-                <div>
-                  <label
-                    htmlFor="businessSize"
-                    className="mb-2 block text-sm font-semibold text-white/75"
-                  >
-                    Business size
-                  </label>
-
-                  <select
-                    id="businessSize"
-                    required
-                    value={businessSize}
-                    onChange={(event) => setBusinessSize(event.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-[#0b0b0f] px-4 py-3.5 text-sm text-white outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
-                  >
-                    <option value="">Select size</option>
-                    <option value="1-10">1–10 employees</option>
-                    <option value="11-50">11–50 employees</option>
-                    <option value="51-200">51–200 employees</option>
-                    <option value="201-500">201–500 employees</option>
-                    <option value="500+">500+ employees</option>
-                  </select>
-                </div>
+                ))}
               </div>
+            </div>
+          )}
 
-              {/* Error */}
-              {error && (
-                <div className="rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  {error}
-                </div>
-              )}
+          {step === 5 && (
+            <div className="mt-6 space-y-4">
+              <Field label="Business description" value={description} onChange={setDescription} />
+              <Field label="Products and services" value={products} onChange={setProducts} />
+              <Field label="Target customers" value={customers} onChange={setCustomers} />
+            </div>
+          )}
 
-              {/* Continue */}
+          {step > 5 && step < 10 && (
+            <div className="mt-6">
+              <Checklist
+                items={[
+                  "Configure this section later from dashboard settings",
+                  "No required blocking actions in this step",
+                ]}
+              />
+            </div>
+          )}
+
+          {step === 10 && (
+            <div className="mt-6 space-y-4">
+              <p className="text-white/70">
+                You are ready to continue. Deploy your first AI employee now, or finish setup later from your dashboard.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={deploy}
+                  disabled={loading}
+                  className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-60"
+                >
+                  {loading ? "Deploying..." : "Deploy now"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={skip}
+                  className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold"
+                >
+                  Continue to dashboard
+                </button>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+
+          {step !== 3 && step !== 10 && (
+            <div className="mt-6 flex justify-end">
               <button
-                type="submit"
+                type="button"
+                onClick={next}
                 disabled={loading}
-                className="w-full rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500 px-4 py-4 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:scale-[1.01] hover:shadow-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black disabled:opacity-60"
               >
-                {loading
-                  ? "Setting up your business..."
-                  : "Continue to Kuba"}
+                {loading ? "Saving..." : "Continue"}
               </button>
-            </form>
-          </div>
-
-          {/* Footer */}
-          <div className="mt-7 text-center">
-            <p className="text-xs leading-6 text-white/25">
-              You can update your business information later from your Kuba
-              settings.
-            </p>
-
-            <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/15">
-              AI Workforce for the Future
-            </p>
-          </div>
-
+            </div>
+          )}
         </div>
       </div>
     </main>
   );
 }
+function Heading({ title }: { title: string }) { return <><h1 className="mt-4 text-3xl font-black tracking-[-0.04em]">{title}</h1></>; }
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className="text-sm font-semibold text-white/70">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-cyan-300/40" /></label>; }
+function Checklist({ items }: { items: string[] }) { return <div className="mt-7 space-y-3">{items.map((item) => <div key={item} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/65"><span className="h-2 w-2 rounded-full bg-cyan-300" />{item}<span className="ml-auto text-xs text-white/30">Configure later</span></div>)}</div>; }

@@ -1,5 +1,6 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
+import { requireBusinessId } from "./business-context";
 
 export const sendWhatsAppMessageTool = createTool({
   id: "send-whatsapp-message",
@@ -8,10 +9,6 @@ export const sendWhatsAppMessageTool = createTool({
     "Send a WhatsApp text message to a lead using the business WhatsApp Cloud API. Use only when the user explicitly asks Kuba to send/contact/message a lead and the lead phone number is available. A successful result means Meta accepted the message and returned a WhatsApp message ID.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the current business."),
-
     phone: z
       .string()
       .describe(
@@ -25,10 +22,10 @@ export const sendWhatsAppMessageTool = createTool({
   }),
 
   execute: async ({
-    businessId,
     phone,
     message,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const accessToken =
       process.env.WHATSAPP_ACCESS_TOKEN;
 

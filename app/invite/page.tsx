@@ -109,18 +109,17 @@ function InviteForm() {
 
         <div className="mb-8 text-center">
           <img
-            src="/brand/kuba-logo-3d.png"
-            alt="Kuba AI"
-            className="mx-auto w-[190px]"
+            src="/brand/superkuba-logo.png"
+            alt="SuperKuba"
+            className="mx-auto w-[220px] max-w-full"
           />
 
           <h1 className="mt-8 text-3xl font-bold">
-            Join your team
+            Join your team on SuperKuba
           </h1>
 
           <p className="mt-3 text-white/50">
-            Create your Kuba account and join the
-            business you were invited to.
+            Create your account and join the business you were invited to.
           </p>
         </div>
 

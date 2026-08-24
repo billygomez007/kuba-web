@@ -658,7 +658,7 @@ AI workforce solutions built around how your industry operates.
 
           <div className="mt-14 flex flex-col gap-4 border-t border-white/[0.06] pt-7 text-xs text-white/25 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              © {new Date().getFullYear()} Kuba AI. All rights reserved.
+              © {new Date().getFullYear()} SuperKuba. All rights reserved.
             </span>
 
             <div className="flex gap-5">

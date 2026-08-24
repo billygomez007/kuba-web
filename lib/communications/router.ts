@@ -158,6 +158,41 @@ export function routeConversation(
       context.message,
     );
 
+  /*
+   * A human has already taken ownership of this
+   * conversation. Do not silently reassign it to AI
+   * on the next inbound message — a human takeover
+   * must be explicitly released by a human action.
+   */
+  if (context.currentAssignedUserId) {
+    return createRoutingDecision({
+      department:
+        context.currentDepartment ??
+        detected.department,
+
+      teamId:
+        context.currentTeamId,
+
+      aiEmployeeId:
+        null,
+
+      assignedUserId:
+        context.currentAssignedUserId,
+
+      assignmentType:
+        "user",
+
+      status:
+        "human_handling",
+
+      confidence:
+        detected.confidence,
+
+      reason:
+        "Conversation remains assigned to a human agent.",
+    });
+  }
+
   return createRoutingDecision({
     department:
       detected.department,

@@ -21,6 +21,7 @@ import {
 } from "@/lib/communications/conversation-access";
 
 import { createAuditLog } from "@/lib/auth/audit";
+import { runAutomationTrigger } from "@/lib/automations/engine";
 
 export async function POST(
   request: Request,
@@ -286,6 +287,21 @@ export async function POST(
                   : "ai_handling",
       },
     });
+
+    if (status === "escalated") {
+      try {
+        await runAutomationTrigger({
+          businessId: conversation.businessId,
+          trigger: "conversation.escalated",
+          data: {
+            conversationId,
+            status,
+          },
+        });
+      } catch (automationError) {
+        console.error("Conversation escalation automation error:", automationError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

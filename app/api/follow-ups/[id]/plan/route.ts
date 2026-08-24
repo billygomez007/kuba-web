@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
@@ -136,6 +137,9 @@ Rules:
 
     const aiResult = await kubaSalesAgent.generate(
       prompt,
+      {
+        requestContext: new RequestContext([["businessId", business.businessId]]),
+      },
     );
 
     console.timeEnd("Kuba Sales Plan Generation");

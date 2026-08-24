@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
@@ -122,12 +123,12 @@ export async function POST(
     const response =
       await sendWhatsAppMessageTool.execute!(
         {
-          businessId:
-            business.businessId,
           phone: lead.phone,
           message,
         },
-        {} as Parameters<NonNullable<typeof sendWhatsAppMessageTool.execute>>[1],
+        {
+          requestContext: new RequestContext([["businessId", business.businessId]]),
+        } as Parameters<NonNullable<typeof sendWhatsAppMessageTool.execute>>[1],
       );
 
 

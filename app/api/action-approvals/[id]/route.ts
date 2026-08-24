@@ -6,8 +6,12 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   actionApprovals,
-  businessUsers,
 } from "@/db/schema";
+import {
+  getBusinessMembership,
+  hasPermission,
+  PERMISSIONS,
+} from "@/lib/auth/permissions";
 
 export async function POST(
   request: Request,
@@ -38,43 +42,35 @@ export async function POST(
     );
   }
 
-  const membership = await db
-    .select({
-      businessId: businessUsers.businessId,
-    })
-    .from(businessUsers)
-    .where(
-      eq(businessUsers.userId, session.user.id),
-    )
-    .limit(1);
-
-  const business = membership[0];
-
-  if (!business) {
-    return NextResponse.json(
-      { error: "No business is associated with this account." },
-      { status: 404 },
-    );
-  }
-
   const approval = await db
     .select()
     .from(actionApprovals)
-    .where(
-      and(
-        eq(actionApprovals.id, id),
-        eq(
-          actionApprovals.businessId,
-          business.businessId,
-        ),
-      ),
-    )
+    .where(eq(actionApprovals.id, id))
     .limit(1);
 
   if (!approval[0]) {
     return NextResponse.json(
       { error: "Approval request not found." },
       { status: 404 },
+    );
+  }
+
+  const membership = await getBusinessMembership(
+    session.user.id,
+    approval[0].businessId,
+  );
+
+  if (
+    !membership ||
+    !hasPermission(
+      membership.role,
+      membership.permissions,
+      PERMISSIONS.MESSAGING_MANAGE,
+    )
+  ) {
+    return NextResponse.json(
+      { error: "Forbidden." },
+      { status: 403 },
     );
   }
 
@@ -96,7 +92,7 @@ export async function POST(
         eq(actionApprovals.id, id),
         eq(
           actionApprovals.businessId,
-          business.businessId,
+          approval[0].businessId,
         ),
       ),
     )

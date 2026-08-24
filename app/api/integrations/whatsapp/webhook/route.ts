@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, eq } from "drizzle-orm";
+import { RequestContext } from "@mastra/core/request-context";
 
 import { db } from "@/db";
 import {
@@ -15,6 +16,7 @@ import {
 import {
   routeConversationToTeam,
 } from "@/lib/communications/team-router";
+import type { ConversationDepartment } from "@/lib/communications/routing";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 
@@ -375,6 +377,40 @@ export async function POST(request: Request) {
     }
 
     /**
+     * Read the existing routing state.
+     *
+     * This allows an existing conversation to remain
+     * with its current team/human owner unless the
+     * router explicitly changes it.
+     */
+    const existingRoutingStateResult =
+      await db
+        .select({
+          department:
+            conversationRouting.department,
+
+          teamId:
+            conversationRouting.teamId,
+
+          aiEmployeeId:
+            conversationRouting.aiEmployeeId,
+
+          assignedUserId:
+            conversationRouting.assignedUserId,
+        })
+        .from(conversationRouting)
+        .where(
+          eq(
+            conversationRouting.conversationId,
+            conversation.id,
+          ),
+        )
+        .limit(1);
+
+    const existingRoutingState =
+      existingRoutingStateResult[0];
+
+    /**
      * Route the conversation through Kuba's
      * department and team routing engine.
      *
@@ -400,16 +436,21 @@ export async function POST(request: Request) {
           customerMessage,
 
         currentDepartment:
-          null,
+          typeof existingRoutingState?.department === "string"
+            ? existingRoutingState.department as ConversationDepartment
+            : null,
 
         currentTeamId:
+          existingRoutingState?.teamId ??
           null,
 
         currentAiEmployeeId:
+          existingRoutingState?.aiEmployeeId ??
           conversation.assignedEmployeeId ??
           null,
 
         currentAssignedUserId:
+          existingRoutingState?.assignedUserId ??
           null,
       });
 
@@ -601,6 +642,7 @@ ${customerMessage}
     let selectedAgent: {
       generate: (
         input: string,
+        options?: { requestContext?: RequestContext },
       ) => Promise<{
         text?: string;
       }>;
@@ -682,6 +724,9 @@ ${customerMessage}
     const result =
       await selectedAgent.generate(
         businessContext,
+        {
+          requestContext: new RequestContext([["businessId", businessId]]),
+        },
       );
 
     const responseText =

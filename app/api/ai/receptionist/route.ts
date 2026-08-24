@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { and, eq } from "drizzle-orm";
+import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
@@ -49,6 +50,10 @@ export async function POST(request: Request) {
 
     const conversationId = String(
       body.conversationId || "",
+    ).trim();
+
+    const employeeId = String(
+      body.employeeId || "",
     ).trim();
 
     if (!message) {
@@ -142,9 +147,12 @@ export async function POST(request: Request) {
         ),
       )
       .where(
-        eq(
-          aiEmployees.businessId,
-          business.id,
+        and(
+          eq(aiEmployees.businessId, business.id),
+          eq(aiEmployees.status, "active"),
+          employeeId
+            ? eq(aiEmployees.id, employeeId)
+            : eq(aiEmployees.type, "receptionist"),
         ),
       )
       .limit(10);
@@ -155,6 +163,16 @@ export async function POST(request: Request) {
           item.employee.type ===
           "receptionist",
       );
+
+    if (employeeId && !receptionist) {
+      return NextResponse.json(
+        {
+          error:
+            "This Receptionist employee is not active for your business.",
+        },
+        { status: 404 },
+      );
+    }
 
     const employeeSettings =
       receptionist?.settings;
@@ -1112,17 +1130,6 @@ ${message}`;
 
 
     const receptionistPrompt = `
-CURRENT BUSINESS ID:
-${business.id}
-
-IMPORTANT:
-This is the exact business ID for the current conversation.
-
-When using the getBusinessKnowledge tool, you MUST pass this exact value as the businessId argument.
-
-Do not guess the business ID.
-Do not omit the businessId argument.
-
 CUSTOMER MESSAGE:
 ${message}
 
@@ -1155,6 +1162,9 @@ ${prompt}
     const result =
       await kubaReceptionistAgent.generate(
         receptionistPrompt,
+        {
+          requestContext: new RequestContext([["businessId", business.id]]),
+        },
       );
 
     console.log(

@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { runAutomationTrigger } from "@/lib/automations/engine";
 
 import {
   businessUsers,
@@ -218,6 +219,23 @@ export async function POST(
       createdAt: now,
       updatedAt: now,
     });
+
+    try {
+      await runAutomationTrigger({
+        businessId,
+        trigger: "task.created",
+        data: {
+          taskId,
+          title,
+          status,
+          priority,
+          leadId: body.leadId || null,
+          customerId: body.customerId || null,
+        },
+      });
+    } catch (automationError) {
+      console.error("Task automation error:", automationError);
+    }
 
     const created = await db
       .select()

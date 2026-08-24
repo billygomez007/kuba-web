@@ -8,6 +8,7 @@ import {
   leads,
   followUps,
 } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const salesWorkPlanTool = createTool({
   id: "sales-work-plan",
@@ -15,13 +16,10 @@ export const salesWorkPlanTool = createTool({
   description:
     "Review the current Sales AI work queue and identify leads and follow-ups that need attention.",
 
-  inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the current business."),
-  }),
+  inputSchema: z.object({}),
 
-  execute: async ({ businessId }) => {
+  execute: async (_input, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const employee = await db
       .select({
         id: aiEmployees.id,

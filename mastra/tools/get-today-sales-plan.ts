@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { leads, followUps } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const getTodaySalesPlanTool = createTool({
   id: "get-today-sales-plan",
@@ -11,15 +12,10 @@ export const getTodaySalesPlanTool = createTool({
   description:
     "Create a deterministic sales work plan for today using the current business leads and follow-ups. Use this whenever the user asks what they should work on today, what they should do today, what their sales priorities are today, or what needs their attention today.",
 
-  inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe(
-        "The ID of the current business whose sales plan should be generated.",
-      ),
-  }),
+  inputSchema: z.object({}),
 
-  execute: async ({ businessId }) => {
+  execute: async (_input, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const businessLeads = await db
       .select({
         id: leads.id,

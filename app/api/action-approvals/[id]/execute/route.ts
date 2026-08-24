@@ -6,10 +6,15 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   actionApprovals,
-  businessUsers,
-  salesActivities,
   communicationLogs,
 } from "@/db/schema";
+import {
+  getBusinessMembership,
+  hasPermission,
+  PERMISSIONS,
+} from "@/lib/auth/permissions";
+import { getChannelAdapter } from "@/lib/channels/router";
+import { type ChannelType } from "@/lib/channels/types";
 
 export async function POST(
   request: Request,
@@ -30,46 +35,35 @@ export async function POST(
 
   const { id } = await context.params;
 
-  const membership = await db
-    .select({
-      businessId: businessUsers.businessId,
-    })
-    .from(businessUsers)
-    .where(
-      eq(
-        businessUsers.userId,
-        session.user.id,
-      ),
-    )
-    .limit(1);
-
-  const business = membership[0];
-
-  if (!business) {
-    return NextResponse.json(
-      { error: "Business not found." },
-      { status: 404 },
-    );
-  }
-
   const approval = await db
     .select()
     .from(actionApprovals)
-    .where(
-      and(
-        eq(actionApprovals.id, id),
-        eq(
-          actionApprovals.businessId,
-          business.businessId,
-        ),
-      ),
-    )
+    .where(eq(actionApprovals.id, id))
     .limit(1);
 
   if (!approval[0]) {
     return NextResponse.json(
       { error: "Approval request not found." },
       { status: 404 },
+    );
+  }
+
+  const membership = await getBusinessMembership(
+    session.user.id,
+    approval[0].businessId,
+  );
+
+  if (
+    !membership ||
+    !hasPermission(
+      membership.role,
+      membership.permissions,
+      PERMISSIONS.MESSAGING_MANAGE,
+    )
+  ) {
+    return NextResponse.json(
+      { error: "Forbidden." },
+      { status: 403 },
     );
   }
 
@@ -83,23 +77,29 @@ export async function POST(
     );
   }
 
-  // Provider connection will happen here:
-  // WhatsApp
-  // Akesel SMS
-  // Akesel Email
+  const adapter = getChannelAdapter(
+    approval[0].channel as ChannelType,
+  );
+
+  const result = await adapter.send({
+    businessId: approval[0].businessId,
+    conversationId: "",
+    recipient: approval[0].recipient,
+    message: approval[0].message,
+  });
 
   await db.insert(communicationLogs).values({
     id: crypto.randomUUID(),
-    businessId: business.businessId,
+    businessId: approval[0].businessId,
     employeeId: null,
     customerId: null,
     leadId: null,
     channel: approval[0].channel,
     recipient: approval[0].recipient,
     message: approval[0].message,
-    status: "sent",
-    provider: "pending",
-    providerMessageId: null,
+    status: result.success ? "sent" : "failed",
+    provider: approval[0].channel,
+    providerMessageId: result.externalMessageId || null,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -107,12 +107,24 @@ export async function POST(
   await db
     .update(actionApprovals)
     .set({
-      status: "completed",
+      status: result.success ? "completed" : "failed",
       updatedAt: new Date(),
     })
     .where(
-      eq(actionApprovals.id, id),
+      and(
+        eq(actionApprovals.id, id),
+        eq(actionApprovals.businessId, approval[0].businessId),
+      ),
     );
+
+  if (!result.success) {
+    return NextResponse.json(
+      {
+        error: "The approved action could not be delivered.",
+      },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({
     success: true,

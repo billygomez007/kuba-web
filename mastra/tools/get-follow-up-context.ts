@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 
 import { and, eq, desc } from "drizzle-orm";
+import { requireBusinessId } from "./business-context";
 
 
 export const getFollowUpContextTool = createTool({
@@ -26,7 +27,8 @@ export const getFollowUpContextTool = createTool({
   }),
 
 
-  execute: async ({ followUpId }) => {
+  execute: async ({ followUpId }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
 
     const followUpResult = await db
       .select({
@@ -42,9 +44,15 @@ export const getFollowUpContextTool = createTool({
         ),
       )
       .where(
-        eq(
-          followUps.id,
-          followUpId,
+        and(
+          eq(
+            followUps.id,
+            followUpId,
+          ),
+          eq(
+            followUps.businessId,
+            businessId,
+          ),
         ),
       )
       .limit(1);

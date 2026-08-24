@@ -64,6 +64,30 @@ export async function PATCH(
       );
     }
 
+    const existing = await db
+      .select({ id: followUps.id })
+      .from(followUps)
+      .where(
+        and(
+          eq(
+            followUps.id,
+            id,
+          ),
+          eq(
+            followUps.businessId,
+            business.businessId,
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (!existing[0]) {
+      return NextResponse.json(
+        { error: "Follow-up not found." },
+        { status: 404 },
+      );
+    }
+
     await db
       .update(followUps)
       .set({

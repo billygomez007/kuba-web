@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { followUps, leads, aiEmployees } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const createFollowUpTool = createTool({
   id: "create-follow-up",
@@ -12,10 +13,6 @@ export const createFollowUpTool = createTool({
     "Create a follow-up for a lead belonging to the current business. Use this when the user asks to create, schedule, or set a follow-up.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the current business."),
-
     leadName: z
       .string()
       .describe("The exact name of the lead."),
@@ -35,12 +32,12 @@ export const createFollowUpTool = createTool({
   }),
 
   execute: async ({
-    businessId,
     leadName,
     title,
     description,
     dueAt,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const matchingLeads = await db
       .select({
         id: leads.id,

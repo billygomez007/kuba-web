@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { leads, followUps } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const prioritizeLeadsTool = createTool({
   id: "prioritize-leads",
@@ -11,13 +12,10 @@ export const prioritizeLeadsTool = createTool({
   description:
     "Identify which leads deserve the most attention based on their sales stage, follow-up status, and age in the pipeline. Use this when the user asks which leads to prioritize, who to contact first, or what sales opportunities need attention.",
 
-  inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the business whose leads should be prioritized."),
-  }),
+  inputSchema: z.object({}),
 
-  execute: async ({ businessId }) => {
+  execute: async (_input, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const businessLeads = await db
       .select({
         id: leads.id,

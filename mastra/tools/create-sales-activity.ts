@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { leads, salesActivities } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const createSalesActivityTool = createTool({
   id: "create-sales-activity",
@@ -12,10 +13,6 @@ export const createSalesActivityTool = createTool({
     "Record a sales activity against an existing lead belonging to the current business. ONLY use this tool when a real sales interaction actually occurred and the user explicitly confirms it, such as saying they spoke with, contacted, emailed, called, messaged, met, or followed up with a lead. NEVER use this tool merely because the user says 'do it', 'go ahead', 'handle it', 'proceed', or approves a recommended action. Do not create an activity for an interaction that has not actually happened.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the current business."),
-
     leadName: z
       .string()
       .describe("The exact name of the lead."),
@@ -36,12 +33,12 @@ export const createSalesActivityTool = createTool({
   }),
 
   execute: async ({
-    businessId,
     leadName,
     type,
     title,
     description,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const matchingLeads = await db
       .select({
         id: leads.id,

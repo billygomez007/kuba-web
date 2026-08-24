@@ -3,6 +3,7 @@ import {
   sqliteTable,
   text,
   index,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 export const session = sqliteTable(
@@ -144,6 +145,44 @@ export const businesses = sqliteTable("businesses", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+export const subscriptions = sqliteTable("subscriptions", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull().unique(),
+  provider: text("provider").notNull(),
+  providerCustomerId: text("provider_customer_id"),
+  providerSubscriptionId: text("provider_subscription_id").unique(),
+  providerAuthorizationReference: text("provider_authorization_reference"),
+  providerEventId: text("provider_event_id").unique(),
+  plan: text("plan").notNull().default("starter"),
+  status: text("status").notNull().default("incomplete"),
+  currentPeriodStart: integer("current_period_start", { mode: "timestamp_ms" }),
+  currentPeriodEnd: integer("current_period_end", { mode: "timestamp_ms" }),
+  cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).notNull().default(false),
+  trialEnd: integer("trial_end", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("subscriptions_business_id_unique").on(table.businessId)]);
+
+export const entitlementOverrides = sqliteTable("entitlement_overrides", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  feature: text("feature").notNull(),
+  overrideType: text("override_type").notNull(),
+  value: text("value").notNull(),
+  reason: text("reason").notNull(),
+  startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const partnerOrganizations = sqliteTable("partner_organizations", {
+  id: text("id").primaryKey(), name: text("name").notNull(), contactEmail: text("contact_email").notNull(), website: text("website"), country: text("country"), description: text("description"), supportContact: text("support_contact"), verificationStatus: text("verification_status").notNull().default("draft"), marketplaceStatus: text("marketplace_status").notNull().default("draft"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+export const partnerProducts = sqliteTable("partner_products", { id: text("id").primaryKey(), partnerId: text("partner_id").notNull(), name: text("name").notNull(), type: text("type").notNull(), description: text("description").notNull(), status: text("status").notNull().default("draft"), verified: integer("verified", { mode: "boolean" }).notNull().default(false), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull() });
+export const partnerProductVersions = sqliteTable("partner_product_versions", { id: text("id").primaryKey(), productId: text("product_id").notNull(), version: text("version").notNull(), releaseNotes: text("release_notes"), manifest: text("manifest").notNull(), status: text("status").notNull().default("draft"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull() });
+export const developerApiKeys = sqliteTable("developer_api_keys", { id: text("id").primaryKey(), partnerId: text("partner_id").notNull(), keyHash: text("key_hash").notNull().unique(), scopes: text("scopes").notNull(), revokedAt: integer("revoked_at", { mode: "timestamp_ms" }), lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull() });
 export const branches = sqliteTable("branches", {
   id: text("id").primaryKey(),
 
@@ -818,6 +857,22 @@ export const conversations = sqliteTable("conversations", {
   customerEmail: text("customer_email"),
 
   assignedEmployeeId: text("assigned_employee_id"),
+
+  voiceProvider: text("voice_provider"),
+
+  voiceDirection: text("voice_direction"),
+
+  voiceStartedAt: integer("voice_started_at", { mode: "timestamp_ms" }),
+
+  voiceConnectedAt: integer("voice_connected_at", { mode: "timestamp_ms" }),
+
+  voiceEndedAt: integer("voice_ended_at", { mode: "timestamp_ms" }),
+
+  voiceDurationSeconds: integer("voice_duration_seconds"),
+
+  voiceBillableMinutes: integer("voice_billable_minutes"),
+
+  voiceRecordingUrl: text("voice_recording_url"),
 
   aiMode: text("ai_mode")
     .notNull()

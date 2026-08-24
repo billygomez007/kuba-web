@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 
 import { db } from "@/db";
 import { leads } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const getLeadsTool = createTool({
   id: "get-leads",
@@ -12,10 +13,6 @@ export const getLeadsTool = createTool({
     "Retrieve leads belonging to the current business. Use this when the user asks to see, list, review, analyze, or find leads in the sales pipeline.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the business whose leads should be retrieved."),
-
     stage: z
       .string()
       .optional()
@@ -24,7 +21,8 @@ export const getLeadsTool = createTool({
       ),
   }),
 
-  execute: async ({ businessId, stage }) => {
+  execute: async ({ stage }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     const conditions = stage
       ? and(
           eq(leads.businessId, businessId),

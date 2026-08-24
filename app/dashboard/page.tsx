@@ -16,6 +16,8 @@ import SuperKubaErrorPage from "../components/SuperKubaErrorPage";
 import BusinessGreeting from "../components/business/BusinessGreeting";
 import ExecutiveIntelligencePanels from "../components/command-center/ExecutiveIntelligencePanels";
 import ExecutiveOperationsOverview from "../components/command-center/ExecutiveOperationsOverview";
+import AIWorkforceOverview from "../components/dashboard/AIWorkforceOverview";
+import SetupChecklist from "../components/dashboard/SetupChecklist";
 
 type Business = {
   id: string;
@@ -91,6 +93,19 @@ export default function DashboardPage() {
         const response = await fetch("/api/businesses", {
           cache: "no-store",
         });
+
+        if (response.status === 404) {
+          const data = await response.json();
+
+          if (data?.onboardingStatus === "new_user") {
+            setBusiness(null);
+            setEmployees([]);
+            setBusinessTimezone(null);
+            setUserTimezone(null);
+            setLoadFailed(false);
+            return;
+          }
+        }
 
         if (!response.ok) {
           throw new Error("Unable to load business.");
@@ -173,6 +188,12 @@ export default function DashboardPage() {
                   View Workforce
                 </Link>
                 <Link
+                  href="/dashboard/business-brain"
+                  className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-2.5 text-center text-xs font-semibold text-cyan-200 transition hover:bg-cyan-300/[0.1] sm:rounded-xl sm:px-5 sm:py-3 sm:text-sm"
+                >
+                  Open Business Brain
+                </Link>
+                <Link
                   href="#workforce"
                   className="inline-flex items-center justify-center rounded-lg sm:rounded-xl bg-white px-4 py-2.5 sm:px-5 sm:py-3 text-xs sm:text-sm font-bold text-black transition hover:scale-[1.02] hover:bg-white/90"
                 >
@@ -184,6 +205,12 @@ export default function DashboardPage() {
 
           {/* Operations Overview */}
           <ExecutiveOperationsOverview initialEmployees={employees} />
+
+          <div className="mt-6">
+            <AIWorkforceOverview />
+          </div>
+
+          <SetupChecklist />
 
           {/* CEO COMMAND CENTER */}
           <section className="mt-12 space-y-8">

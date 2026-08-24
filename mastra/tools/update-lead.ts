@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { leads } from "@/db/schema";
+import { requireBusinessId } from "./business-context";
 
 export const updateLeadTool = createTool({
   id: "update-lead",
@@ -12,10 +13,6 @@ export const updateLeadTool = createTool({
     "Update an existing lead belonging to the current business. Use this when the user asks to change a lead's name, email, phone, source, or sales stage.",
 
   inputSchema: z.object({
-    businessId: z
-      .string()
-      .describe("The ID of the business that owns the lead."),
-
     leadId: z
       .string()
       .optional()
@@ -60,7 +57,6 @@ export const updateLeadTool = createTool({
   }),
 
   execute: async ({
-    businessId,
     leadId,
     leadName,
     name,
@@ -68,7 +64,8 @@ export const updateLeadTool = createTool({
     phone,
     source,
     stage,
-  }) => {
+  }, { requestContext }) => {
+    const businessId = requireBusinessId(requestContext);
     let targetLeadId = leadId;
 
     if (!targetLeadId && leadName) {

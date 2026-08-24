@@ -11,9 +11,12 @@ import {
   followUps,
   customers,
   conversations,
+  tasks,
+  actionApprovals,
+  aiEmployeeActivities,
 } from "@/db/schema";
 
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 
 
 export async function GET() {
@@ -47,11 +50,6 @@ export async function GET() {
 
     const business = membership[0];
 
-    console.log(
-      "COMMAND CENTER MEMBERSHIP:",
-      membership,
-    );
-
     if (!business) {
       return NextResponse.json(
         { error: "Business not found" },
@@ -59,12 +57,19 @@ export async function GET() {
       );
     }
 
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
     const [
       employeeData,
       leadData,
       followUpData,
       customerData,
       conversationData,
+      todayCompletedTasks,
+      pendingApprovalData,
+      activityData,
     ] = await Promise.all([
       db
         .select()
@@ -115,6 +120,47 @@ export async function GET() {
             business.businessId,
           ),
         ),
+
+      db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.businessId, business.businessId),
+            eq(tasks.status, "completed"),
+            gte(tasks.completedAt, startOfDay),
+          ),
+        ),
+
+      db
+        .select({ id: actionApprovals.id })
+        .from(actionApprovals)
+        .where(
+          and(
+            eq(actionApprovals.businessId, business.businessId),
+            eq(actionApprovals.status, "pending"),
+          ),
+        ),
+
+      db
+        .select({
+          id: aiEmployeeActivities.id,
+          employeeId: aiEmployeeActivities.employeeId,
+          type: aiEmployeeActivities.type,
+          title: aiEmployeeActivities.title,
+          description: aiEmployeeActivities.description,
+          status: aiEmployeeActivities.status,
+          createdAt: aiEmployeeActivities.createdAt,
+        })
+        .from(aiEmployeeActivities)
+        .where(
+          eq(
+            aiEmployeeActivities.businessId,
+            business.businessId,
+          ),
+        )
+        .orderBy(desc(aiEmployeeActivities.createdAt))
+        .limit(8),
     ]);
 
     const pipeline = {
@@ -135,8 +181,6 @@ export async function GET() {
       ).length,
     };
 
-
-    const now = new Date();
 
     const followUpSummary = {
       total: followUpData.length,
@@ -172,6 +216,25 @@ export async function GET() {
       customers: customerData.length,
 
       conversations: conversationData.length,
+
+      workforce: {
+        totalEmployees: employeeData.length,
+        activeEmployees: employeeData.filter(
+          (employee) => employee.status === "active",
+        ).length,
+        conversationsToday: conversationData.filter(
+          (conversation) => conversation.updatedAt >= startOfDay,
+        ).length,
+        tasksCompletedToday: todayCompletedTasks.length,
+        pendingApprovals: pendingApprovalData.length,
+        employees: employeeData.map((employee) => ({
+          id: employee.id,
+          name: employee.name,
+          type: employee.type,
+          status: employee.status,
+        })),
+        activities: activityData,
+      },
     });
 
   } catch (error) {

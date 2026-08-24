@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/db";
@@ -14,6 +14,7 @@ import {
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { getBusinessPlan, employeeLimitMessage } from "@/lib/billing/entitlements";
 
 export async function POST(
   request: Request,
@@ -63,6 +64,14 @@ export async function POST(
       );
     }
 
+    const plan = await getBusinessPlan(membership.businessId);
+    if (plan.employeeLimit !== null) {
+      const activeEmployees = await db.select({ total: count() }).from(aiEmployees).where(and(eq(aiEmployees.businessId, membership.businessId), eq(aiEmployees.status, "active")));
+      if (Number(activeEmployees[0]?.total || 0) >= plan.employeeLimit) {
+        return NextResponse.json({ error: employeeLimitMessage(plan), upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
+      }
+    }
+
     const body =
       await request.json();
 
@@ -96,6 +105,10 @@ export async function POST(
         },
         { status: 400 },
       );
+    }
+
+    if (plan.id === "starter" && !["receptionist", "appointment", "customer-support"].includes(type)) {
+      return NextResponse.json({ error: `${type} AI requires Growth or higher.`, upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
     }
 
     const existingEmployee =

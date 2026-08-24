@@ -12,6 +12,7 @@ import {
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { runAutomationTrigger } from "@/lib/automations/engine";
 
 export async function PATCH(
   request: Request,
@@ -136,6 +137,19 @@ export async function PATCH(
           ),
         ),
       );
+
+    try {
+      await runAutomationTrigger({
+        businessId: membership.businessId,
+        trigger: "lead.status_changed",
+        data: {
+          leadId: id,
+          stage,
+        },
+      });
+    } catch (automationError) {
+      console.error("Lead status automation error:", automationError);
+    }
 
     return NextResponse.json({
       success: true,

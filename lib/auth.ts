@@ -1,6 +1,11 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db";
+import { resend } from "@/lib/email/resend";
+import {
+  emailChangeConfirmationTemplate,
+  verificationEmailTemplate,
+} from "@/lib/email/templates";
 
 const PRODUCTION_URL = "https://superkuba.com";
 const isProduction = process.env.NODE_ENV === "production";
@@ -17,10 +22,6 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "sqlite",
   }),
-
-  user: {
-    modelName: "users",
-  },
 
   baseURL,
 
@@ -44,5 +45,44 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+  },
+
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      const template = verificationEmailTemplate({
+        name: user.name || "there",
+        actionUrl: url,
+      });
+
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM!,
+        to: user.email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+    },
+  },
+
+  user: {
+    modelName: "users",
+    changeEmail: {
+      enabled: true,
+      sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+        const template = emailChangeConfirmationTemplate({
+          name: user.name || "there",
+          newEmail,
+          actionUrl: url,
+        });
+
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM!,
+          to: user.email,
+          subject: template.subject,
+          html: template.html,
+          text: template.text,
+        });
+      },
+    },
   },
 });

@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { RequestContext } from "@mastra/core/request-context";
 
 import { db } from "@/db";
 import {
@@ -8,7 +9,16 @@ import {
   followUps,
   leads,
   tasks,
+  conversations,
+  conversationRouting,
+  handoffs,
+  integrations,
 } from "@/db/schema";
+import { getChannelAdapter } from "@/lib/channels/router";
+import type { ChannelType } from "@/lib/channels/types";
+import { kubaSalesAgent } from "@/mastra/agents/sales";
+import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
+import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 
 
 type AutomationCondition = {
@@ -40,6 +50,42 @@ type AutomationAction =
       priority?: "low" | "normal" | "high" | "urgent";
       delayMinutes?: number;
       assignToEmployeeType?: string;
+    }
+  | {
+      type: "send_message";
+      channel?: string;
+      recipient?: string;
+      message: string;
+    }
+  | {
+      type: "create_lead";
+      name?: string;
+      email?: string;
+      phone?: string;
+      service?: string;
+      stage?: string;
+    }
+  | {
+      type: "update_lead_status";
+      status: string;
+    }
+  | {
+      type: "assign_conversation";
+      employeeType?: string;
+      userId?: string;
+    }
+  | {
+      type: "notify_team_member";
+      message?: string;
+    }
+  | {
+      type: "escalate_to_human";
+      reason?: string;
+    }
+  | {
+      type: "run_ai_employee";
+      employeeType: string;
+      message?: string;
     };
 
 
@@ -228,6 +274,195 @@ export async function runAutomationTrigger({
             );
         }
 
+
+        else if (action.type === "send_message") {
+          const channel = String(
+            action.channel || data.channel || "",
+          ) as ChannelType;
+          const recipient = String(
+            action.recipient || data.recipient || data.customerPhone || data.customerEmail || "",
+          );
+
+          if (!channel || !recipient || !action.message) {
+            throw new Error("send_message requires channel, recipient, and message.");
+          }
+
+          const connection = await db
+            .select({ id: integrations.id })
+            .from(integrations)
+            .where(and(
+              eq(integrations.businessId, businessId),
+              eq(integrations.provider, channel),
+              eq(integrations.status, "active"),
+            ))
+            .limit(1);
+
+          if (!connection[0]) {
+            throw new Error(`No active ${channel} integration is configured.`);
+          }
+
+          const adapter = getChannelAdapter(channel);
+          await adapter.send({
+            businessId,
+            conversationId: typeof data.conversationId === "string" ? data.conversationId : "",
+            recipient,
+            message: action.message,
+          });
+        }
+
+        else if (action.type === "create_lead") {
+          await db.insert(leads).values({
+            id: crypto.randomUUID(),
+            businessId,
+            customerId: typeof data.customerId === "string" ? data.customerId : null,
+            name: action.name || (typeof data.customerName === "string" ? data.customerName : null),
+            email: action.email || (typeof data.customerEmail === "string" ? data.customerEmail : null),
+            phone: action.phone || (typeof data.customerPhone === "string" ? data.customerPhone : null),
+            service: action.service || null,
+            destination: null,
+            intent: null,
+            notes: null,
+            studyLevel: null,
+            program: null,
+            university: null,
+            preferredIntake: null,
+            budget: null,
+            source: `automation:${automation.id}`,
+            stage: action.stage || "new",
+            estimatedValue: null,
+            currency: "GHS",
+            dealStatus: "open",
+            closedAt: null,
+            assignedEmployeeId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+
+        else if (action.type === "update_lead_status") {
+          if (typeof data.leadId !== "string" || !action.status) {
+            throw new Error("update_lead_status requires leadId and status.");
+          }
+
+          await db.update(leads).set({
+            stage: action.status,
+            updatedAt: new Date(),
+          }).where(and(
+            eq(leads.id, data.leadId),
+            eq(leads.businessId, businessId),
+          ));
+        }
+
+        else if (action.type === "assign_conversation") {
+          if (typeof data.conversationId !== "string") {
+            throw new Error("assign_conversation requires conversationId.");
+          }
+
+          const conversation = await db.select({
+            businessId: conversations.businessId,
+          }).from(conversations).where(and(
+            eq(conversations.id, data.conversationId),
+            eq(conversations.businessId, businessId),
+          )).limit(1);
+
+          if (!conversation[0]) throw new Error("Conversation not found for automation.");
+
+          const employee = action.employeeType
+            ? await db.select({ id: aiEmployees.id }).from(aiEmployees).where(and(
+                eq(aiEmployees.businessId, businessId),
+                eq(aiEmployees.type, action.employeeType),
+                eq(aiEmployees.status, "active"),
+              )).limit(1)
+            : [];
+
+          if (action.employeeType && !employee[0]) {
+            throw new Error(`No active ${action.employeeType} employee found.`);
+          }
+
+          await db.update(conversations).set({
+            assignedEmployeeId: employee[0]?.id || null,
+            updatedAt: new Date(),
+          }).where(and(
+            eq(conversations.id, data.conversationId),
+            eq(conversations.businessId, businessId),
+          ));
+
+          const routing = await db.select({ id: conversationRouting.id }).from(conversationRouting).where(eq(
+            conversationRouting.conversationId,
+            data.conversationId,
+          )).limit(1);
+
+          if (routing[0]) {
+            await db.update(conversationRouting).set({
+              aiEmployeeId: employee[0]?.id || null,
+              assignedUserId: action.userId || null,
+              assignmentType: action.userId ? "user" : "ai",
+              status: action.userId ? "human_handling" : "ai_handling",
+              updatedAt: new Date(),
+            }).where(eq(conversationRouting.id, routing[0].id));
+          }
+        }
+
+        else if (action.type === "notify_team_member") {
+          throw new Error("notify_team_member is not available until a notification service is configured.");
+        }
+
+        else if (action.type === "escalate_to_human") {
+          if (typeof data.conversationId !== "string") {
+            throw new Error("escalate_to_human requires conversationId.");
+          }
+
+          await db.insert(handoffs).values({
+            id: crypto.randomUUID(),
+            businessId,
+            conversationId: data.conversationId,
+            fromEmployeeId: typeof data.employeeId === "string" ? data.employeeId : null,
+            toUserId: null,
+            reason: action.reason || "Escalated by automation.",
+            status: "pending",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          await db.update(conversations).set({
+            status: "escalated",
+            updatedAt: new Date(),
+          }).where(and(
+            eq(conversations.id, data.conversationId),
+            eq(conversations.businessId, businessId),
+          ));
+        }
+
+        else if (action.type === "run_ai_employee") {
+          const employee = await db.select({
+            id: aiEmployees.id,
+            type: aiEmployees.type,
+          }).from(aiEmployees).where(and(
+            eq(aiEmployees.businessId, businessId),
+            eq(aiEmployees.type, action.employeeType),
+            eq(aiEmployees.status, "active"),
+          )).limit(1);
+
+          if (!employee[0]) throw new Error(`No active ${action.employeeType} employee found.`);
+
+          const prompt = action.message || String(data.message || "Review the current business event.");
+          const agent = employee[0].type === "sales"
+            ? kubaSalesAgent
+            : employee[0].type === "customer-support"
+              ? kubaCustomerSupportAgent
+              : employee[0].type === "receptionist"
+                ? kubaReceptionistAgent
+                : null;
+
+          if (!agent) throw new Error(`No runtime is available for ${action.employeeType}.`);
+          await agent.generate(prompt, {
+            memory: {
+              resource: businessId,
+              thread: `automation-${automation.id}`,
+            },
+            requestContext: new RequestContext([["businessId", businessId]]),
+          });
+        }
 
         else if (action.type === "create_follow_up") {
           if (typeof data.leadId !== "string") {
