@@ -13,9 +13,9 @@ import { db } from "@/db";
 
 import {
   aiEmployees,
-  businessUsers,
   knowledgeSources,
 } from "@/db/schema";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 
 export async function GET(
@@ -44,23 +44,7 @@ export async function GET(
     const { id: employeeId } =
       await params;
 
-    const membership =
-      await db
-        .select({
-          businessId:
-            businessUsers.businessId,
-        })
-        .from(businessUsers)
-        .where(
-          eq(
-            businessUsers.userId,
-            session.user.id,
-          ),
-        )
-        .limit(1);
-
-    const business =
-      membership[0];
+    const business = await getCurrentMembership();
 
     if (!business) {
       return NextResponse.json(

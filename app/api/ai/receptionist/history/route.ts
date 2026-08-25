@@ -3,12 +3,11 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 import {
-  conversations,
   messages,
   aiEmployees,
-  businessUsers,
 } from "@/db/schema";
 
 import { and, eq, desc } from "drizzle-orm";
@@ -32,23 +31,7 @@ export async function GET() {
     }
 
 
-    const membership =
-      await db
-        .select({
-          businessId:
-            businessUsers.businessId,
-        })
-        .from(businessUsers)
-        .where(
-          eq(
-            businessUsers.userId,
-            session.user.id,
-          ),
-        )
-        .limit(1);
-
-
-    const business = membership[0];
+    const business = await getCurrentMembership();
 
 
     if (!business) {

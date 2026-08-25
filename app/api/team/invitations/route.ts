@@ -9,11 +9,11 @@ import {
 } from "@/db/schema";
 
 import {
-  getBusinessMembership,
   hasPermission,
   PERMISSIONS,
   isBusinessRole,
 } from "@/lib/auth/permissions";
+import { getBranchForBusiness, getCurrentMembership } from "@/lib/auth/tenant";
 
 import {
   createAuditLog,
@@ -33,10 +33,7 @@ export async function GET() {
       );
     }
 
-    const membership =
-      await getBusinessMembership(
-        session.user.id,
-      );
+    const membership = await getCurrentMembership();
 
     if (!membership) {
       return NextResponse.json(
@@ -123,10 +120,7 @@ export async function POST(
       );
     }
 
-    const membership =
-      await getBusinessMembership(
-        session.user.id,
-      );
+    const membership = await getCurrentMembership();
 
     if (!membership) {
       return NextResponse.json(
@@ -200,6 +194,13 @@ export async function POST(
           error:
             "The owner role cannot be assigned through an invitation.",
         },
+        { status: 400 },
+      );
+    }
+
+    if (branchId && !(await getBranchForBusiness(branchId, membership.businessId))) {
+      return NextResponse.json(
+        { error: "Branch does not belong to the selected business." },
         { status: 400 },
       );
     }

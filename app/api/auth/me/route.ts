@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
+import { db } from "@/db";
+import { businesses, businessUsers } from "@/db/schema";
 import {
-  getBusinessMembership,
   getRolePermissions,
 } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 export async function GET() {
   try {
@@ -20,11 +23,21 @@ export async function GET() {
       );
     }
 
-    const membership = await getBusinessMembership(
-      session.user.id,
-    );
+    const membership = await getCurrentMembership();
 
-    if (!membership) {
+    const businessesForUser = await db
+      .select({
+        id: businesses.id,
+        name: businesses.name,
+        slug: businesses.slug,
+        role: businessUsers.role,
+        branchId: businessUsers.branchId,
+      })
+      .from(businessUsers)
+      .innerJoin(businesses, eq(businessUsers.businessId, businesses.id))
+      .where(eq(businessUsers.userId, session.user.id));
+
+    if (!membership && businessesForUser.length === 0) {
       return NextResponse.json(
         { error: "Business access denied." },
         { status: 403 },
@@ -33,14 +46,14 @@ export async function GET() {
 
     let permissions: string[];
 
-    if (membership.role === "owner") {
+    if (membership?.role === "owner") {
       permissions = getRolePermissions("owner");
     } else {
       permissions = [
-        ...getRolePermissions(membership.role),
+        ...getRolePermissions(membership?.role || "member"),
       ];
 
-      if (membership.permissions) {
+      if (membership?.permissions) {
         try {
           const custom =
             JSON.parse(membership.permissions);
@@ -70,11 +83,12 @@ export async function GET() {
         email: session.user.email,
       },
       membership: {
-        businessId: membership.businessId,
-        role: membership.role,
-        branchId: membership.branchId,
+        businessId: membership?.businessId || null,
+        role: membership?.role || null,
+        branchId: membership?.branchId || null,
         permissions,
       },
+      businesses: businessesForUser,
     });
   } catch (error) {
     console.error(

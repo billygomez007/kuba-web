@@ -4,14 +4,15 @@ import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiBusinessSettings, aiEmployeeActivities, aiEmployeeSettings, aiEmployees, businessUsers, integrations, knowledgeSources } from "@/db/schema";
+import { aiBusinessSettings, aiEmployeeActivities, aiEmployeeSettings, aiEmployees, integrations, knowledgeSources } from "@/db/schema";
 import { createAuditLog } from "@/lib/auth/audit";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 async function getContext() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  const membership = (await db.select({ businessId: businessUsers.businessId, role: businessUsers.role, permissions: businessUsers.permissions }).from(businessUsers).where(eq(businessUsers.userId, session.user.id)).limit(1))[0];
+  const membership = await getCurrentMembership();
   if (!membership) return { error: NextResponse.json({ error: "Business not found." }, { status: 404 }) };
   if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return { error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) };
   return { session, membership };

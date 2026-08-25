@@ -4,9 +4,9 @@ import { eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 import {
-  businessUsers,
   leads,
   followUps,
   aiEmployees,
@@ -72,24 +72,7 @@ export async function POST(
     }
 
 
-    const membership =
-      await db
-        .select({
-          businessId:
-            businessUsers.businessId,
-        })
-        .from(businessUsers)
-        .where(
-          eq(
-            businessUsers.userId,
-            session.user.id,
-          ),
-        )
-        .limit(1);
-
-
-    const business =
-      membership[0];
+    const business = await getCurrentMembership();
 
 
     if (!business) {

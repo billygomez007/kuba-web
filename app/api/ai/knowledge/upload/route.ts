@@ -9,9 +9,9 @@ import { db } from "@/db";
 
 import {
   aiEmployees,
-  businessUsers,
   knowledgeSources,
 } from "@/db/schema";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 import { ingestKnowledgeSource } from "@/lib/knowledge/ingest";
 
@@ -139,24 +139,7 @@ export async function POST(
     }
 
 
-    const membership =
-      await db
-        .select({
-          businessId:
-            businessUsers.businessId,
-        })
-        .from(businessUsers)
-        .where(
-          eq(
-            businessUsers.userId,
-            session.user.id,
-          ),
-        )
-        .limit(1);
-
-
-    const business =
-      membership[0];
+    const business = await getCurrentMembership();
 
 
     if (!business) {

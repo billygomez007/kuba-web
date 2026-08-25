@@ -18,7 +18,7 @@ type NavigationGroup = {
   items: NavigationItem[];
 };
 
-const navigationGroups: NavigationGroup[] = [
+let navigationGroups: NavigationGroup[] = [
 
   {
     title: "Super Admin",
@@ -204,6 +204,81 @@ const navigationGroups: NavigationGroup[] = [
         icon: "◇",
         permission: "workforce.view",
       },
+    ],
+  },
+];
+
+navigationGroups = [
+  {
+    title: "Command Center",
+    items: [
+      { label: "Business Overview", href: "/dashboard", icon: "⌂" },
+      { label: "Workforce Overview", href: "/dashboard/workforce-command-center", icon: "◉", permission: "workforce.view" },
+    ],
+  },
+  {
+    title: "AI Workforce",
+    items: [
+      { label: "AI Employees", href: "/dashboard/ai-employees", icon: "✦", permission: "workforce.view" },
+      { label: "AI Employee Builder", href: "/dashboard/ai-employees/create", icon: "+", permission: "workforce.view" },
+      { label: "AI Teams", href: "/dashboard/workforce/team", icon: "♙", permission: "workforce.view" },
+      { label: "Deployment", href: "/dashboard/workforce/deployment", icon: "⇧", permission: "workforce.view" },
+      { label: "Orchestration", href: "/dashboard/workforce/orchestration", icon: "⇄", permission: "workforce.view" },
+      { label: "Monitoring", href: "/dashboard/workforce/monitoring", icon: "◉", permission: "workforce.view" },
+      { label: "Performance", href: "/dashboard/ai-performance", icon: "▥", permission: "workforce.view" },
+      { label: "Simulator", href: "/dashboard/workforce/simulator", icon: "◌", permission: "workforce.view" },
+      { label: "Marketplace", href: "/dashboard/marketplace", icon: "◫", permission: "workforce.view" },
+    ],
+  },
+  {
+    title: "Human Workforce",
+    items: [
+      { label: "Operational Teams", href: "/dashboard/workforce/team", icon: "♙", permission: "workforce.view" },
+    ],
+  },
+  {
+    title: "Customer Operations",
+    items: [
+      { label: "Inbox", href: "/dashboard/inbox", icon: "✉", permission: "messaging.view" },
+      { label: "Customers", href: "/dashboard/customers", icon: "◎", permission: "customers.view" },
+      { label: "Leads", href: "/dashboard/sales", icon: "↗", permission: "sales.view" },
+      { label: "Follow-ups", href: "/dashboard/follow-ups", icon: "◌", permission: "followups.view" },
+    ],
+  },
+  {
+    title: "Business Operations",
+    items: [
+      { label: "Tasks", href: "/dashboard/tasks", icon: "✓", permission: "tasks.view" },
+      { label: "Approvals", href: "/dashboard/approvals", icon: "✓", permission: "messaging.manage" },
+      { label: "Automations", href: "/dashboard/automations", icon: "⚙", permission: "automations.view" },
+    ],
+  },
+  {
+    title: "Intelligence",
+    items: [
+      { label: "Analytics", href: "/dashboard/analytics", icon: "▥", permission: "analytics.view" },
+      { label: "AI Workforce Analytics", href: "/dashboard/ai-performance", icon: "◈", permission: "workforce.view" },
+    ],
+  },
+  {
+    title: "Integrations",
+    items: [
+      { label: "All Integrations", href: "/dashboard/integrations", icon: "⌘", permission: "integrations.view" },
+    ],
+  },
+  {
+    title: "Business Brain",
+    items: [
+      { label: "Business Knowledge", href: "/dashboard/knowledge", icon: "▤", permission: "knowledge.view" },
+      { label: "Memory", href: "/dashboard/business-brain/memory", icon: "◉", permission: "knowledge.view" },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { label: "Business Profile", href: "/dashboard/settings/profile", icon: "◎", permission: "settings.view" },
+      { label: "Team Staff", href: "/dashboard/settings/team", icon: "♙", permission: "users.view" },
+      { label: "Billing & Subscription", href: "/dashboard/billing", icon: "$", permission: "billing.view" },
     ],
   },
 ];
@@ -491,21 +566,6 @@ export default function DashboardLayout({
             </span>
 
             <span>Settings</span>
-          </Link>
-
-          <Link
-            href="/dashboard/settings/team"
-            className={`mt-1.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-              pathname.startsWith("/dashboard/settings/team")
-                ? "bg-white/[0.08] text-white"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
-            }`}
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-base text-white/40">
-              👥
-            </span>
-
-            <span>Team</span>
           </Link>
 
           <Link

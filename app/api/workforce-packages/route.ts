@@ -4,16 +4,17 @@ import { and, count, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiEmployees, automations, businessUsers, integrations } from "@/db/schema";
+import { aiEmployees, automations, integrations } from "@/db/schema";
 import { getPackageTemplates, getWorkforcePackage, workforcePackages } from "@/lib/automations/packages";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getBusinessPlan, employeeLimitMessage } from "@/lib/billing/entitlements";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 async function context() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return { session: null, membership: null };
-  const memberships = await db.select({ businessId: businessUsers.businessId, branchId: businessUsers.branchId, role: businessUsers.role, permissions: businessUsers.permissions }).from(businessUsers).where(eq(businessUsers.userId, session.user.id)).limit(1);
-  return { session, membership: memberships[0] || null };
+  const membership = await getCurrentMembership();
+  return { session, membership };
 }
 
 export async function GET() {

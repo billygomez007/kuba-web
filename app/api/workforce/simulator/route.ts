@@ -5,7 +5,8 @@ import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiBusinessSettings, aiEmployeeActivities, aiEmployees, businessUsers, conversations, messages } from "@/db/schema";
+import { getCurrentMembership } from "@/lib/auth/tenant";
+import { aiBusinessSettings, aiEmployeeActivities, aiEmployees, conversations, messages } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
@@ -23,8 +24,7 @@ export async function GET() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const membership = await db.select({ businessId: businessUsers.businessId, role: businessUsers.role, permissions: businessUsers.permissions }).from(businessUsers).where(eq(businessUsers.userId, session.user.id)).limit(1);
-    const business = membership[0];
+    const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
@@ -40,8 +40,7 @@ export async function POST(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const membership = await db.select({ businessId: businessUsers.businessId, role: businessUsers.role, permissions: businessUsers.permissions }).from(businessUsers).where(eq(businessUsers.userId, session.user.id)).limit(1);
-    const business = membership[0];
+    const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 

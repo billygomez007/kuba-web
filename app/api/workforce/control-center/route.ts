@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { actionApprovals, aiBusinessSettings, aiEmployeeActivities, aiEmployeeSettings, aiEmployees, automationRuns, businessUsers, conversations, handoffs, integrations, knowledgeSources, leads, tasks } from "@/db/schema";
+import { actionApprovals, aiBusinessSettings, aiEmployeeActivities, aiEmployeeSettings, aiEmployees, automationRuns, conversations, handoffs, integrations, knowledgeSources, leads, tasks } from "@/db/schema";
 import { auth } from "@/lib/auth";
-import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 function departmentFor(type: string) {
   if (type === "sales") return "Revenue Operations";
@@ -18,12 +19,12 @@ export async function GET() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const membership = await getBusinessMembership(session.user.id);
+    const membership = await getCurrentMembership();
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const businessId = membership.businessId;
     const [employees, settings, brain, sources, connections, conversationsData, leadsData, tasksData, handoffsData, approvals, runs, activities] = await Promise.all([
       db.select().from(aiEmployees).where(eq(aiEmployees.businessId, businessId)),
-      db.select({ employeeId: aiEmployeeSettings.employeeId, workingHours: aiEmployeeSettings.workingHours, responsibilities: aiEmployeeSettings.responsibilities, communicationStyle: aiEmployeeSettings.communicationStyle }).from(aiEmployeeSettings),
+      db.select({ employeeId: aiEmployeeSettings.employeeId, workingHours: aiEmployeeSettings.workingHours, responsibilities: aiEmployeeSettings.responsibilities, communicationStyle: aiEmployeeSettings.communicationStyle }).from(aiEmployeeSettings).innerJoin(aiEmployees, eq(aiEmployees.id, aiEmployeeSettings.employeeId)).where(eq(aiEmployees.businessId, businessId)),
       db.select().from(aiBusinessSettings).where(eq(aiBusinessSettings.businessId, businessId)).limit(1),
       db.select().from(knowledgeSources).where(eq(knowledgeSources.businessId, businessId)),
       db.select().from(integrations).where(eq(integrations.businessId, businessId)),

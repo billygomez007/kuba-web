@@ -4,9 +4,8 @@ import { eq, and, asc } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import {
-  businesses,
-  businessUsers,
   aiEmployees,
   leads,
   followUps,
@@ -25,19 +24,8 @@ export async function GET() {
       );
     }
 
-    const membership = await db
-      .select({
-        businessId: businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .innerJoin(
-        businesses,
-        eq(businessUsers.businessId, businesses.id),
-      )
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-
-    const businessId = membership[0]?.businessId;
+    const membership = await getCurrentMembership();
+    const businessId = membership?.businessId;
 
     if (!businessId) {
       return NextResponse.json(

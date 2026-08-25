@@ -4,11 +4,12 @@ import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiEmployeeSettings, aiEmployees, businessUsers } from "@/db/schema";
-import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { aiEmployeeSettings, aiEmployees } from "@/db/schema";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
-async function employeeContext(userId: string, employeeId: string) {
-  const membership = await getBusinessMembership(userId);
+async function employeeContext(employeeId: string) {
+  const membership = await getCurrentMembership();
   if (!membership) return null;
   const employee = await db.select({ id: aiEmployees.id, name: aiEmployees.name, type: aiEmployees.type, status: aiEmployees.status, supervisionMode: aiEmployees.supervisionMode }).from(aiEmployees).where(and(eq(aiEmployees.id, employeeId), eq(aiEmployees.businessId, membership.businessId))).limit(1);
   return employee[0] ? { membership, employee: employee[0] } : null;
@@ -19,7 +20,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await context.params;
-    const data = await employeeContext(session.user.id, id);
+    const data = await employeeContext(id);
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     const settings = await db.select().from(aiEmployeeSettings).where(eq(aiEmployeeSettings.employeeId, id)).limit(1);
@@ -35,7 +36,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await context.params;
-    const data = await employeeContext(session.user.id, id);
+    const data = await employeeContext(id);
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)) return NextResponse.json({ error: "You do not have permission to configure this employee." }, { status: 403 });
 

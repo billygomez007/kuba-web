@@ -4,10 +4,10 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 import {
   automations,
-  businessUsers,
 } from "@/db/schema";
 
 
@@ -24,25 +24,12 @@ async function getBusinessId() {
     };
   }
 
-  const membership =
-    await db
-      .select({
-        businessId:
-          businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
+  const membership = await getCurrentMembership();
 
   return {
     session,
     businessId:
-      membership[0]?.businessId || null,
+      membership?.businessId || null,
   };
 }
 

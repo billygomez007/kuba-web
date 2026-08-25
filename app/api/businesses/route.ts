@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
@@ -55,6 +55,8 @@ export async function GET() {
     const result = await db
       .select({
         business: businesses,
+        role: businessUsers.role,
+        branchId: businessUsers.branchId,
       })
       .from(businessUsers)
       .innerJoin(
@@ -62,9 +64,16 @@ export async function GET() {
         eq(businessUsers.businessId, businesses.id),
       )
       .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
+      ;
 
-    const business = result[0]?.business;
+    const selectedBusinessId = (await cookies()).get("superkuba_business_id")?.value;
+    const selected = selectedBusinessId
+      ? result.find((row) => row.business.id === selectedBusinessId)
+      : result.length === 1
+        ? result[0]
+        : null;
+
+    const business = selected?.business;
 
     if (!business) {
       return NextResponse.json(
@@ -84,6 +93,8 @@ export async function GET() {
     return NextResponse.json({
       business,
       employees,
+      businesses: result.map((row) => ({ ...row.business, role: row.role, branchId: row.branchId })),
+      selectedBusinessId: selected?.business.id || null,
       onboardingStatus:
         employees.length > 0
           ? "onboarding_completed"

@@ -4,15 +4,16 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiEmployeeActivities, aiEmployees, automations, businessUsers, conversationRouting, conversations, handoffs } from "@/db/schema";
+import { aiEmployeeActivities, aiEmployees, automations, conversationRouting, conversations, handoffs } from "@/db/schema";
 import { canAccessConversation } from "@/lib/communications/conversation-access";
-import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 export async function GET() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const membership = await getBusinessMembership(session.user.id);
+    const membership = await getCurrentMembership();
     if (!membership) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
@@ -58,15 +59,15 @@ export async function POST(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const membership = await getCurrentMembership();
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     const body = await request.json();
     const conversationId = typeof body.conversationId === "string" ? body.conversationId.trim() : "";
     const employeeId = typeof body.employeeId === "string" ? body.employeeId.trim() : "";
     if (!conversationId || !employeeId) return NextResponse.json({ error: "Conversation and employee are required." }, { status: 400 });
 
-    const conversation = await db.select({ id: conversations.id, businessId: conversations.businessId, assignedEmployeeId: conversations.assignedEmployeeId }).from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+    const conversation = await db.select({ id: conversations.id, businessId: conversations.businessId, assignedEmployeeId: conversations.assignedEmployeeId }).from(conversations).where(and(eq(conversations.id, conversationId), eq(conversations.businessId, membership.businessId))).limit(1);
     if (!conversation[0]) return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
-    const membership = await getBusinessMembership(session.user.id, conversation[0].businessId);
-    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     const access = await canAccessConversation(session.user.id, conversationId);
     if (!access.allowed) return NextResponse.json({ error: "You do not have access to this conversation." }, { status: 403 });
     const employee = await db.select({ id: aiEmployees.id }).from(aiEmployees).where(and(eq(aiEmployees.id, employeeId), eq(aiEmployees.businessId, membership.businessId), eq(aiEmployees.status, "active"))).limit(1);

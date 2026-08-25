@@ -13,13 +13,13 @@ import {
   users,
 } from "@/db/schema";
 import {
-  getBusinessMembership,
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
-async function getContext(userId: string, employeeId: string) {
-  const membership = await getBusinessMembership(userId);
+async function getContext(employeeId: string) {
+  const membership = await getCurrentMembership();
   if (!membership) return null;
 
   const employee = await db
@@ -47,7 +47,7 @@ export async function GET(
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id } = await context.params;
-    const data = await getContext(session.user.id, id);
+    const data = await getContext(id);
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
@@ -86,7 +86,7 @@ export async function POST(
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id } = await context.params;
-    const data = await getContext(session.user.id, id);
+    const data = await getContext(id);
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)) {
       return NextResponse.json({ error: "You do not have permission to configure this employee." }, { status: 403 });

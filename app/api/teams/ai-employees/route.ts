@@ -12,10 +12,10 @@ import {
 } from "@/db/schema";
 
 import {
-  getBusinessMembership,
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 async function getAccess() {
   const session = await auth.api.getSession({
@@ -24,8 +24,7 @@ async function getAccess() {
 
   if (!session?.user) return null;
 
-  const membership =
-    await getBusinessMembership(session.user.id);
+  const membership = await getCurrentMembership();
 
   if (!membership) return null;
 

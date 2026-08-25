@@ -4,9 +4,10 @@ import { and, eq } from "drizzle-orm";
 import { RequestContext } from "@mastra/core/request-context";
 
 import { db } from "@/db";
-import { aiEmployeeActivities, aiEmployeeSettings, aiEmployees, businessUsers, conversations, customers, messages } from "@/db/schema";
+import { aiEmployeeActivities, aiEmployeeSettings, aiEmployees, conversations, customers, messages } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { createAuditLog } from "@/lib/auth/audit";
 import { getVoiceTransport } from "@/lib/voice/providers";
 import { retryVoiceOperation, updateVoiceSession } from "@/lib/voice/session-manager";
@@ -24,10 +25,6 @@ function parseVoiceConfig(value: string | null): VoiceConfig {
   const empty = { enabled: false, phoneNumber: "", provider: "", callDirection: "both" as const };
   if (!value?.includes(voiceMarker)) return empty;
   try { return { ...empty, ...JSON.parse(value.slice(value.indexOf(voiceMarker) + voiceMarker.length)) }; } catch { return empty; }
-}
-
-async function getMembership(userId: string) {
-  return (await db.select({ businessId: businessUsers.businessId, role: businessUsers.role, permissions: businessUsers.permissions }).from(businessUsers).where(eq(businessUsers.userId, userId)).limit(1))[0];
 }
 
 async function getEmployee(businessId: string, employeeId: string) {
@@ -114,7 +111,7 @@ export async function POST(request: Request) {
     if (body.action === "outbound") {
       const session = await auth.api.getSession({ headers: await headers() });
       if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      const membership = await getMembership(session.user.id);
+      const membership = await getCurrentMembership();
       if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       const employeeId = typeof body.employeeId === "string" ? body.employeeId : "";
       const phoneNumber = typeof body.phoneNumber === "string" ? body.phoneNumber.trim() : "";

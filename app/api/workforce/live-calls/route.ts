@@ -2,14 +2,15 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { aiEmployees, conversations, handoffs, businessUsers } from "@/db/schema";
+import { aiEmployees, conversations, handoffs } from "@/db/schema";
 import { auth } from "@/lib/auth";
-import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 async function access() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  const membership = await getBusinessMembership(session.user.id);
+  const membership = await getCurrentMembership();
   if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   return { membership, userId: session.user.id };
 }

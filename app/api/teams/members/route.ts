@@ -12,10 +12,10 @@ import {
 } from "@/db/schema";
 
 import {
-  getBusinessMembership,
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 async function getAccess() {
   const session = await auth.api.getSession({
@@ -24,8 +24,7 @@ async function getAccess() {
 
   if (!session?.user) return null;
 
-  const membership =
-    await getBusinessMembership(session.user.id);
+  const membership = await getCurrentMembership();
 
   if (!membership) return null;
 
@@ -253,6 +252,51 @@ export async function DELETE(request: Request) {
             "teamId and businessUserId are required.",
         },
         { status: 400 },
+      );
+    }
+
+    const team = await db
+      .select({ id: businessTeams.id })
+      .from(businessTeams)
+      .where(
+        and(
+          eq(businessTeams.id, teamId),
+          eq(
+            businessTeams.businessId,
+            membership.businessId,
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (!team[0]) {
+      return NextResponse.json(
+        { error: "Team not found." },
+        { status: 404 },
+      );
+    }
+
+    const user = await db
+      .select({ id: businessUsers.id })
+      .from(businessUsers)
+      .where(
+        and(
+          eq(
+            businessUsers.id,
+            businessUserId,
+          ),
+          eq(
+            businessUsers.businessId,
+            membership.businessId,
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (!user[0]) {
+      return NextResponse.json(
+        { error: "Team member not found." },
+        { status: 404 },
       );
     }
 

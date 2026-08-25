@@ -1,15 +1,15 @@
-import { and, eq, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-  businessUsers,
   salesActivities,
   followUps,
   leads,
 } from "@/db/schema";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 export async function GET() {
   try {
@@ -24,20 +24,7 @@ export async function GET() {
       );
     }
 
-    const membership = await db
-      .select({
-        businessId: businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
-
-    const business = membership[0];
+    const business = await getCurrentMembership();
 
     if (!business) {
       return NextResponse.json(

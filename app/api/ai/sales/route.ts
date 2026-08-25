@@ -5,8 +5,9 @@ import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { searchKnowledge } from "@/lib/knowledge/search";
-import { businesses, businessUsers, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
+import { businesses, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
 
 export async function POST(request: Request) {
@@ -34,19 +35,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const businessResult = await db
-      .select({
-        business: businesses,
-      })
-      .from(businessUsers)
-      .innerJoin(
-        businesses,
-        eq(businessUsers.businessId, businesses.id),
-      )
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-
-    const business = businessResult[0]?.business;
+    const membership = await getCurrentMembership();
+    const business = membership
+      ? (await db.select().from(businesses).where(eq(businesses.id, membership.businessId)).limit(1))[0]
+      : null;
 
     if (!business) {
       return NextResponse.json(

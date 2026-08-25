@@ -1,9 +1,10 @@
-import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { cookies, headers } from "next/headers";
+import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { businessUsers } from "@/db/schema";
+import { branches, businessUsers } from "@/db/schema";
+import { isResourceOwnedByBusiness, selectBusinessMembership } from "@/lib/auth/business-context-policy";
 
 export async function getCurrentUser() {
   const session =
@@ -26,6 +27,25 @@ export async function getCurrentMembership() {
     return null;
   }
 
+  const selectedBusinessId =
+    (await cookies()).get("superkuba_business_id")?.value;
+
+  const conditions = [
+    eq(
+      businessUsers.userId,
+      user.id,
+    ),
+  ];
+
+  if (selectedBusinessId) {
+    conditions.push(
+      eq(
+        businessUsers.businessId,
+        selectedBusinessId,
+      ),
+    );
+  }
+
   const result =
     await db
       .select({
@@ -43,14 +63,23 @@ export async function getCurrentMembership() {
       })
       .from(businessUsers)
       .where(
-        eq(
-          businessUsers.userId,
-          user.id,
-        ),
+        and(...conditions),
       )
       .limit(1);
 
-  return result[0] ?? null;
+  const memberships = await db
+      .select({
+        businessId: businessUsers.businessId,
+        role: businessUsers.role,
+        permissions: businessUsers.permissions,
+        branchId: businessUsers.branchId,
+      })
+      .from(businessUsers)
+      .where(eq(businessUsers.userId, user.id));
+
+  return selectBusinessMembership(memberships, selectedBusinessId)
+    ? result[0] ?? null
+    : null;
 }
 
 export async function requireBusinessMembership() {
@@ -83,12 +112,27 @@ export async function requireBusinessMembership() {
   } as const;
 }
 
+export async function getBranchForBusiness(
+  branchId: string,
+  businessId: string,
+) {
+  const result = await db
+    .select()
+    .from(branches)
+    .where(
+      and(
+        eq(branches.id, branchId),
+        eq(branches.businessId, businessId),
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
 export function isSameBusiness(
   membershipBusinessId: string,
   resourceBusinessId: string,
 ) {
-  return (
-    membershipBusinessId ===
-    resourceBusinessId
-  );
+  return isResourceOwnedByBusiness(membershipBusinessId, resourceBusinessId);
 }

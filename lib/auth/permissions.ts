@@ -253,14 +253,14 @@ export async function getBusinessMembership(
     );
   }
 
-  const result =
-    await db
-      .select()
-      .from(businessUsers)
-      .where(
-        and(...conditions),
-      )
-      .limit(1);
+  const result = await db
+    .select()
+    .from(businessUsers)
+    .where(and(...conditions));
+
+  if (!businessId && result.length !== 1) {
+    return null;
+  }
 
   return result[0] || null;
 }

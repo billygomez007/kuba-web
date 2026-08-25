@@ -6,9 +6,9 @@ import path from "path";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 import {
-  businessUsers,
   knowledgeSources,
   knowledgeChunks,
 } from "@/db/schema";
@@ -27,25 +27,11 @@ async function getBusinessId() {
     };
   }
 
-  const membership =
-    await db
-      .select({
-        businessId:
-          businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
+  const membership = await getCurrentMembership();
 
   return {
     session,
-    businessId:
-      membership[0]?.businessId || null,
+    businessId: membership?.businessId || null,
   };
 }
 

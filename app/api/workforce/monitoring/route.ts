@@ -9,12 +9,12 @@ import {
   aiEmployeeActivities,
   aiEmployees,
   automationRuns,
-  businessUsers,
   conversations,
   handoffs,
   messages,
 } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 function departmentFor(type: string) {
   if (type === "sales") return "Revenue Operations";
@@ -30,12 +30,7 @@ export async function GET() {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const membership = await db
-      .select({ businessId: businessUsers.businessId, role: businessUsers.role, permissions: businessUsers.permissions })
-      .from(businessUsers)
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-    const business = membership[0];
+    const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 

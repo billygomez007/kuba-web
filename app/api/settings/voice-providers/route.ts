@@ -5,14 +5,15 @@ import { db } from "@/db";
 import { integrations } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { createAuditLog } from "@/lib/auth/audit";
-import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { encryptVoiceSecret } from "@/lib/voice/secrets";
 import { voiceProviders, getVoiceProvider } from "@/lib/voice/providers";
 
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const membership = await getBusinessMembership(session.user.id);
+  const membership = await getCurrentMembership();
   if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const connections = await db.select({ id: integrations.id, provider: integrations.provider, status: integrations.status, externalAccountId: integrations.externalAccountId, displayName: integrations.displayName, metadata: integrations.metadata, updatedAt: integrations.updatedAt }).from(integrations).where(and(eq(integrations.businessId, membership.businessId), eq(integrations.metadata, "voice_provider")));
   return NextResponse.json({ providers: voiceProviders, connections });
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const membership = await getBusinessMembership(session.user.id);
+    const membership = await getCurrentMembership();
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const body = await request.json();
     const provider = typeof body.provider === "string" ? body.provider : "";
