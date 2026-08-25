@@ -328,6 +328,9 @@ export async function PUT() {
 }
 
 export async function POST(request: Request) {
+  let responseStage =
+    "parse_request";
+
   try {
     const body = await request.json();
 
@@ -367,6 +370,8 @@ export async function POST(request: Request) {
      * Resolve the tenant exclusively through
      * the public website integration key.
      */
+    responseStage =
+      "resolve_integration";
     const integrationResult = await db
       .select({
         integration: integrations,
@@ -425,6 +430,8 @@ export async function POST(request: Request) {
     /**
      * Load business-specific AI configuration.
      */
+    responseStage =
+      "load_business_settings";
     const settingsResult = await db
       .select()
       .from(aiBusinessSettings)
@@ -441,6 +448,8 @@ export async function POST(request: Request) {
     /**
      * Receptionist is the fallback AI employee.
      */
+    responseStage =
+      "load_receptionist";
     const receptionistResult = await db
       .select({
         id: aiEmployees.id,
@@ -524,6 +533,8 @@ export async function POST(request: Request) {
       conversationId =
         crypto.randomUUID();
 
+      responseStage =
+        "create_conversation";
       await db
         .insert(conversations)
         .values({
@@ -562,6 +573,8 @@ export async function POST(request: Request) {
     /**
      * Save the incoming visitor message first.
      */
+    responseStage =
+      "save_inbound_message";
     await db
       .insert(messages)
       .values({
@@ -604,6 +617,8 @@ export async function POST(request: Request) {
      * This allows an existing conversation to remain
      * with its current team unless the router changes it.
      */
+    responseStage =
+      "load_routing";
     const existingRoutingResult =
       await db
         .select({
@@ -634,6 +649,8 @@ export async function POST(request: Request) {
     /**
      * Run the central Kuba routing engine.
      */
+    responseStage =
+      "route_conversation";
     const routingDecision =
       await routeConversationToTeam({
         businessId:
@@ -671,6 +688,8 @@ export async function POST(request: Request) {
      * Persist routing state.
      */
     if (!existingRouting) {
+      responseStage =
+        "create_routing";
       await db
         .insert(conversationRouting)
         .values({
@@ -716,6 +735,8 @@ export async function POST(request: Request) {
             now,
         });
     } else {
+      responseStage =
+        "update_routing";
       await db
         .update(conversationRouting)
         .set({
@@ -771,6 +792,8 @@ export async function POST(request: Request) {
     if (
       routingDecision.aiEmployeeId
     ) {
+      responseStage =
+        "resolve_routed_employee";
       const routedEmployeeResult =
         await db
           .select({
@@ -827,6 +850,8 @@ export async function POST(request: Request) {
     let knowledgeContext = "";
 
     try {
+      responseStage =
+        "search_knowledge";
       const knowledgeResults =
         await searchKnowledge(
           business.id,
@@ -924,6 +949,8 @@ Answer naturally, helpfully and professionally.
     /**
      * Generate the AI response.
      */
+    responseStage =
+      "generate_response";
     const response =
       await selectedAgent.generate(
         businessContext,
@@ -946,6 +973,8 @@ Answer naturally, helpfully and professionally.
     /**
      * Save Kuba's response.
      */
+    responseStage =
+      "save_outbound_message";
     await db
       .insert(messages)
       .values({
@@ -1001,6 +1030,8 @@ Answer naturally, helpfully and professionally.
      * Keep the conversation assigned to the
      * routed AI employee.
      */
+    responseStage =
+      "update_conversation";
     await db
       .update(conversations)
       .set({
@@ -1063,6 +1094,10 @@ Answer naturally, helpfully and professionally.
       {
         error:
           "Unable to respond.",
+        code:
+          "WEBSITE_CHAT_RESPONSE_FAILED",
+        stage:
+          responseStage,
       },
       { status: 500 },
     );
