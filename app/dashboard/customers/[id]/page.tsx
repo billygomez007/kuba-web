@@ -215,6 +215,8 @@ export default function CustomerProfilePage({
             title="AI employee activity"
             description="See how Kuba Sales, Receptionist, Support, Marketing, and other AI employees interact with this customer."
           />
+
+          <RelationshipPanel icon="◉" title="Business Brain memory" count={relationship.leads.length + relationship.conversations.length} description="Customer context is derived from scoped lead and conversation history." href="/dashboard/business-brain/memory" />
         </section>
 
         {/* Future intelligence */}

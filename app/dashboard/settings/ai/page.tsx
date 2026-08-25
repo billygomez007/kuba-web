@@ -1,35 +1,18 @@
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   aiBusinessSettings,
-  businessUsers,
 } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 export default async function AISettingsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user) {
+  const { user, membership } = await requireBusinessMembership();
+  if (!user) {
     redirect("/login");
   }
-
-  const membership = await db
-    .select({
-      businessId: businessUsers.businessId,
-      role: businessUsers.role,
-    })
-    .from(businessUsers)
-    .where(eq(businessUsers.userId, session.user.id))
-    .limit(1);
-
-  const business = membership[0];
-
-  if (!business) {
+  if (!membership) {
     redirect("/onboarding");
   }
 
@@ -39,7 +22,7 @@ export default async function AISettingsPage() {
     .where(
       eq(
         aiBusinessSettings.businessId,
-        business.businessId,
+        membership.businessId,
       ),
     )
     .limit(1);
@@ -47,8 +30,8 @@ export default async function AISettingsPage() {
   const aiSettings = settings[0];
 
   const canEdit =
-    business.role === "owner" ||
-    business.role === "admin";
+    membership.role === "owner" ||
+    membership.role === "admin";
 
   return (
     <main className="min-h-screen bg-[#07070A] text-white">

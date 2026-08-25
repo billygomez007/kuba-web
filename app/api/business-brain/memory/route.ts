@@ -1,14 +1,11 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   aiBusinessSettings,
   aiEmployeeActivities,
   aiEmployees,
-  businessUsers,
   conversations,
   followUps,
   handoffs,
@@ -16,6 +13,8 @@ import {
   leads,
   messages,
 } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
 type MemoryItem = {
   id: string;
@@ -42,18 +41,11 @@ function topCounts(values: string[], limit = 5) {
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const membership = await db
-      .select({ businessId: businessUsers.businessId })
-      .from(businessUsers)
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-    const business = membership[0];
-    if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
-
-    const businessId = business.businessId;
+    const { user, membership, error } = await requireBusinessMembership();
+    if (!user) return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
+    if (!membership) return NextResponse.json({ error: error || "Business access denied." }, { status: 403 });
+    if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.KNOWLEDGE_VIEW)) return NextResponse.json({ error: "Knowledge access denied." }, { status: 403 });
+    const businessId = membership.businessId;
     const [settings, sources, employees, conversationsData, messagesData, leadsData, followUpsData, handoffsData, activities] = await Promise.all([
       db.select().from(aiBusinessSettings).where(eq(aiBusinessSettings.businessId, businessId)).limit(1),
       db.select().from(knowledgeSources).where(eq(knowledgeSources.businessId, businessId)).orderBy(desc(knowledgeSources.updatedAt)),

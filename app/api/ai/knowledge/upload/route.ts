@@ -12,6 +12,8 @@ import {
   knowledgeSources,
 } from "@/db/schema";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { createAuditLog } from "@/lib/auth/audit";
 
 import { ingestKnowledgeSource } from "@/lib/knowledge/ingest";
 
@@ -153,6 +155,7 @@ export async function POST(
         },
       );
     }
+    if (!hasPermission(business.role, business.permissions, PERMISSIONS.KNOWLEDGE_MANAGE)) return NextResponse.json({ error: "Knowledge management access denied." }, { status: 403 });
 
 
     const formData =
@@ -453,7 +456,9 @@ export async function POST(
             fileId,
           ),
         )
-        .limit(1);
+      .limit(1);
+
+    await createAuditLog({ businessId: business.businessId, userId: session.user.id, action: "business_brain.source.uploaded", resource: "knowledge_source", resourceId: fileId, description: `Uploaded knowledge source ${originalName}.`, metadata: { fileType, employeeId, status: updatedSource[0]?.status || source.status } });
 
 
     return NextResponse.json(

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isResourceOwnedByBusiness, selectBusinessMembership } from "../lib/auth/business-context-policy.ts";
+import { canUseKnowledgeSource } from "../lib/knowledge/access-policy.ts";
 
 const memberships = [
   { businessId: "business-a", role: "owner", permissions: null, branchId: null },
@@ -105,4 +106,32 @@ test("a client businessId override cannot replace canonical selected context", (
   const clientBody = { businessId: "business-b" };
   assert.equal(selected?.businessId, "business-a");
   assert.equal(isResourceOwnedByBusiness(selected.businessId, clientBody.businessId), false);
+});
+
+const sharedSourceA = { businessId: "business-a", employeeId: null };
+const employeeSourceA = { businessId: "business-a", employeeId: "employee-a" };
+const employeeSourceB = { businessId: "business-b", employeeId: "employee-b" };
+
+test("Business A sees only its knowledge sources", () => {
+  assert.equal(canUseKnowledgeSource("business-a", sharedSourceA), true);
+  assert.equal(canUseKnowledgeSource("business-a", employeeSourceB), false);
+});
+
+test("Business B sees only its knowledge sources", () => {
+  assert.equal(canUseKnowledgeSource("business-b", employeeSourceB), true);
+  assert.equal(canUseKnowledgeSource("business-b", sharedSourceA), false);
+});
+
+test("foreign source IDs cannot cross the selected-business boundary", () => assert.equal(canUseKnowledgeSource("business-a", employeeSourceB), false));
+test("foreign employee knowledge assignments are denied", () => assert.equal(canUseKnowledgeSource("business-a", employeeSourceA, "employee-b"), false));
+test("employee retrieval includes shared and assigned sources", () => {
+  assert.equal(canUseKnowledgeSource("business-a", sharedSourceA, "employee-a"), true);
+  assert.equal(canUseKnowledgeSource("business-a", employeeSourceA, "employee-a"), true);
+});
+test("employee retrieval excludes another employee's dedicated source", () => assert.equal(canUseKnowledgeSource("business-a", employeeSourceA, "employee-b"), false));
+test("knowledge search policy cannot return another business source", () => assert.equal(canUseKnowledgeSource("business-a", employeeSourceB, "employee-a"), false));
+test("foreign customer memory remains outside selected context", () => assert.equal(isResourceOwnedByBusiness("business-a", "business-b"), false));
+test("AI instructions never cross business context", () => {
+  const settings = [{ businessId: "business-a", instructions: "A" }, { businessId: "business-b", instructions: "B" }];
+  assert.deepEqual(settings.filter((item) => isResourceOwnedByBusiness("business-a", item.businessId)), [{ businessId: "business-a", instructions: "A" }]);
 });

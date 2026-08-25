@@ -132,10 +132,10 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       { label: "Business Knowledge", href: "/dashboard/business-brain", icon: "◈", permission: "knowledge.view" },
       { label: "Knowledge Sources", href: "/dashboard/knowledge", icon: "▤", permission: "knowledge.view" },
-      { label: "Documents", icon: "□", status: "Planned" },
+      { label: "Documents", href: "/dashboard/business-brain/documents", icon: "□", permission: "knowledge.view" },
       { label: "Memory", href: "/dashboard/business-brain/memory", icon: "◉", permission: "knowledge.view" },
       { label: "AI Instructions", href: "/dashboard/settings/ai", icon: "✣", permission: "settings.view" },
-      { label: "Knowledge Management", icon: "▤", status: "Planned" },
+      { label: "Knowledge Management", href: "/dashboard/business-brain/management", icon: "▤", permission: "knowledge.manage" },
     ],
   },
   {

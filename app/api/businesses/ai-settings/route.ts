@@ -1,51 +1,28 @@
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   aiBusinessSettings,
-  businessUsers,
 } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
+import { createAuditLog } from "@/lib/auth/audit";
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user) {
+    const { user, membership, error } = await requireBusinessMembership();
+    if (!user) {
       return NextResponse.json(
         { error: "You must be signed in." },
         { status: 401 },
       );
     }
 
-    const membership = await db
-      .select({
-        businessId: businessUsers.businessId,
-        role: businessUsers.role,
-      })
-      .from(businessUsers)
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-
-    const business = membership[0];
-
-    if (!business) {
-      return NextResponse.json(
-        {
-          error:
-            "No business is associated with this account.",
-        },
-        { status: 404 },
-      );
-    }
+    if (!membership) return NextResponse.json({ error: error || "Business access denied." }, { status: 403 });
 
     if (
-      business.role !== "owner" &&
-      business.role !== "admin"
+      membership.role !== "owner" &&
+      membership.role !== "admin"
     ) {
       return NextResponse.json(
         {
@@ -101,7 +78,7 @@ export async function POST(request: Request) {
       .where(
         eq(
           aiBusinessSettings.businessId,
-          business.businessId,
+          membership.businessId,
         ),
       )
       .limit(1);
@@ -134,7 +111,7 @@ export async function POST(request: Request) {
     } else {
       await db.insert(aiBusinessSettings).values({
         id: crypto.randomUUID(),
-        businessId: business.businessId,
+        businessId: membership.businessId,
         businessDescription:
           businessDescription || null,
         productsAndServices:
@@ -150,6 +127,8 @@ export async function POST(request: Request) {
         updatedAt: now,
       });
     }
+
+    await createAuditLog({ businessId: membership.businessId, userId: user.id, action: "business_brain.instructions.updated", resource: "ai_business_settings", resourceId: existing[0]?.id || null, description: "Business knowledge and AI instructions updated." });
 
     return NextResponse.redirect(
       new URL("/dashboard/settings/ai", request.url),

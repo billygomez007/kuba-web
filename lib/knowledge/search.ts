@@ -1,10 +1,11 @@
-import { and, eq, like, or, isNull } from "drizzle-orm";
+import { and, eq, or, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   knowledgeChunks,
   knowledgeSources,
 } from "@/db/schema";
+import { canUseKnowledgeSource } from "@/lib/knowledge/access-policy";
 
 
 export type KnowledgeSearchResult = {
@@ -66,6 +67,12 @@ export async function searchKnowledge(
 
         content:
           knowledgeChunks.content,
+
+        businessId:
+          knowledgeSources.businessId,
+
+        employeeId:
+          knowledgeSources.employeeId,
       })
       .from(knowledgeChunks)
       .innerJoin(
@@ -106,6 +113,7 @@ export async function searchKnowledge(
 
   const scored =
     rows
+      .filter((row) => canUseKnowledgeSource(businessId, row, employeeId))
       .map((row) => {
 
         const content =

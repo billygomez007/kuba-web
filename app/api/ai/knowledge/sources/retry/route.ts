@@ -7,6 +7,8 @@ import path from "path";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { createAuditLog } from "@/lib/auth/audit";
 
 import {
   knowledgeSources,
@@ -49,6 +51,7 @@ export async function POST(
         },
       );
     }
+    if (!hasPermission(business.role, business.permissions, PERMISSIONS.KNOWLEDGE_MANAGE)) return NextResponse.json({ error: "Knowledge management access denied." }, { status: 403 });
 
     const body =
       await request.json();
@@ -162,6 +165,8 @@ export async function POST(
         sourceId,
         buffer,
       );
+
+    await createAuditLog({ businessId: business.businessId, userId: session.user.id, action: "business_brain.source.retried", resource: "knowledge_source", resourceId: sourceId, description: `Retried processing for ${source.originalName}.`, metadata: { chunks: result.chunks } });
 
     return NextResponse.json({
       success: true,

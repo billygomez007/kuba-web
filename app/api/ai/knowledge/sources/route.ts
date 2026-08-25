@@ -7,6 +7,8 @@ import path from "path";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { createAuditLog } from "@/lib/auth/audit";
 
 import {
   knowledgeSources,
@@ -24,6 +26,7 @@ async function getBusinessId() {
     return {
       session,
       businessId: null,
+      membership: null,
     };
   }
 
@@ -32,6 +35,7 @@ async function getBusinessId() {
   return {
     session,
     businessId: membership?.businessId || null,
+    membership,
   };
 }
 
@@ -41,6 +45,7 @@ export async function GET() {
     const {
       session,
       businessId,
+      membership,
     } = await getBusinessId();
 
     if (!session?.user) {
@@ -64,6 +69,7 @@ export async function GET() {
         },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.KNOWLEDGE_VIEW)) return NextResponse.json({ error: "Knowledge access denied." }, { status: 403 });
 
     const sources =
       await db
@@ -110,6 +116,7 @@ export async function DELETE(
     const {
       session,
       businessId,
+      membership,
     } = await getBusinessId();
 
     if (!session?.user) {
@@ -133,6 +140,7 @@ export async function DELETE(
         },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.KNOWLEDGE_MANAGE)) return NextResponse.json({ error: "Knowledge management access denied." }, { status: 403 });
 
     const body =
       await request.json();
@@ -233,6 +241,8 @@ export async function DELETE(
         error,
       );
     }
+
+    await createAuditLog({ businessId, userId: session.user.id, action: "business_brain.source.deleted", resource: "knowledge_source", resourceId: sourceId, description: `Deleted knowledge source ${source.originalName}.` });
 
     return NextResponse.json({
       success: true,
