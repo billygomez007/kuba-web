@@ -544,8 +544,14 @@ export async function POST(request: Request) {
           businessId:
             business.id,
 
+          customerId:
+            null,
+
           integrationId:
             integration.id,
+
+          externalConversationId:
+            conversationId,
 
           customerName:
             "Website Visitor",
@@ -558,6 +564,9 @@ export async function POST(request: Request) {
 
           assignedEmployeeId:
             receptionist.id,
+
+          aiMode:
+            "active",
 
           status:
             "open",
