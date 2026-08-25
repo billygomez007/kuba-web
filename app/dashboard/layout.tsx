@@ -47,6 +47,12 @@ const navigationGroups: NavigationGroup[] = [
         icon: "⌂",
       },
       {
+        label: "AI Workforce",
+        href: "/dashboard/workforce",
+        icon: "✦",
+        permission: "workforce.view",
+      },
+      {
         label: "Workforce Command Center",
         href: "/dashboard/workforce-command-center",
         icon: "◉",
