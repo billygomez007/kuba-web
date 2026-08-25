@@ -17,6 +17,14 @@ function LoginForm() {
 
   const invitationToken =
     searchParams.get("token") || "";
+  const requestedCallback =
+    searchParams.get("callbackUrl") || "";
+  const callbackUrl =
+    requestedCallback.startsWith("/") &&
+    !requestedCallback.startsWith("//") &&
+    !requestedCallback.includes("\\")
+      ? requestedCallback
+      : "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,7 +54,7 @@ function LoginForm() {
         `/invite?token=${encodeURIComponent(invitationToken)}`
       );
     } else {
-      router.push("/dashboard");
+      router.push(callbackUrl);
     }
 
     router.refresh();

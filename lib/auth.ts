@@ -32,6 +32,15 @@ export const auth = betterAuth({
     ...(!isProduction ? ["http://localhost:3000", "http://localhost:3001"] : []),
   ],
 
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: isProduction,
+      domain: isProduction
+        ? ".superkuba.com"
+        : undefined,
+    },
+  },
+
   rateLimit: {
     enabled: isProduction,
     window: 60,
