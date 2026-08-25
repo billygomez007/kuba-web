@@ -1,8 +1,6 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   actionApprovals,
@@ -17,46 +15,37 @@ import {
   tasks,
   users,
 } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: error || "Unauthorized" },
         { status: 401 },
       );
     }
 
-    const membership = await db
-      .select({ businessId: businessUsers.businessId })
-      .from(businessUsers)
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-
-    const business = membership[0];
-
-    if (!business) {
+    if (!membership) {
       return NextResponse.json(
-        { error: "Business not found." },
-        { status: 404 },
+        { error: error || "Business access denied." },
+        { status: 403 },
       );
     }
 
     const [conversationRows, employeeRows, memberRows, messageRows, routingRows, handoffRows, leadRows, followUpRows, taskRows, approvalRows] = await Promise.all([
-      db.select().from(conversations).where(eq(conversations.businessId, business.businessId)).orderBy(desc(conversations.updatedAt)),
-      db.select({ id: aiEmployees.id, name: aiEmployees.name, type: aiEmployees.type, status: aiEmployees.status }).from(aiEmployees).where(eq(aiEmployees.businessId, business.businessId)),
-      db.select({ id: businessUsers.id, userId: users.id, name: users.name, email: users.email }).from(businessUsers).innerJoin(users, eq(users.id, businessUsers.userId)).where(eq(businessUsers.businessId, business.businessId)),
-      db.select().from(messages).where(eq(messages.businessId, business.businessId)).orderBy(desc(messages.createdAt)),
-      db.select().from(conversationRouting).where(eq(conversationRouting.businessId, business.businessId)),
-      db.select().from(handoffs).where(eq(handoffs.businessId, business.businessId)).orderBy(desc(handoffs.createdAt)),
-      db.select().from(leads).where(eq(leads.businessId, business.businessId)),
-      db.select().from(followUps).where(eq(followUps.businessId, business.businessId)),
-      db.select().from(tasks).where(eq(tasks.businessId, business.businessId)),
-      db.select({ id: actionApprovals.id }).from(actionApprovals).where(and(eq(actionApprovals.businessId, business.businessId), eq(actionApprovals.status, "pending"))),
+      db.select().from(conversations).where(eq(conversations.businessId, membership.businessId)).orderBy(desc(conversations.updatedAt)),
+      db.select({ id: aiEmployees.id, name: aiEmployees.name, type: aiEmployees.type, status: aiEmployees.status }).from(aiEmployees).where(eq(aiEmployees.businessId, membership.businessId)),
+      db.select({ id: businessUsers.id, userId: users.id, name: users.name, email: users.email }).from(businessUsers).innerJoin(users, eq(users.id, businessUsers.userId)).where(eq(businessUsers.businessId, membership.businessId)),
+      db.select().from(messages).where(eq(messages.businessId, membership.businessId)).orderBy(desc(messages.createdAt)),
+      db.select().from(conversationRouting).where(eq(conversationRouting.businessId, membership.businessId)),
+      db.select().from(handoffs).where(eq(handoffs.businessId, membership.businessId)).orderBy(desc(handoffs.createdAt)),
+      db.select().from(leads).where(eq(leads.businessId, membership.businessId)),
+      db.select().from(followUps).where(eq(followUps.businessId, membership.businessId)),
+      db.select().from(tasks).where(eq(tasks.businessId, membership.businessId)),
+      db.select({ id: actionApprovals.id }).from(actionApprovals).where(and(eq(actionApprovals.businessId, membership.businessId), eq(actionApprovals.status, "pending"))),
     ]);
 
     const employeesById = new Map(employeeRows.map((employee) => [employee.id, employee]));

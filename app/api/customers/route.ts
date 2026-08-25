@@ -1,53 +1,32 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { businesses, businessUsers, customers } from "@/db/schema";
-
-async function getBusinessForUser(userId: string) {
-  const result = await db
-    .select({
-      business: businesses,
-    })
-    .from(businessUsers)
-    .innerJoin(
-      businesses,
-      eq(businessUsers.businessId, businesses.id),
-    )
-    .where(eq(businessUsers.userId, userId))
-    .limit(1);
-
-  return result[0]?.business;
-}
+import { customers } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
-        { error: "You must be signed in." },
+        { error: error || "You must be signed in." },
         { status: 401 },
       );
     }
 
-    const business = await getBusinessForUser(session.user.id);
-
-    if (!business) {
+    if (!membership) {
       return NextResponse.json(
-        { error: "No business is associated with this account." },
-        { status: 404 },
+        { error: error || "Business access denied." },
+        { status: 403 },
       );
     }
 
     const result = await db
       .select()
       .from(customers)
-      .where(eq(customers.businessId, business.id))
+      .where(eq(customers.businessId, membership.businessId))
       .orderBy(desc(customers.createdAt));
 
     return NextResponse.json({
@@ -65,23 +44,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
-        { error: "You must be signed in." },
+        { error: error || "You must be signed in." },
         { status: 401 },
       );
     }
 
-    const business = await getBusinessForUser(session.user.id);
-
-    if (!business) {
+    if (!membership) {
       return NextResponse.json(
-        { error: "No business is associated with this account." },
-        { status: 404 },
+        { error: error || "Business access denied." },
+        { status: 403 },
       );
     }
 
@@ -104,7 +79,7 @@ export async function POST(request: Request) {
 
     await db.insert(customers).values({
       id: customerId,
-      businessId: business.id,
+      businessId: membership.businessId,
       name: name || null,
       email: email || null,
       phone: phone || null,

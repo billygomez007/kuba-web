@@ -1,73 +1,50 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { eq, desc } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-  businesses,
-  businessUsers,
   leads,
   followUps,
   salesActivities,
 } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 import { runAutomationTrigger } from "@/lib/automations/engine";
 
-async function getBusinessForUser(userId: string) {
-  const result = await db
-    .select({
-      business: businesses,
-    })
-    .from(businessUsers)
-    .innerJoin(
-      businesses,
-      eq(businessUsers.businessId, businesses.id),
-    )
-    .where(eq(businessUsers.userId, userId))
-    .limit(1);
-
-  return result[0]?.business;
-}
-
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
-        { error: "You must be signed in." },
+        { error: error || "You must be signed in." },
         { status: 401 },
       );
     }
 
-    const business = await getBusinessForUser(session.user.id);
-
-    if (!business) {
+    if (!membership) {
       return NextResponse.json(
-        { error: "No business is associated with this account." },
-        { status: 404 },
+        { error: error || "Business access denied." },
+        { status: 403 },
       );
     }
 
     const businessLeads = await db
       .select()
       .from(leads)
-      .where(eq(leads.businessId, business.id))
+      .where(eq(leads.businessId, membership.businessId))
       .orderBy(desc(leads.createdAt));
 
     const businessFollowUps = await db
       .select()
       .from(followUps)
-      .where(eq(followUps.businessId, business.id))
+      .where(eq(followUps.businessId, membership.businessId))
       .orderBy(desc(followUps.dueAt));
 
     const businessActivities = await db
       .select()
       .from(salesActivities)
-      .where(eq(salesActivities.businessId, business.id))
+      .where(eq(salesActivities.businessId, membership.businessId))
       .orderBy(desc(salesActivities.createdAt));
 
     return NextResponse.json({
@@ -87,23 +64,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
-        { error: "You must be signed in." },
+        { error: error || "You must be signed in." },
         { status: 401 },
       );
     }
 
-    const business = await getBusinessForUser(session.user.id);
-
-    if (!business) {
+    if (!membership) {
       return NextResponse.json(
-        { error: "No business is associated with this account." },
-        { status: 404 },
+        { error: error || "Business access denied." },
+        { status: 403 },
       );
     }
 
@@ -131,7 +104,7 @@ export async function POST(request: Request) {
 
     await db.insert(leads).values({
       id: leadId,
-      businessId: business.id,
+      businessId: membership.businessId,
       customerId: null,
       name: name || null,
       email: email || null,
@@ -163,7 +136,7 @@ export async function POST(request: Request) {
     if (createdLead) {
       try {
         await runAutomationTrigger({
-          businessId: business.id,
+          businessId: membership.businessId,
           trigger: "lead.created",
           data: {
             leadId: createdLead.id,

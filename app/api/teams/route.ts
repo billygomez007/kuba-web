@@ -1,44 +1,31 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 
 import {
   businessTeams,
 } from "@/db/schema";
 
-import {
-  getBusinessMembership,
-  hasPermission,
-  PERMISSIONS,
-} from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 export async function GET() {
   try {
-    const session =
-      await auth.api.getSession({
-        headers: await headers(),
-      });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: error || "Unauthorized" },
         { status: 401 },
       );
     }
-
-    const membership =
-      await getBusinessMembership(
-        session.user.id,
-      );
 
     if (!membership) {
       return NextResponse.json(
         {
           error:
-            "Business access denied.",
+            error || "Business access denied.",
         },
         { status: 403 },
       );
@@ -95,28 +82,20 @@ export async function POST(
   request: Request,
 ) {
   try {
-    const session =
-      await auth.api.getSession({
-        headers: await headers(),
-      });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: error || "Unauthorized" },
         { status: 401 },
       );
     }
-
-    const membership =
-      await getBusinessMembership(
-        session.user.id,
-      );
 
     if (!membership) {
       return NextResponse.json(
         {
           error:
-            "Business access denied.",
+            error || "Business access denied.",
         },
         { status: 403 },
       );
