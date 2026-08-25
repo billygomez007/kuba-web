@@ -659,48 +659,34 @@ export async function POST(request: Request) {
 
       responseStage =
         "create_conversation";
-      await db
-        .insert(conversations)
-        .values({
-          id:
-            conversationId,
-
-          businessId:
-            business.id,
-
-          customerId:
-            null,
-
-          integrationId:
-            integration.id,
-
-          externalConversationId:
-            conversationId,
-
-          customerName:
-            "Website Visitor",
-
-          customerPhone:
-            null,
-
-          customerEmail:
-            null,
-
-          assignedEmployeeId:
-            receptionist.id,
-
-          aiMode:
-            "active",
-
-          status:
-            "open",
-
-          createdAt:
-            now,
-
-          updatedAt:
-            now,
-        });
+      // Keep this insert compatible with the validated live baseline.
+      await db.run(sql`
+        INSERT INTO conversations (
+          id,
+          business_id,
+          integration_id,
+          external_conversation_id,
+          customer_name,
+          customer_phone,
+          customer_email,
+          assigned_employee_id,
+          status,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${conversationId},
+          ${business.id},
+          ${integration.id},
+          ${conversationId},
+          ${"Website Visitor"},
+          ${null},
+          ${null},
+          ${receptionist.id},
+          ${"open"},
+          ${now.getTime()},
+          ${now.getTime()}
+        )
+      `);
     }
 
     /**
