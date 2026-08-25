@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function proxy(request: NextRequest) {
+  if (
+    request.nextUrl.pathname ===
+    "/dashboard/integrations/website-chat"
+  ) {
+    return NextResponse.next();
+  }
+
   if (getSessionCookie(request)) {
     return NextResponse.next();
   }

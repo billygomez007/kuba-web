@@ -39,6 +39,14 @@ export const auth = betterAuth({
         ? ".superkuba.com"
         : undefined,
     },
+    defaultCookieAttributes: isProduction
+      ? {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+          partitioned: true,
+        }
+      : {},
   },
 
   rateLimit: {
