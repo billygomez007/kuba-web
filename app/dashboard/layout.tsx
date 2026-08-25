@@ -369,7 +369,7 @@ export default function DashboardLayout({
             groupActive
               ? "bg-white/[0.08] text-white"
               : "text-white/60 hover:bg-white/[0.04] hover:text-white/85"
-          }`}
+          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70`}
         >
           <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm ${
             groupActive
@@ -425,6 +425,7 @@ export default function DashboardLayout({
                     href={item.href}
                     onClick={() => mobile && setMobileNavigationOpen(false)}
                     aria-current={active ? "page" : undefined}
+                    tabIndex={expanded ? 0 : -1}
                     className={`flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium transition ${
                       active
                         ? "bg-cyan-400/[0.09] text-cyan-100"
