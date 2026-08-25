@@ -18,6 +18,13 @@ type NavigationGroup = {
   items: NavigationItem[];
 };
 
+type AccessibleBusiness = {
+  id: string;
+  name: string;
+  role: string;
+  branchId: string | null;
+};
+
 let navigationGroups: NavigationGroup[] = [
 
   {
@@ -326,6 +333,21 @@ export default function DashboardLayout({
   const [platformRole, setPlatformRole] =
     useState<string | null>(null);
 
+  const [businesses, setBusinesses] =
+    useState<AccessibleBusiness[]>([]);
+
+  const [selectedBusinessId, setSelectedBusinessId] =
+    useState("");
+
+  const [switchingBusiness, setSwitchingBusiness] =
+    useState(false);
+
+  const [businessSwitchError, setBusinessSwitchError] =
+    useState("");
+
+  const isStaging =
+    process.env.NEXT_PUBLIC_APP_ENV === "staging";
+
   useEffect(() => {
     let cancelled = false;
 
@@ -359,6 +381,14 @@ export default function DashboardLayout({
             data.user?.platformRole || null,
           );
 
+          setBusinesses(
+            Array.isArray(data.businesses) ? data.businesses : [],
+          );
+
+          setSelectedBusinessId(
+            data.membership?.businessId || "",
+          );
+
           const matchedRoute = Object.keys(
             navigationPermissions,
           )
@@ -389,6 +419,34 @@ export default function DashboardLayout({
       cancelled = true;
     };
   }, []);
+
+  async function switchBusiness(businessId: string) {
+    if (!businessId || businessId === selectedBusinessId || switchingBusiness) {
+      return;
+    }
+
+    setSwitchingBusiness(true);
+    setBusinessSwitchError("");
+
+    try {
+      const response = await fetch("/api/businesses/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId }),
+      });
+
+      if (!response.ok) {
+        setBusinessSwitchError("Unable to switch business. Please try again.");
+        return;
+      }
+
+      setSelectedBusinessId(businessId);
+      router.refresh();
+      window.location.reload();
+    } finally {
+      setSwitchingBusiness(false);
+    }
+  }
 
   const visibleNavigation = navigationGroups.flatMap((group) =>
     group.items.filter((item) => {
@@ -446,7 +504,39 @@ export default function DashboardLayout({
               className="h-auto w-[140px] object-contain"
             />
           </Link>
+          {isStaging && (
+            <span className="ml-3 rounded border border-amber-300/30 bg-amber-300/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-amber-200">
+              STAGING
+            </span>
+          )}
         </div>
+
+        {businesses.length > 0 && (
+          <div className="border-b border-white/[0.07] px-4 py-3">
+            <label htmlFor="business-switcher" className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">
+              Current business
+            </label>
+            <select
+              id="business-switcher"
+              value={selectedBusinessId}
+              disabled={switchingBusiness}
+              onChange={(event) => switchBusiness(event.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-xs text-white outline-none disabled:opacity-50"
+            >
+              {!selectedBusinessId && <option value="">Select a business</option>}
+              {businesses.map((business) => (
+                <option key={business.id} value={business.id} className="bg-[#07070A]">
+                  {business.name}
+                </option>
+              ))}
+            </select>
+            {businessSwitchError && (
+              <p className="mt-2 text-[11px] text-rose-300" role="alert">
+                {businessSwitchError}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Navigation Workspace */}
         <nav className="flex-1 overflow-y-auto px-4 py-6">
@@ -609,6 +699,12 @@ export default function DashboardLayout({
             />
           </Link>
 
+          {isStaging && (
+            <span className="rounded border border-amber-300/30 bg-amber-300/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-amber-200">
+              STAGING
+            </span>
+          )}
+
           <div className="flex items-center gap-2">
             <Link
               href="/help"
@@ -661,4 +757,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-

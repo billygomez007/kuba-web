@@ -9,13 +9,16 @@ import {
 
 const PRODUCTION_URL = "https://superkuba.com";
 const isProduction = process.env.NODE_ENV === "production";
+const configuredAuthURL = process.env.BETTER_AUTH_URL || null;
+const configuredAppURL =
+  process.env.NEXT_PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || null;
 const vercelPreviewURL =
   process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : null;
 const baseURL =
+  configuredAuthURL ||
   vercelPreviewURL ||
-  process.env.BETTER_AUTH_URL ||
   (isProduction ? PRODUCTION_URL : "http://localhost:3000");
 
 export const auth = betterAuth({
@@ -28,6 +31,8 @@ export const auth = betterAuth({
   trustedOrigins: [
     PRODUCTION_URL,
     "https://www.superkuba.com",
+    ...(configuredAuthURL ? [configuredAuthURL] : []),
+    ...(configuredAppURL ? [configuredAppURL] : []),
     ...(vercelPreviewURL ? [vercelPreviewURL] : []),
     ...(!isProduction ? ["http://localhost:3000", "http://localhost:3001"] : []),
   ],
