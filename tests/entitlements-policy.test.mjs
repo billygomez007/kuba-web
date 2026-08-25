@@ -167,3 +167,10 @@ test("Billing status does not expose provider secrets", () => {
   assert.equal("secretKey" in publicEntitlements, false);
   assert.equal("webhookSecret" in publicEntitlements, false);
 });
+
+test("Module add-ons remain an explicit empty layer until supported", () => {
+  const base = resolve("pro");
+  const modules = [];
+  assert.deepEqual(modules, []);
+  assert.equal(base.capabilities.has("human_workforce.payroll"), true);
+});
