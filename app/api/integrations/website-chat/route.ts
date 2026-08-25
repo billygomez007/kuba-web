@@ -17,6 +17,7 @@ import {
 
 import { routeConversationToTeam } from "@/lib/communications/team-router";
 import { type ConversationDepartment } from "@/lib/communications/routing";
+import { routeConversation } from "@/lib/communications/router";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { runAutomationTrigger } from "@/lib/automations/engine";
@@ -736,162 +737,196 @@ export async function POST(request: Request) {
      * This allows an existing conversation to remain
      * with its current team unless the router changes it.
      */
+    let enhancedRoutingAvailable =
+      true;
+    let existingRouting:
+      | {
+          department:
+            string | null;
+          teamId:
+            string | null;
+          aiEmployeeId:
+            string | null;
+          assignedUserId:
+            string | null;
+        }
+      | undefined;
+
     responseStage =
       "load_routing";
-    const existingRoutingResult =
-      await db
-        .select({
-          department:
-            conversationRouting.department,
+    try {
+      const existingRoutingResult =
+        await db
+          .select({
+            department:
+              conversationRouting.department,
+            teamId:
+              conversationRouting.teamId,
+            aiEmployeeId:
+              conversationRouting.aiEmployeeId,
+            assignedUserId:
+              conversationRouting.assignedUserId,
+          })
+          .from(conversationRouting)
+          .where(
+            eq(
+              conversationRouting.conversationId,
+              conversationId,
+            ),
+          )
+          .limit(1);
 
-          teamId:
-            conversationRouting.teamId,
+      existingRouting =
+        existingRoutingResult[0];
+    } catch (routingLoadError) {
+      if (
+        classifyWebsiteChatError(
+          routingLoadError,
+        ) !== "missing_table"
+      ) {
+        throw routingLoadError;
+      }
 
-          aiEmployeeId:
-            conversationRouting.aiEmployeeId,
-
-          assignedUserId:
-            conversationRouting.assignedUserId,
-        })
-        .from(conversationRouting)
-        .where(
-          eq(
-            conversationRouting.conversationId,
-            conversationId,
-          ),
-        )
-        .limit(1);
-
-    const existingRouting =
-      existingRoutingResult[0];
+      enhancedRoutingAvailable =
+        false;
+      console.warn(
+        "Website Chat enhanced routing tables are unavailable.",
+      );
+    }
 
     /**
      * Run the central Kuba routing engine.
      */
+    const routingContext = {
+      businessId:
+        business.id,
+      customerId:
+        null,
+      conversationId,
+      channel:
+        "website_chat" as const,
+      message,
+      currentDepartment:
+        typeof existingRouting?.department === "string"
+          ? existingRouting.department as ConversationDepartment
+          : null,
+      currentTeamId:
+        existingRouting?.teamId ??
+        null,
+      currentAiEmployeeId:
+        existingRouting?.aiEmployeeId ??
+        null,
+      currentAssignedUserId:
+        existingRouting?.assignedUserId ??
+        null,
+    };
+
     responseStage =
       "route_conversation";
-    const routingDecision =
-      await routeConversationToTeam({
-        businessId:
-          business.id,
+    let routingDecision =
+      routeConversation(
+        routingContext,
+      );
 
-        customerId:
-          null,
+    if (enhancedRoutingAvailable) {
+      try {
+        routingDecision =
+          await routeConversationToTeam(
+            routingContext,
+          );
+      } catch (teamRoutingError) {
+        const failureType =
+          classifyWebsiteChatError(
+            teamRoutingError,
+          );
 
-        conversationId,
+        if (
+          failureType !==
+            "missing_table" &&
+          failureType !==
+            "missing_column"
+        ) {
+          throw teamRoutingError;
+        }
 
-        channel:
-          "website_chat",
-
-        message,
-
-        currentDepartment:
-          typeof existingRouting?.department === "string"
-            ? existingRouting.department as ConversationDepartment
-            : null,
-
-        currentTeamId:
-          existingRouting?.teamId ??
-          null,
-
-        currentAiEmployeeId:
-          existingRouting?.aiEmployeeId ??
-          null,
-
-        currentAssignedUserId:
-          existingRouting?.assignedUserId ??
-          null,
-      });
+        enhancedRoutingAvailable =
+          false;
+        console.warn(
+          "Website Chat team routing tables are unavailable.",
+        );
+      }
+    }
 
     /**
      * Persist routing state.
      */
-    if (!existingRouting) {
-      responseStage =
-        "create_routing";
-      await db
-        .insert(conversationRouting)
-        .values({
-          id:
-            crypto.randomUUID(),
-
-          businessId:
-            business.id,
-
-          conversationId,
-
-          department:
-            routingDecision.department,
-
-          teamId:
-            routingDecision.teamId,
-
-          aiEmployeeId:
-            routingDecision.aiEmployeeId,
-
-          assignedUserId:
-            routingDecision.assignedUserId,
-
-          assignmentType:
-            routingDecision.assignmentType,
-
-          status:
-            routingDecision.status,
-
-          priority:
-            "normal",
-
-          confidence:
-            routingDecision.confidence,
-
-          routingReason:
-            routingDecision.reason,
-
-          createdAt:
-            now,
-
-          updatedAt:
-            now,
-        });
-    } else {
-      responseStage =
-        "update_routing";
-      await db
-        .update(conversationRouting)
-        .set({
-          department:
-            routingDecision.department,
-
-          teamId:
-            routingDecision.teamId,
-
-          aiEmployeeId:
-            routingDecision.aiEmployeeId,
-
-          assignedUserId:
-            routingDecision.assignedUserId,
-
-          assignmentType:
-            routingDecision.assignmentType,
-
-          status:
-            routingDecision.status,
-
-          confidence:
-            routingDecision.confidence,
-
-          routingReason:
-            routingDecision.reason,
-
-          updatedAt:
-            new Date(),
-        })
-        .where(
-          eq(
-            conversationRouting.conversationId,
+    if (enhancedRoutingAvailable) {
+      if (!existingRouting) {
+        responseStage =
+          "create_routing";
+        await db
+          .insert(conversationRouting)
+          .values({
+            id:
+              crypto.randomUUID(),
+            businessId:
+              business.id,
             conversationId,
-          ),
-        );
+            department:
+              routingDecision.department,
+            teamId:
+              routingDecision.teamId,
+            aiEmployeeId:
+              routingDecision.aiEmployeeId,
+            assignedUserId:
+              routingDecision.assignedUserId,
+            assignmentType:
+              routingDecision.assignmentType,
+            status:
+              routingDecision.status,
+            priority:
+              "normal",
+            confidence:
+              routingDecision.confidence,
+            routingReason:
+              routingDecision.reason,
+            createdAt:
+              now,
+            updatedAt:
+              now,
+          });
+      } else {
+        responseStage =
+          "update_routing";
+        await db
+          .update(conversationRouting)
+          .set({
+            department:
+              routingDecision.department,
+            teamId:
+              routingDecision.teamId,
+            aiEmployeeId:
+              routingDecision.aiEmployeeId,
+            assignedUserId:
+              routingDecision.assignedUserId,
+            assignmentType:
+              routingDecision.assignmentType,
+            status:
+              routingDecision.status,
+            confidence:
+              routingDecision.confidence,
+            routingReason:
+              routingDecision.reason,
+            updatedAt:
+              new Date(),
+          })
+          .where(
+            eq(
+              conversationRouting.conversationId,
+              conversationId,
+            ),
+          );
+      }
     }
 
     /**
