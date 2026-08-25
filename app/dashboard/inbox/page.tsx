@@ -44,7 +44,11 @@ export default function InboxPage() {
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Unable to load inbox.");
 			setWorkspace(data);
-			setSelectedId((current) => current || data.conversations?.[0]?.id || null);
+			setSelectedId((current) => {
+				const requested = new URLSearchParams(window.location.search).get("conversation");
+				const validRequested = data.conversations?.some((item: Conversation) => item.id === requested);
+				return current || (validRequested ? requested : null) || data.conversations?.[0]?.id || null;
+			});
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Unable to load inbox.");
 		} finally {

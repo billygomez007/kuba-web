@@ -13,6 +13,7 @@ type Customer = {
   createdAt: string | number | Date;
   updatedAt: string | number | Date;
 };
+type Relationship = { conversations: Array<{ id: string; status: string }>; leads: Array<{ id: string; stage: string }>; followUps: Array<{ id: string; status: string }>; tags: Array<{ id: string; tag: string }> };
 
 export default function CustomerProfilePage({
   params,
@@ -22,13 +23,14 @@ export default function CustomerProfilePage({
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [relationship, setRelationship] = useState<Relationship>({ conversations: [], leads: [], followUps: [], tags: [] });
 
   useEffect(() => {
     async function loadCustomer() {
       try {
         const { id } = await params;
 
-        const response = await fetch(`/api/customers/${id}`, {
+        const response = await fetch(`/api/customers/profile?id=${encodeURIComponent(id)}`, {
           cache: "no-store",
         });
 
@@ -39,6 +41,7 @@ export default function CustomerProfilePage({
         }
 
         setCustomer(data.customer);
+        setRelationship({ conversations: data.conversations || [], leads: data.leads || [], followUps: data.followUps || [], tags: data.tags || [] });
       } catch (error) {
         setError(
           error instanceof Error
@@ -146,12 +149,7 @@ export default function CustomerProfilePage({
               </div>
             </div>
 
-            <button
-              type="button"
-              className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/60 transition hover:bg-white/[0.08] hover:text-white"
-            >
-              Edit customer
-            </button>
+            <Link href="/dashboard/inbox" className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/60 transition hover:bg-white/[0.08] hover:text-white">Open inbox</Link>
           </div>
         </section>
 
@@ -182,6 +180,7 @@ export default function CustomerProfilePage({
                 label="Customer ID"
                 value={customer.id}
               />
+              <InfoItem label="Tags" value={relationship.tags.length ? relationship.tags.map((item) => item.tag).join(", ") : "No tags"} />
             </div>
           </div>
 
@@ -207,17 +206,9 @@ export default function CustomerProfilePage({
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <SalesActivityPanel customerId={customer.id} />
 
-          <PlaceholderPanel
-            icon="◌"
-            title="Conversations"
-            description="Customer conversations and messages handled by Kuba AI employees will appear here."
-          />
+          <RelationshipPanel icon="◌" title="Conversations" count={relationship.conversations.length} description={`${relationship.conversations.filter((item) => item.status !== "resolved").length} currently open`} href="/dashboard/conversations" />
 
-          <PlaceholderPanel
-            icon="✓"
-            title="Tasks & follow-ups"
-            description="Tasks, reminders, and follow-ups associated with this customer will appear here."
-          />
+          <RelationshipPanel icon="✓" title="Leads & follow-ups" count={relationship.leads.length + relationship.followUps.length} description={`${relationship.leads.length} leads · ${relationship.followUps.filter((item) => item.status !== "completed").length} open follow-ups`} href="/dashboard/follow-ups" />
 
           <PlaceholderPanel
             icon="✦"
@@ -401,6 +392,10 @@ function SalesActivityPanel({
   );
 }
 
+
+function RelationshipPanel({ icon, title, count, description, href }: { icon: string; title: string; count: number; description: string; href: string }) {
+  return <Link href={href} className="rounded-3xl border border-white/10 bg-white/[0.025] p-7 transition hover:border-cyan-300/20"><div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.04] text-lg text-cyan-200">{icon}</div><h2 className="mt-5 text-lg font-bold">{title}</h2><p className="mt-3 text-3xl font-black">{count}</p><p className="mt-2 text-sm text-white/30">{description}</p></Link>;
+}
 
 function PlaceholderPanel({
   icon,

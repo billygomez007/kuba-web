@@ -16,6 +16,7 @@ import {
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 export async function canAccessConversation(
   userId: string,
@@ -44,6 +45,20 @@ export async function canAccessConversation(
       allowed: false,
       reason: "Conversation not found.",
       conversation: null,
+    };
+  }
+
+  const selectedMembership = await getCurrentMembership();
+
+  if (
+    !selectedMembership ||
+    selectedMembership.userId !== userId ||
+    selectedMembership.businessId !== conversation.businessId
+  ) {
+    return {
+      allowed: false,
+      reason: "Conversation is outside the selected business.",
+      conversation,
     };
   }
 

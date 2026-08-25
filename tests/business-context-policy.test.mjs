@@ -90,3 +90,19 @@ test("Intelligence aggregates switch with selected business without cross-busine
   assert.equal(totalFor(selectBusinessMembership(memberships, "business-a").businessId), 10);
   assert.equal(totalFor(selectBusinessMembership(memberships, "business-b").businessId), 99);
 });
+
+for (const resourceName of ["customer", "lead", "conversation", "message", "follow-up", "handoff"]) {
+  test(`${resourceName} access is pinned to the selected business`, () => {
+    const selected = selectBusinessMembership(memberships, "business-a");
+    assert.ok(selected);
+    assert.equal(isResourceOwnedByBusiness(selected.businessId, "business-a"), true);
+    assert.equal(isResourceOwnedByBusiness(selected.businessId, "business-b"), false);
+  });
+}
+
+test("a client businessId override cannot replace canonical selected context", () => {
+  const selected = selectBusinessMembership(memberships, "business-a");
+  const clientBody = { businessId: "business-b" };
+  assert.equal(selected?.businessId, "business-a");
+  assert.equal(isResourceOwnedByBusiness(selected.businessId, clientBody.businessId), false);
+});

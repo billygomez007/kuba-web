@@ -1,36 +1,36 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   customers,
   conversations,
   leads,
   followUps,
+  customerTags,
 } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 
 export async function GET(
   request: Request,
 ) {
 
-  const session =
-    await auth.api.getSession({
-      headers: await headers(),
-    });
+  const { user, membership, error } = await requireBusinessMembership();
 
-
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json(
       {
-        error:"Unauthorized",
+        error:error || "Unauthorized",
       },
       {
         status:401,
       },
     );
+  }
+
+  if (!membership) {
+    return NextResponse.json({ error: error || "Business access denied." }, { status: 403 });
   }
 
 
@@ -59,12 +59,13 @@ export async function GET(
       .select()
       .from(customers)
       .where(
-        eq(
-          customers.id,
-          customerId,
-        ),
+        and(eq(customers.id, customerId), eq(customers.businessId, membership.businessId)),
       )
       .limit(1);
+
+  if (!customer[0]) {
+    return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+  }
 
 
   const customerConversations =
@@ -72,10 +73,7 @@ export async function GET(
       .select()
       .from(conversations)
       .where(
-        eq(
-          conversations.customerId,
-          customerId,
-        ),
+        and(eq(conversations.customerId, customerId), eq(conversations.businessId, membership.businessId)),
       );
 
 
@@ -84,15 +82,14 @@ export async function GET(
       .select()
       .from(leads)
       .where(
-        eq(
-          leads.customerId,
-          customerId,
-        ),
+        and(eq(leads.customerId, customerId), eq(leads.businessId, membership.businessId)),
       );
 
-
-  const customerFollowUps: Array<Record<string, unknown>> =
-    [];
+  const leadIds = customerLeads.map((lead) => lead.id);
+  const customerFollowUps = leadIds.length
+    ? await db.select().from(followUps).where(and(eq(followUps.businessId, membership.businessId), inArray(followUps.leadId, leadIds)))
+    : [];
+  const tags = await db.select().from(customerTags).where(eq(customerTags.customerId, customerId));
 
 
   return NextResponse.json({
@@ -100,6 +97,7 @@ export async function GET(
     conversations:customerConversations,
     leads:customerLeads,
     followUps:customerFollowUps,
+    tags,
   });
 
 }

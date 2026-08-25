@@ -159,6 +159,18 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       conversations: inbox,
+      handoffs: handoffRows.map((handoff) => {
+        const conversation = conversationRows.find((item) => item.id === handoff.conversationId);
+        const routing = routingByConversation.get(handoff.conversationId);
+        return {
+          ...handoff,
+          customerName: conversation?.customerName || "Unknown customer",
+          conversationStatus: conversation?.status || "unknown",
+          assignedUser: handoff.toUserId ? membersByUserId.get(handoff.toUserId) || null : null,
+          assignedTeamId: routing?.teamId || null,
+          priority: routing?.priority || "normal",
+        };
+      }),
       employees: employeeRows,
       members: memberRows,
       metrics: {

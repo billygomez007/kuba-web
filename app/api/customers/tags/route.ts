@@ -1,25 +1,31 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   customerTags,
+  customers,
 } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
+
+async function requireOwnedCustomer(customerId: string) {
+  const context = await requireBusinessMembership();
+  if (!context.user || !context.membership) return { ...context, customer: null };
+  const customer = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.id, customerId), eq(customers.businessId, context.membership.businessId))).limit(1);
+  return { ...context, customer: customer[0] ?? null };
+}
 
 
 export async function POST(
   request: Request,
 ) {
 
-  const session =
-    await auth.api.getSession({
-      headers: await headers(),
-    });
+  const body = await request.json();
+  const customerId = String(body.customerId || "").trim();
+  const tag = String(body.tag || "").trim();
+  const context = await requireOwnedCustomer(customerId);
 
-
-  if (!session?.user) {
+  if (!context.user) {
     return NextResponse.json(
       {
         error:"Unauthorized",
@@ -31,12 +37,6 @@ export async function POST(
   }
 
 
-  const {
-    customerId,
-    tag,
-  } = await request.json();
-
-
   if (!customerId || !tag) {
     return NextResponse.json(
       {
@@ -46,6 +46,10 @@ export async function POST(
         status:400,
       },
     );
+  }
+
+  if (!context.membership || !context.customer) {
+    return NextResponse.json({ error: "Customer not found for the selected business." }, { status: 404 });
   }
 
 
@@ -94,6 +98,10 @@ export async function GET(
       },
     );
   }
+
+  const context = await requireOwnedCustomer(customerId);
+  if (!context.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!context.membership || !context.customer) return NextResponse.json({ error: "Customer not found for the selected business." }, { status: 404 });
 
 
   const tags =

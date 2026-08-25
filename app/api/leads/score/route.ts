@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   leads,
@@ -10,19 +8,16 @@ import {
 
 import { calculateLeadScore } from "@/lib/ai/lead-scoring";
 import { logAIActivity } from "@/lib/ai/activity-log";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 
 export async function GET(
   request: Request,
 ) {
 
-  const session =
-    await auth.api.getSession({
-      headers: await headers(),
-    });
+  const { user, membership, error } = await requireBusinessMembership();
 
-
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json(
       {
         error:"Unauthorized",
@@ -32,6 +27,8 @@ export async function GET(
       },
     );
   }
+
+  if (!membership) return NextResponse.json({ error: error || "Business access denied." }, { status: 403 });
 
 
   const { searchParams } =
@@ -59,10 +56,7 @@ export async function GET(
       .select()
       .from(leads)
       .where(
-        eq(
-          leads.id,
-          leadId,
-        ),
+        and(eq(leads.id, leadId), eq(leads.businessId, membership.businessId)),
       )
       .limit(1);
 

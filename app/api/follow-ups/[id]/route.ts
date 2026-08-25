@@ -1,13 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import {
-  businessUsers,
-  followUps,
-} from "@/db/schema";
+import { followUps } from "@/db/schema";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 
 export async function PATCH(
   request: Request,
@@ -16,16 +12,16 @@ export async function PATCH(
   },
 ) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const { user, membership, error } = await requireBusinessMembership();
 
-    if (!session?.user) {
+    if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 },
       );
     }
+
+    if (!membership) return NextResponse.json({ error: error || "Business access denied." }, { status: 403 });
 
     const { id } = await context.params;
 
@@ -42,28 +38,6 @@ export async function PATCH(
       );
     }
 
-    const membership = await db
-      .select({
-        businessId: businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
-
-    const business = membership[0];
-
-    if (!business) {
-      return NextResponse.json(
-        { error: "Business not found." },
-        { status: 404 },
-      );
-    }
-
     const existing = await db
       .select({ id: followUps.id })
       .from(followUps)
@@ -75,7 +49,7 @@ export async function PATCH(
           ),
           eq(
             followUps.businessId,
-            business.businessId,
+            membership.businessId,
           ),
         ),
       )
@@ -102,7 +76,7 @@ export async function PATCH(
           ),
           eq(
             followUps.businessId,
-            business.businessId,
+            membership.businessId,
           ),
         ),
       );
