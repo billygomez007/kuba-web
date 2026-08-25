@@ -10,25 +10,49 @@ import {
   FaTelegram,
   FaEnvelope,
   FaGlobe,
+  FaCheckCircle,
+  FaTimesCircle,
 } from "react-icons/fa";
 
 type IntegrationRecord = {
+  id: string;
   provider: string;
   status?: string;
+  displayName?: string | null;
+  externalAccountId?: string | null;
+  createdAt?: number;
+};
+
+type IntegrationsOverview = {
+  integrations: IntegrationRecord[];
+  stats: {
+    connected: number;
+    total: number;
+    lastUpdated: string;
+  };
 };
 
 export default function IntegrationsPage() {
   const router = useRouter();
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([]);
+  const [stats, setStats] = useState({ connected: 0, total: 0, lastUpdated: new Date().toISOString() });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadIntegrations = async () => {
-      const res = await fetch("/api/integrations", {
-        cache: "no-store",
-      });
+      try {
+        const res = await fetch("/api/integrations", {
+          cache: "no-store",
+        });
 
-      const data = (await res.json()) as { integrations?: IntegrationRecord[] };
-      setIntegrations(data.integrations || []);
+        const data = (await res.json()) as IntegrationsOverview;
+        setIntegrations(data.integrations || []);
+        setStats(data.stats || { connected: 0, total: 0, lastUpdated: new Date().toISOString() });
+      } catch (err) {
+        console.error("Failed to load integrations:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     void loadIntegrations();
@@ -38,6 +62,7 @@ export default function IntegrationsPage() {
     {
       name: "WhatsApp",
       provider: "whatsapp",
+      category: "Communication Channels",
       description:
         "Connect WhatsApp so Kuba can communicate with customers.",
       icon: <FaWhatsapp size={40} />,
@@ -45,6 +70,7 @@ export default function IntegrationsPage() {
     {
       name: "Email",
       provider: "email",
+      category: "Communication Channels",
       description:
         "Connect business email communication.",
       icon: <FaEnvelope size={40} />,
@@ -52,13 +78,33 @@ export default function IntegrationsPage() {
     {
       name: "Website Chat",
       provider: "website",
+      category: "Communication Channels",
       description:
         "Add Kuba chat to your website.",
       icon: <FaGlobe size={40} />,
     },
     {
+      name: "SMS",
+      provider: "sms",
+      category: "Communication Channels",
+      description:
+        "Connect SMS for customer messaging.",
+      icon: <FaEnvelope size={40} />,
+      status: "coming-soon",
+    },
+    {
+      name: "Voice",
+      provider: "voice",
+      category: "Communication Channels",
+      description:
+        "Connect phone calls via Twilio.",
+      icon: <FaGlobe size={40} />,
+      status: "coming-soon",
+    },
+    {
       name: "Facebook & Instagram",
       provider: "meta",
+      category: "Social Channels",
       description:
         "Manage social conversations.",
       icon:
@@ -70,67 +116,193 @@ export default function IntegrationsPage() {
     {
       name: "Telegram",
       provider: "telegram",
+      category: "Social Channels",
       description:
         "Connect Telegram for customer conversations.",
       icon: <FaTelegram size={40} />,
     },
   ];
 
+  const commChannels = items.filter(i => i.category === "Communication Channels");
+  const socialChannels = items.filter(i => i.category === "Social Channels");
+
+  const getIntegrationStatus = (provider: string) => {
+    const integration = integrations.find((i) => i.provider === provider);
+    const isActive = integration?.status === "active";
+    const isTransactionalEmail = provider === "email" && isActive;
+    const isWebsiteConfigured = provider === "website" && isActive;
+    const isWhatsAppConfigured = provider === "whatsapp" && isActive;
+
+    return {
+      connected: isWhatsAppConfigured || isWebsiteConfigured,
+      isTransactionalEmail,
+      integration,
+    };
+  };
+
   return (
     <main className="min-h-screen bg-[#050507] px-6 py-10 text-white">
-      <h1 className="text-4xl font-black">Integrations</h1>
+      <div className="mb-10">
+        <h1 className="text-4xl font-black">Integrations</h1>
+        <p className="mt-3 text-white/50">
+          Connect Kuba with your business channels and external services.
+        </p>
+      </div>
 
-      <p className="mt-3 text-white/50">
-        Connect Kuba with your business channels.
-      </p>
+      {/* Stats Overview */}
+      <div className="mb-10 grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+          <div className="text-sm text-white/60">Connected</div>
+          <div className="mt-2 text-3xl font-bold">{stats.connected}</div>
+          <div className="mt-1 text-xs text-white/40">of {stats.total} integrations</div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+          <div className="text-sm text-white/60">Status</div>
+          <div className="mt-2 text-lg font-semibold text-green-400">Active</div>
+          <div className="mt-1 text-xs text-white/40">Last updated now</div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+          <div className="text-sm text-white/60">Setup Required</div>
+          <div className="mt-2 text-3xl font-bold">{stats.total - stats.connected}</div>
+          <div className="mt-1 text-xs text-white/40">Not yet configured</div>
+        </div>
+      </div>
 
-      <div className="mt-10 grid gap-5 md:grid-cols-2">
-        {items.map((item) => {
-          const connected = integrations.some(
-            (integration) =>
-              integration.provider === item.provider &&
-              integration.status === "active",
-          );
+      {/* Communication Channels */}
+      <div className="mb-12">
+        <h2 className="mb-6 text-2xl font-bold">Communication Channels</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          {commChannels.map((item) => {
+            const { connected, integration } = getIntegrationStatus(item.provider);
+            const isComingSoon = item.status === "coming-soon";
 
-          return (
-            <div
-              key={item.provider}
-              className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
-            >
-              <div className="text-white">{item.icon}</div>
+            return (
+              <div
+                key={item.provider}
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="text-white">{item.icon}</div>
+                  {connected && <FaCheckCircle className="text-green-400" size={24} />}
+                  {!connected && !isComingSoon && <FaTimesCircle className="text-white/40" size={24} />}
+                </div>
 
-              <h2 className="mt-4 text-xl font-bold">{item.name}</h2>
+                <h3 className="mt-4 text-xl font-bold">{item.name}</h3>
 
-              <p className="mt-2 text-sm text-white/50">{item.description}</p>
+                <p className="mt-2 text-sm text-white/50">{item.description}</p>
 
-              <div className="mt-5 flex items-center justify-between">
-                <span className="text-xs uppercase text-white/40">
-                  {connected ? "Connected" : "Not connected"}
-                </span>
+                {integration && (
+                  <div className="mt-3 text-xs text-white/40">
+                    <div>Account: {integration.displayName || integration.externalAccountId || "Configured"}</div>
+                  </div>
+                )}
 
-                <button
-                  onClick={() => {
-                    const routeMap: Record<string, string> = {
-                      whatsapp: "/dashboard/integrations/whatsapp",
-                      website: "/dashboard/integrations/website-chat",
-                      meta: "/dashboard/integrations/meta",
-                      telegram: "/dashboard/integrations/telegram",
-                      email: "/dashboard/integrations/email",
-                    };
+                <div className="mt-5 flex items-center justify-between">
+                  <span className="text-xs uppercase text-white/40">
+                    {item.provider === "email" && integration?.status === "active" ? "Transactional only" : item.provider === "email" ? "Not Configured" : connected ? "Connected" : isComingSoon ? "Coming Soon" : "Configuration Required"}
+                  </span>
 
-                    const nextRoute = routeMap[item.provider];
-                    if (nextRoute) {
-                      router.push(nextRoute);
-                    }
-                  }}
-                  className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black"
-                >
-                  {connected ? "Manage" : "Connect"}
-                </button>
+                  {!isComingSoon && (
+                    <button
+                      onClick={() => {
+                        const routeMap: Record<string, string> = {
+                          whatsapp: "/dashboard/integrations/whatsapp",
+                          website: "/dashboard/integrations/website-chat",
+                          meta: "/dashboard/integrations/meta",
+                          telegram: "/dashboard/integrations/telegram",
+                          email: "/dashboard/integrations/email",
+                          sms: "/dashboard/integrations/sms",
+                          voice: "/dashboard/integrations/voice",
+                        };
+
+                        const nextRoute = routeMap[item.provider];
+                        if (nextRoute) {
+                          router.push(nextRoute);
+                        }
+                      }}
+                      className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black transition-opacity hover:opacity-90"
+                    >
+                      {connected ? "Manage" : "Connect"}
+                    </button>
+                  )}
+                </div>
               </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Social Channels */}
+      <div className="mb-12">
+        <h2 className="mb-6 text-2xl font-bold">Social Channels</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          {socialChannels.map((item) => {
+            const { connected } = getIntegrationStatus(item.provider);
+
+            return (
+              <div
+                key={item.provider}
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="text-white">{item.icon}</div>
+                  {connected && <FaCheckCircle className="text-green-400" size={24} />}
+                  {!connected && <FaTimesCircle className="text-white/40" size={24} />}
+                </div>
+
+                <h3 className="mt-4 text-xl font-bold">{item.name}</h3>
+
+                <p className="mt-2 text-sm text-white/50">{item.description}</p>
+
+                <div className="mt-5 flex items-center justify-between">
+                  <span className="text-xs uppercase text-white/40">
+                    {connected ? "Connected" : "Not connected"}
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      const routeMap: Record<string, string> = {
+                        meta: "/dashboard/integrations/meta",
+                        telegram: "/dashboard/integrations/telegram",
+                      };
+
+                      const nextRoute = routeMap[item.provider];
+                      if (nextRoute) {
+                        router.push(nextRoute);
+                      }
+                    }}
+                    className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black transition-opacity hover:opacity-90"
+                  >
+                    {connected ? "Manage" : "Connect"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Coming Soon Section */}
+      <div className="mb-12">
+        <h2 className="mb-6 text-2xl font-bold">Coming Soon</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            { name: "Calendar", description: "Google Calendar & Outlook integration" },
+            { name: "Payments", description: "Accept payments with Stripe or Paystack" },
+            { name: "Accounting", description: "QuickBooks & Xero sync" },
+            { name: "CRM", description: "HubSpot, Salesforce, Pipedrive" },
+            { name: "External Apps", description: "Slack, Teams, Zapier & more" },
+            { name: "API & Webhooks", description: "Developer integrations & custom webhooks" },
+          ].map((item) => (
+            <div
+              key={item.name}
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+            >
+              <h3 className="font-semibold">{item.name}</h3>
+              <p className="mt-2 text-sm text-white/50">{item.description}</p>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </main>
   );

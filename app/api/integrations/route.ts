@@ -15,6 +15,26 @@ import {
   forbiddenResponse,
 } from "@/lib/auth/security";
 
+// List of all available integration providers
+const ALL_PROVIDERS = [
+  "whatsapp",
+  "email",
+  "website",
+  "sms",
+  "voice",
+  "meta",
+  "telegram",
+  "calendar",
+  "stripe",
+  "paystack",
+  "quickbooks",
+  "xero",
+  "hubspot",
+  "salesforce",
+  "slack",
+  "teams",
+];
+
 export async function GET() {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -54,7 +74,18 @@ export async function GET() {
       ),
     );
 
+  // Calculate stats
+  const connected = result.filter(
+    (i) => i.status === "active",
+  ).length;
+  const total = ALL_PROVIDERS.length;
+
   return NextResponse.json({
     integrations: result,
+    stats: {
+      connected,
+      total,
+      lastUpdated: new Date().toISOString(),
+    },
   });
 }
