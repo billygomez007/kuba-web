@@ -6,6 +6,7 @@ import { aiEmployees, automations, integrations } from "@/db/schema";
 import { getAutomationTemplate, automationTemplates } from "@/lib/automations/templates";
 import { hasPermission, PERMISSIONS, type Permission } from "@/lib/auth/permissions";
 import { getBusinessPlan } from "@/lib/billing/entitlements";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 
 async function getBusinessContext() {
@@ -18,6 +19,7 @@ export async function GET() {
     const { session, membership } = await getBusinessContext();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!membership) return NextResponse.json({ error: "Business not found." }, { status: 404 });
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "business_ops.workflows")) return NextResponse.json({ error: "Workflow templates require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
 
     const [employees, connections, installed] = await Promise.all([
       db.select({ type: aiEmployees.type, status: aiEmployees.status }).from(aiEmployees).where(eq(aiEmployees.businessId, membership.businessId)),
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     const { session, membership } = await getBusinessContext();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!membership) return NextResponse.json({ error: "Business not found." }, { status: 404 });
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "business_ops.workflows")) return NextResponse.json({ error: "Workflow templates require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
     if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) {
       return NextResponse.json({ error: "You do not have permission to install automations." }, { status: 403 });
     }

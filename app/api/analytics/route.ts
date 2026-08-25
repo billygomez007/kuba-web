@@ -12,6 +12,7 @@ import {
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 import {
   customers,
@@ -50,6 +51,10 @@ export async function GET() {
 
     const businessId =
       business.businessId;
+    const entitlements = await getBusinessEntitlements(businessId);
+    if (!hasCapability(entitlements, "intelligence.basic")) {
+      return NextResponse.json({ error: "Analytics requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
+    }
 
     const now = new Date();
 

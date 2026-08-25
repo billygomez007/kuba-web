@@ -14,6 +14,7 @@ import {
   unauthorizedResponse,
   forbiddenResponse,
 } from "@/lib/auth/security";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 // List of all available integration providers
 const ALL_PROVIDERS = [
@@ -62,6 +63,11 @@ export async function GET() {
 
   if (!allowed) {
     return forbiddenResponse();
+  }
+
+  const entitlements = await getBusinessEntitlements(membership.businessId);
+  if (!hasCapability(entitlements, "integrations.core")) {
+    return NextResponse.json({ error: "Integrations require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
   }
 
   const result = await db

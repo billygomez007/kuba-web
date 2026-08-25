@@ -32,6 +32,7 @@ import {
 import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { getEffectivePermissions, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { canViewPayroll } from "@/lib/human-workforce/policy";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,10 @@ export async function GET() {
     }
 
     const businessId = membership.businessId;
+    const entitlements = await getBusinessEntitlements(businessId);
+    if (!hasCapability(entitlements, "human_workforce.core")) {
+      return NextResponse.json({ error: "Human Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);

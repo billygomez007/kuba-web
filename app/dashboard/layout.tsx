@@ -28,6 +28,13 @@ type AccessibleBusiness = {
   branchId: string | null;
 };
 
+type BusinessEntitlements = {
+  plan: string;
+  planName: string;
+  capabilities: string[];
+  limits: Record<string, number | null>;
+};
+
 const navigationGroups: NavigationGroup[] = [
   {
     title: "Command Center",
@@ -183,6 +190,85 @@ const navigationPermissions: Record<string, string> = {
   "/dashboard/integrations": "integrations.view",
 };
 
+const navigationCapabilities: Record<string, string> = {
+  "/dashboard/ai-employees": "ai_workforce.core",
+  "/dashboard/ai-employees/create": "ai_workforce.builder",
+  "/dashboard/workforce/team": "ai_workforce.teams",
+  "/dashboard/workforce/deployment": "ai_workforce.deployment",
+  "/dashboard/workforce/orchestration": "ai_workforce.orchestration",
+  "/dashboard/workforce/monitoring": "ai_workforce.monitoring",
+  "/dashboard/ai-performance": "ai_workforce.performance",
+  "/dashboard/settings/voice-providers": "ai_workforce.voice",
+  "/dashboard/workforce/simulator": "ai_workforce.simulator",
+  "/dashboard/workforce-marketplace": "ai_workforce.marketplace",
+  "/dashboard/human-workforce": "human_workforce.core",
+  "/dashboard/human-workforce/employees": "human_workforce.core",
+  "/dashboard/human-workforce/hr": "human_workforce.hr",
+  "/dashboard/human-workforce/payroll": "human_workforce.payroll",
+  "/dashboard/human-workforce/teams": "human_workforce.teams",
+  "/dashboard/inbox": "customer_ops.inbox",
+  "/dashboard/customers": "customer_ops.customers",
+  "/dashboard/sales": "customer_ops.leads",
+  "/dashboard/conversations": "customer_ops.conversations",
+  "/dashboard/follow-ups": "customer_ops.followups",
+  "/dashboard/handoffs": "customer_ops.handoffs",
+  "/dashboard/business-operations": "business_ops.core",
+  "/dashboard/tasks": "business_ops.tasks",
+  "/dashboard/approvals": "business_ops.approvals",
+  "/dashboard/automations": "business_ops.automations",
+  "/dashboard/automations/templates": "business_ops.workflows",
+  "/dashboard/business-operations/inventory": "business_ops.inventory",
+  "/dashboard/business-operations/documents": "business_ops.documents",
+  "/dashboard/business-operations/alerts": "business_ops.alerts",
+  "/dashboard/analytics": "intelligence.basic",
+  "/dashboard/integrations": "integrations.core",
+  "/dashboard/integrations/meta": "integrations.social",
+  "/dashboard/integrations/calendar": "integrations.calendar",
+  "/dashboard/integrations/payments": "integrations.payments",
+  "/dashboard/integrations/accounting": "integrations.accounting",
+  "/dashboard/integrations/crm": "integrations.crm",
+  "/dashboard/integrations/external-apps": "integrations.external_apps",
+  "/dashboard/integrations/developer": "integrations.developer_api",
+  "/dashboard/business-brain": "business_brain.core",
+  "/dashboard/knowledge": "business_brain.sources",
+  "/dashboard/business-brain/documents": "business_brain.documents",
+  "/dashboard/business-brain/memory": "business_brain.memory",
+  "/dashboard/settings/ai": "business_brain.instructions",
+  "/dashboard/business-brain/management": "business_brain.management",
+  "/dashboard/settings/profile": "admin.team_staff",
+  "/dashboard/settings/team": "admin.team_staff",
+  "/dashboard/billing": "admin.billing",
+  "/dashboard/settings": "admin.team_staff",
+};
+
+const navigationItemCapabilities: Record<string, string> = {
+  "Organization Overview": "command_center.advanced",
+  "Branch Overview": "enterprise.organization",
+  "Collections Agent": "ai_workforce.collections",
+  "Skills": "ai_workforce.builder",
+  "Appointments": "customer_ops.appointments",
+  "Support / Tickets": "customer_ops.tickets",
+  "Executive Intelligence": "intelligence.advanced",
+  "Business Performance": "intelligence.advanced",
+  "Sales Intelligence": "intelligence.sales",
+  "Customer Intelligence": "intelligence.customer",
+  "AI Workforce Analytics": "intelligence.ai_workforce",
+  "Human Workforce Analytics": "intelligence.human_workforce",
+  "Operations Analytics": "intelligence.operations",
+  "Inventory Analytics": "intelligence.inventory",
+  "Reports": "intelligence.reports",
+  "Insights & Alerts": "intelligence.advanced",
+  "Calendar": "integrations.calendar",
+  "Payments": "integrations.payments",
+  "Accounting": "integrations.accounting",
+  "CRM": "integrations.crm",
+  "External Apps": "integrations.external_apps",
+  "API / Developer Integrations": "integrations.developer_api",
+  "Organization / Business Group": "enterprise.organization",
+  "Branches & Locations": "admin.branches",
+  "Roles & Permissions": "admin.roles_permissions",
+};
+
 function isRouteActive(pathname: string, href?: string) {
   if (!href) return false;
   return href === "/dashboard"
@@ -196,6 +282,13 @@ function activeGroupForPath(pathname: string) {
   )?.title;
 }
 
+function capabilityForPath(pathname: string) {
+  const route = Object.keys(navigationCapabilities)
+    .sort((a, b) => b.length - a.length)
+    .find((candidate) => pathname === candidate || pathname.startsWith(`${candidate}/`));
+  return route ? navigationCapabilities[route] : undefined;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -206,6 +299,12 @@ export default function DashboardLayout({
 
   const [permissions, setPermissions] =
     useState<string[] | null>(null);
+
+  const [entitlements, setEntitlements] =
+    useState<BusinessEntitlements | null>(null);
+
+  const [blockedCapability, setBlockedCapability] =
+    useState<string | null>(null);
 
   const [role, setRole] =
     useState<string | null>(null);
@@ -255,6 +354,7 @@ export default function DashboardLayout({
             : [];
 
           setPermissions(userPermissions);
+          setEntitlements(data.membership?.entitlements || null);
 
           setRole(
             data.membership?.role || null,
@@ -277,14 +377,14 @@ export default function DashboardLayout({
                 pathname === route ||
                 pathname.startsWith(`${route}/`),
             );
+          const matchedCapability = capabilityForPath(pathname);
 
-          if (
-            matchedRoute &&
-            !userPermissions.includes(
-              navigationPermissions[matchedRoute],
-            )
-          ) {
+          if (matchedRoute && !userPermissions.includes(navigationPermissions[matchedRoute])) {
             router.replace("/dashboard");
+          } else if (matchedCapability && !data.membership?.entitlements?.capabilities?.includes(matchedCapability)) {
+            setBlockedCapability(matchedCapability);
+          } else {
+            setBlockedCapability(null);
           }
         }
       } catch {
@@ -341,11 +441,12 @@ export default function DashboardLayout({
   }
 
   function canShowItem(item: NavigationItem) {
-    if (!item.href) return true;
     if (item.ownerOnly && role !== "owner") return false;
 
-    const required = item.permission || navigationPermissions[item.href];
-    return !required || permissions === null || permissions.includes(required);
+    const required = item.permission || (item.href ? navigationPermissions[item.href] : undefined);
+    if (required && permissions !== null && !permissions.includes(required)) return false;
+    const capability = item.href ? navigationCapabilities[item.href] : navigationItemCapabilities[item.label];
+    return !capability || entitlements === null || entitlements.capabilities.includes(capability);
   }
 
   function toggleGroup(title: string) {
@@ -356,6 +457,7 @@ export default function DashboardLayout({
 
   function renderNavigationGroup(group: NavigationGroup, mobile = false) {
     const items = group.items.filter(canShowItem);
+    if (items.length === 0) return null;
     const groupActive = group.title === activeGroup;
     const expanded = Boolean(expandedGroups[group.title]);
 
@@ -609,7 +711,16 @@ export default function DashboardLayout({
 
       {/* Main Content Area */}
       <div className="lg:pl-[260px]">
-        {children}
+        {blockedCapability ? (
+          <main className="flex min-h-screen items-center justify-center px-6 py-12 text-white">
+            <section className="w-full max-w-xl rounded-3xl border border-amber-300/20 bg-amber-300/[0.05] p-8">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/70">Upgrade required</p>
+              <h1 className="mt-3 text-3xl font-black">{blockedCapability.replace(/[._]/g, " ")}</h1>
+              <p className="mt-3 text-sm leading-6 text-white/60">This capability is not included in your current {entitlements?.planName || "plan"} plan. Upgrade to unlock it for this business.</p>
+              <Link href="/dashboard/billing/plans" className="mt-6 inline-flex rounded-xl bg-cyan-400 px-4 py-3 text-sm font-bold text-black">View plans</Link>
+            </section>
+          </main>
+        ) : children}
       </div>
     </div>
   );

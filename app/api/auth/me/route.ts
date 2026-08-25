@@ -9,6 +9,7 @@ import {
   getRolePermissions,
 } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 
 export async function GET() {
   try {
@@ -87,6 +88,7 @@ export async function GET() {
         role: membership?.role || null,
         branchId: membership?.branchId || null,
         permissions,
+        entitlements: membership ? await getBusinessEntitlements(membership.businessId) : null,
       },
       businesses: businessesForUser,
     });

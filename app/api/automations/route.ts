@@ -8,6 +8,7 @@ import { getCurrentMembership } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { createAuditLog } from "@/lib/auth/audit";
 import { rejectBusinessOverride } from "@/lib/operations/policy";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 import {
   automations,
@@ -99,6 +100,13 @@ function validateAutomation(body: Record<string, unknown>) {
   };
 }
 
+async function automationFeatureGuard(businessId: string) {
+  const entitlements = await getBusinessEntitlements(businessId);
+  return hasCapability(entitlements, "business_ops.automations")
+    ? null
+    : NextResponse.json({ error: "Automations require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
+}
+
 
 export async function GET() {
   try {
@@ -122,6 +130,8 @@ export async function GET() {
       );
     }
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    const featureError = await automationFeatureGuard(businessId);
+    if (featureError) return featureError;
 
     const results =
       await db
@@ -183,6 +193,8 @@ export async function POST(
       );
     }
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    const featureError = await automationFeatureGuard(businessId);
+    if (featureError) return featureError;
 
     const body =
       await request.json();
@@ -283,6 +295,8 @@ export async function PATCH(
         { status: 404 },
       );
     }
+    const featureError = await automationFeatureGuard(businessId);
+    if (featureError) return featureError;
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body =
@@ -406,6 +420,8 @@ export async function DELETE(
         { status: 404 },
       );
     }
+    const featureError = await automationFeatureGuard(businessId);
+    if (featureError) return featureError;
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body =
