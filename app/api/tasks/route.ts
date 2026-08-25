@@ -6,10 +6,35 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { runAutomationTrigger } from "@/lib/automations/engine";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { createAuditLog } from "@/lib/auth/audit";
+import { rejectBusinessOverride } from "@/lib/operations/policy";
 
 import {
+  aiEmployees,
+  automations,
+  businessUsers,
+  customers,
+  leads,
   tasks,
 } from "@/db/schema";
+
+async function invalidTaskRelation(body: Record<string, unknown>, businessId: string) {
+  const checks = [
+    ["assignedUserId", businessUsers, businessUsers.userId, businessUsers.businessId],
+    ["assignedEmployeeId", aiEmployees, aiEmployees.id, aiEmployees.businessId],
+    ["leadId", leads, leads.id, leads.businessId],
+    ["customerId", customers, customers.id, customers.businessId],
+    ["automationId", automations, automations.id, automations.businessId],
+  ] as const;
+  for (const [key, table, idColumn, businessColumn] of checks) {
+    const value = body[key];
+    if (value === undefined || value === null || value === "") continue;
+    const found = await db.select({ id: idColumn }).from(table).where(and(eq(idColumn, String(value)), eq(businessColumn, businessId))).limit(1);
+    if (!found[0]) return key;
+  }
+  return null;
+}
 
 async function getBusinessId() {
   const session = await auth.api.getSession({
@@ -19,6 +44,7 @@ async function getBusinessId() {
   if (!session?.user) {
     return {
       session: null,
+      membership: null,
       businessId: null,
     };
   }
@@ -27,6 +53,7 @@ async function getBusinessId() {
 
   return {
     session,
+    membership,
     businessId: membership?.businessId || null,
   };
 }
@@ -35,6 +62,7 @@ export async function GET() {
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -51,6 +79,7 @@ export async function GET() {
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const result = await db
       .select()
@@ -84,6 +113,7 @@ export async function POST(
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -100,8 +130,12 @@ export async function POST(
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body = await request.json();
+    if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
+    const invalidRelation = await invalidTaskRelation(body, businessId);
+    if (invalidRelation) return NextResponse.json({ error: `${invalidRelation} does not belong to the selected business.` }, { status: 400 });
 
     const title = String(
       body.title || "",
@@ -207,6 +241,7 @@ export async function POST(
       createdAt: now,
       updatedAt: now,
     });
+    await createAuditLog({ businessId, userId: session.user.id, action: "task.created", resource: "task", resourceId: taskId, description: title, metadata: { status, priority } });
 
     try {
       await runAutomationTrigger({
@@ -262,6 +297,7 @@ export async function PATCH(
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -278,8 +314,12 @@ export async function PATCH(
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body = await request.json();
+    if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
+    const invalidRelation = await invalidTaskRelation(body, businessId);
+    if (invalidRelation) return NextResponse.json({ error: `${invalidRelation} does not belong to the selected business.` }, { status: 400 });
 
     const taskId = String(
       body.id || "",
@@ -442,6 +482,8 @@ export async function PATCH(
           ),
         ),
       );
+    const auditAction = body.status === "completed" ? "task.completed" : body.assignedUserId !== undefined || body.assignedEmployeeId !== undefined ? "task.reassigned" : "task.updated";
+    await createAuditLog({ businessId, userId: session.user.id, action: auditAction, resource: "task", resourceId: taskId, description: existing[0].title, metadata: { changedFields: Object.keys(body).filter((key) => key !== "id" && key !== "businessId") } });
 
     const updated = await db
       .select()
@@ -480,6 +522,7 @@ export async function DELETE(
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -496,8 +539,10 @@ export async function DELETE(
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body = await request.json();
+    if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
 
     const taskId = String(
       body.id || "",
@@ -510,7 +555,7 @@ export async function DELETE(
       );
     }
 
-    await db
+    const deleted = await db
       .delete(tasks)
       .where(
         and(
@@ -520,7 +565,10 @@ export async function DELETE(
             businessId,
           ),
         ),
-      );
+      ).returning({ id: tasks.id, title: tasks.title });
+
+    if (!deleted[0]) return NextResponse.json({ error: "Task not found." }, { status: 404 });
+    await createAuditLog({ businessId, userId: session.user.id, action: "task.deleted", resource: "task", resourceId: taskId, description: deleted[0].title });
 
     return NextResponse.json({
       success: true,

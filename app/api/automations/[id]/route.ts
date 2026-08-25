@@ -1,32 +1,26 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { automationRuns, automations, businessUsers } from "@/db/schema";
+import { automationRuns, automations } from "@/db/schema";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const membership = await db
-      .select({ businessId: businessUsers.businessId })
-      .from(businessUsers)
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-    const business = membership[0];
-    if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
+    const [user, membership] = await Promise.all([getCurrentUser(), getCurrentMembership()]);
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!membership) return NextResponse.json({ error: "Business access denied." }, { status: 403 });
+    if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const { id } = await context.params;
     const automationResult = await db
       .select()
       .from(automations)
-      .where(and(eq(automations.id, id), eq(automations.businessId, business.businessId)))
+      .where(and(eq(automations.id, id), eq(automations.businessId, membership.businessId)))
       .limit(1);
     const automation = automationResult[0];
     if (!automation) return NextResponse.json({ error: "Automation not found." }, { status: 404 });
@@ -34,7 +28,7 @@ export async function GET(
     const runs = await db
       .select()
       .from(automationRuns)
-      .where(and(eq(automationRuns.automationId, id), eq(automationRuns.businessId, business.businessId)))
+      .where(and(eq(automationRuns.automationId, id), eq(automationRuns.businessId, membership.businessId)))
       .orderBy(desc(automationRuns.startedAt))
       .limit(100);
     const completedRuns = runs.filter((run) => run.status === "completed").length;

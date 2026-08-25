@@ -1,25 +1,20 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { and, desc, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 
 import {
   automationRuns,
   automations,
-  businessUsers,
 } from "@/db/schema";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
 
 export async function GET() {
   try {
-    const session =
-      await auth.api.getSession({
-        headers: await headers(),
-      });
-
-    if (!session?.user) {
+    const [user, membership] = await Promise.all([getCurrentUser(), getCurrentMembership()]);
+    if (!user) {
       return NextResponse.json(
         {
           error: "Unauthorized",
@@ -30,25 +25,7 @@ export async function GET() {
       );
     }
 
-    const membership =
-      await db
-        .select({
-          businessId:
-            businessUsers.businessId,
-        })
-        .from(businessUsers)
-        .where(
-          eq(
-            businessUsers.userId,
-            session.user.id,
-          ),
-        )
-        .limit(1);
-
-    const business =
-      membership[0];
-
-    if (!business) {
+    if (!membership) {
       return NextResponse.json(
         {
           error:
@@ -59,6 +36,7 @@ export async function GET() {
         },
       );
     }
+    if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const runs =
       await db
@@ -102,11 +80,11 @@ export async function GET() {
           and(
             eq(
               automationRuns.businessId,
-              business.businessId,
+              membership.businessId,
             ),
             eq(
               automations.businessId,
-              business.businessId,
+              membership.businessId,
             ),
           ),
         )

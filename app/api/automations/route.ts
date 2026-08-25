@@ -5,6 +5,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { createAuditLog } from "@/lib/auth/audit";
+import { rejectBusinessOverride } from "@/lib/operations/policy";
 
 import {
   automations,
@@ -20,6 +23,7 @@ async function getBusinessId() {
   if (!session?.user) {
     return {
       session: null,
+      membership: null,
       businessId: null,
     };
   }
@@ -28,6 +32,7 @@ async function getBusinessId() {
 
   return {
     session,
+    membership,
     businessId:
       membership?.businessId || null,
   };
@@ -99,6 +104,7 @@ export async function GET() {
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -115,6 +121,7 @@ export async function GET() {
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const results =
       await db
@@ -158,6 +165,7 @@ export async function POST(
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -174,9 +182,11 @@ export async function POST(
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body =
       await request.json();
+    if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
 
     const validated =
       validateAutomation(body);
@@ -222,6 +232,7 @@ export async function POST(
     await db
       .insert(automations)
       .values(automation);
+    await createAuditLog({ businessId, userId: session.user.id, action: "automation.created", resource: "automation", resourceId: automation.id, description: automation.name });
 
     return NextResponse.json(
       {
@@ -255,6 +266,7 @@ export async function PATCH(
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -271,9 +283,11 @@ export async function PATCH(
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body =
       await request.json();
+    if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
 
     const id =
       String(body.id || "").trim();
@@ -343,6 +357,7 @@ export async function PATCH(
         { status: 404 },
       );
     }
+    await createAuditLog({ businessId, userId: session.user.id, action: validated.status === "active" ? "automation.enabled" : "automation.disabled", resource: "automation", resourceId: id, description: validated.name });
 
     return NextResponse.json({
       success: true,
@@ -374,6 +389,7 @@ export async function DELETE(
   try {
     const {
       session,
+      membership,
       businessId,
     } = await getBusinessId();
 
@@ -390,9 +406,11 @@ export async function DELETE(
         { status: 404 },
       );
     }
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
     const body =
       await request.json();
+    if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
 
     const id =
       String(body.id || "").trim();
@@ -435,6 +453,7 @@ export async function DELETE(
         { status: 404 },
       );
     }
+    await createAuditLog({ businessId, userId: session.user.id, action: "automation.deleted", resource: "automation", resourceId: id });
 
     return NextResponse.json({
       success: true,

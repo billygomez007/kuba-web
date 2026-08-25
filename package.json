@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
-    "test": "node --experimental-strip-types --test tests/business-context-policy.test.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "start": "next start",
     "bootstrap:super-admin": "node scripts/bootstrap-super-admin.mjs",
     "lint": "eslint"

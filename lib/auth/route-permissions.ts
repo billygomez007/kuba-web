@@ -12,6 +12,9 @@ export const DASHBOARD_ROUTE_PERMISSIONS: Record<
   "/dashboard/workforce":
     PERMISSIONS.WORKFORCE_VIEW,
 
+  "/dashboard/business-operations":
+    PERMISSIONS.DASHBOARD_VIEW,
+
   "/dashboard/customers":
     PERMISSIONS.CUSTOMERS_VIEW,
 

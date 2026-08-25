@@ -1,23 +1,16 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { and, count, eq } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiEmployees, automations, businessUsers, integrations } from "@/db/schema";
+import { aiEmployees, automations, integrations } from "@/db/schema";
 import { getAutomationTemplate, automationTemplates } from "@/lib/automations/templates";
 import { hasPermission, PERMISSIONS, type Permission } from "@/lib/auth/permissions";
 import { getBusinessPlan } from "@/lib/billing/entitlements";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 
 async function getBusinessContext() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) return { session: null, membership: null };
-  const membership = await db
-    .select({ businessId: businessUsers.businessId, role: businessUsers.role, permissions: businessUsers.permissions })
-    .from(businessUsers)
-    .where(eq(businessUsers.userId, session.user.id))
-    .limit(1);
-  return { session, membership: membership[0] || null };
+  const [user, membership] = await Promise.all([getCurrentUser(), getCurrentMembership()]);
+  return { session: user ? { user } : null, membership };
 }
 
 export async function GET() {

@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   actionApprovals,
   communicationLogs,
 } from "@/db/schema";
-import {
-  getBusinessMembership,
-  hasPermission,
-  PERMISSIONS,
-} from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
+import { createAuditLog } from "@/lib/auth/audit";
 import { getChannelAdapter } from "@/lib/channels/router";
 import { type ChannelType } from "@/lib/channels/types";
 
@@ -22,11 +18,8 @@ export async function POST(
     params: Promise<{ id: string }>;
   },
 ) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user) {
+  const [user, membership] = await Promise.all([getCurrentUser(), getCurrentMembership()]);
+  if (!user) {
     return NextResponse.json(
       { error: "You must be signed in." },
       { status: 401 },
@@ -35,35 +28,17 @@ export async function POST(
 
   const { id } = await context.params;
 
+  if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   const approval = await db
     .select()
     .from(actionApprovals)
-    .where(eq(actionApprovals.id, id))
+    .where(and(eq(actionApprovals.id, id), eq(actionApprovals.businessId, membership.businessId)))
     .limit(1);
 
   if (!approval[0]) {
     return NextResponse.json(
       { error: "Approval request not found." },
       { status: 404 },
-    );
-  }
-
-  const membership = await getBusinessMembership(
-    session.user.id,
-    approval[0].businessId,
-  );
-
-  if (
-    !membership ||
-    !hasPermission(
-      membership.role,
-      membership.permissions,
-      PERMISSIONS.MESSAGING_MANAGE,
-    )
-  ) {
-    return NextResponse.json(
-      { error: "Forbidden." },
-      { status: 403 },
     );
   }
 
@@ -116,6 +91,8 @@ export async function POST(
         eq(actionApprovals.businessId, approval[0].businessId),
       ),
     );
+
+  await createAuditLog({ businessId: membership.businessId, userId: user.id, action: "approval.execute", resource: "action_approval", resourceId: id, description: result.success ? "Approved action executed." : "Approved action execution failed.", metadata: { channel: approval[0].channel, success: result.success } });
 
   if (!result.success) {
     return NextResponse.json(

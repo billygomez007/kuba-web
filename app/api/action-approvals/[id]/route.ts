@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   actionApprovals,
 } from "@/db/schema";
-import {
-  getBusinessMembership,
-  hasPermission,
-  PERMISSIONS,
-} from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
+import { createAuditLog } from "@/lib/auth/audit";
 
 export async function POST(
   request: Request,
@@ -19,11 +15,8 @@ export async function POST(
     params: Promise<{ id: string }>;
   },
 ) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user) {
+  const [user, membership] = await Promise.all([getCurrentUser(), getCurrentMembership()]);
+  if (!user) {
     return NextResponse.json(
       { error: "You must be signed in." },
       { status: 401 },
@@ -42,35 +35,17 @@ export async function POST(
     );
   }
 
+  if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   const approval = await db
     .select()
     .from(actionApprovals)
-    .where(eq(actionApprovals.id, id))
+    .where(and(eq(actionApprovals.id, id), eq(actionApprovals.businessId, membership.businessId)))
     .limit(1);
 
   if (!approval[0]) {
     return NextResponse.json(
       { error: "Approval request not found." },
       { status: 404 },
-    );
-  }
-
-  const membership = await getBusinessMembership(
-    session.user.id,
-    approval[0].businessId,
-  );
-
-  if (
-    !membership ||
-    !hasPermission(
-      membership.role,
-      membership.permissions,
-      PERMISSIONS.MESSAGING_MANAGE,
-    )
-  ) {
-    return NextResponse.json(
-      { error: "Forbidden." },
-      { status: 403 },
     );
   }
 
@@ -97,6 +72,8 @@ export async function POST(
       ),
     )
     .returning();
+
+  await createAuditLog({ businessId: membership.businessId, userId: user.id, action: `approval.${decision}`, resource: "action_approval", resourceId: id, description: `${decision} ${approval[0].channel} action for ${approval[0].recipient}` });
 
   return NextResponse.json({
     success: true,

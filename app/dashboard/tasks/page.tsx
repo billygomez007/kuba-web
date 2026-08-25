@@ -59,6 +59,13 @@ export default function TasksPage() {
   const [dueAt, setDueAt] =
     useState("");
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [dueFilter, setDueFilter] = useState("all");
+  const [currentTime] = useState(() => Date.now());
+
   async function loadTasks() {
     try {
       setLoading(true);
@@ -286,6 +293,21 @@ export default function TasksPage() {
     };
   }, [tasks]);
 
+  const filteredTasks = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const now = currentTime;
+    const soon = now + 3 * 24 * 60 * 60 * 1000;
+    return tasks.filter((task) => {
+      const due = task.dueAt ? new Date(task.dueAt).getTime() : null;
+      const open = !["completed", "cancelled"].includes(task.status);
+      return (!query || `${task.title} ${task.description || ""}`.toLowerCase().includes(query))
+        && (statusFilter === "all" || task.status === statusFilter)
+        && (priorityFilter === "all" || task.priority === priorityFilter)
+        && (assigneeFilter === "all" || (assigneeFilter === "ai" ? Boolean(task.assignedEmployeeId) : assigneeFilter === "human" ? Boolean(task.assignedUserId) : !task.assignedEmployeeId && !task.assignedUserId))
+        && (dueFilter === "all" || (dueFilter === "overdue" ? Boolean(due && due < now && open) : Boolean(due && due >= now && due <= soon && open)));
+    });
+  }, [tasks, search, statusFilter, priorityFilter, assigneeFilter, dueFilter, currentTime]);
+
   return (
     <main className="min-h-screen bg-[#050507] px-6 py-10 text-white lg:ml-[250px]">
       <div className="mx-auto max-w-7xl">
@@ -502,11 +524,19 @@ export default function TasksPage() {
             </p>
           </div>
 
+          <div className="grid gap-3 border-b border-white/10 p-4 sm:grid-cols-2 xl:grid-cols-5">
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks..." className="rounded-xl border border-white/10 bg-[#0b0b0f] px-3 py-2.5 text-xs outline-none placeholder:text-white/25" />
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-xl border border-white/10 bg-[#0b0b0f] px-3 py-2.5 text-xs"><option value="all">All statuses</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="rounded-xl border border-white/10 bg-[#0b0b0f] px-3 py-2.5 text-xs"><option value="all">All priorities</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className="rounded-xl border border-white/10 bg-[#0b0b0f] px-3 py-2.5 text-xs"><option value="all">All assignees</option><option value="ai">AI assigned</option><option value="human">Human assigned</option><option value="unassigned">Unassigned</option></select>
+            <select value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} className="rounded-xl border border-white/10 bg-[#0b0b0f] px-3 py-2.5 text-xs"><option value="all">Any due date</option><option value="overdue">Overdue</option><option value="soon">Due in 3 days</option></select>
+          </div>
+
           {loading ? (
             <div className="p-12 text-center text-sm text-white/30">
               Loading tasks...
             </div>
-          ) : tasks.length === 0 ? (
+          ) : filteredTasks.length === 0 ? (
             <div className="p-12 text-center">
 
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-xl">
@@ -514,7 +544,7 @@ export default function TasksPage() {
               </div>
 
               <p className="mt-4 text-sm font-bold">
-                No tasks yet
+                {tasks.length ? "No tasks match these filters" : "No tasks yet"}
               </p>
 
               <p className="mt-2 text-xs text-white/25">
@@ -527,7 +557,7 @@ export default function TasksPage() {
           ) : (
             <div className="divide-y divide-white/10">
 
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
                 <div
                   key={task.id}
                   className="flex flex-col gap-5 px-6 py-5 lg:flex-row lg:items-center lg:justify-between"
@@ -602,6 +632,14 @@ export default function TasksPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
+
+                    <select
+                      value={task.priority}
+                      onChange={(event) => updateTask(task.id, { priority: event.target.value })}
+                      className="rounded-xl border border-white/10 bg-[#0b0b0f] px-3 py-2 text-xs outline-none"
+                    >
+                      {Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
 
                     <select
                       value={task.status}

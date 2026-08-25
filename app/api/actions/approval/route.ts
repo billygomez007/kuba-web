@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
   actionApprovals,
-  businessUsers,
 } from "@/db/schema";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
 
-async function requireBusinessId(request: Request) {
-  const session =
-    await auth.api.getSession({
-      headers: await headers(),
-    });
-
-  if (!session?.user) {
+async function requireBusinessId() {
+  const [user, membership] = await Promise.all([getCurrentUser(), getCurrentMembership()]);
+  if (!user) {
     return {
       error: NextResponse.json(
         { error: "Unauthorized" },
@@ -25,17 +20,7 @@ async function requireBusinessId(request: Request) {
     } as const;
   }
 
-  const membership = await db
-    .select({
-      businessId: businessUsers.businessId,
-    })
-    .from(businessUsers)
-    .where(eq(businessUsers.userId, session.user.id))
-    .limit(1);
-
-  const business = membership[0];
-
-  if (!business) {
+  if (!membership) {
     return {
       error: NextResponse.json(
         { error: "No business is associated with this account." },
@@ -43,8 +28,8 @@ async function requireBusinessId(request: Request) {
       ),
     } as const;
   }
-
-  return { businessId: business.businessId } as const;
+  if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return { error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) } as const;
+  return { businessId: membership.businessId } as const;
 }
 
 
@@ -52,7 +37,7 @@ export async function POST(
   request: Request,
 ) {
 
-  const auth_ = await requireBusinessId(request);
+  const auth_ = await requireBusinessId();
   if ("error" in auth_) return auth_.error;
 
 
@@ -118,9 +103,9 @@ export async function POST(
 }
 
 
-export async function GET(request: Request) {
+export async function GET() {
 
-  const auth_ = await requireBusinessId(request);
+  const auth_ = await requireBusinessId();
   if ("error" in auth_) return auth_.error;
 
   const actions =
@@ -143,7 +128,7 @@ export async function PATCH(
   request: Request,
 ) {
 
-  const auth_ = await requireBusinessId(request);
+  const auth_ = await requireBusinessId();
   if ("error" in auth_) return auth_.error;
 
   const {
