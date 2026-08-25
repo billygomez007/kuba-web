@@ -269,6 +269,23 @@ const navigationItemCapabilities: Record<string, string> = {
   "Roles & Permissions": "admin.roles_permissions",
 };
 
+const capabilityRequiredPlans: Record<string, string> = {
+  "human_workforce.core": "Pro",
+  "human_workforce.hr": "Pro",
+  "human_workforce.payroll": "Pro",
+  "integrations.calendar": "Pro",
+  "integrations.payments": "Pro",
+  "integrations.accounting": "Pro",
+  "integrations.crm": "Pro",
+  "integrations.external_apps": "Pro",
+  "integrations.developer_api": "Pro",
+  "enterprise.organization": "Enterprise",
+  "enterprise.multi_business": "Enterprise",
+  "enterprise.group_command_center": "Enterprise",
+  "enterprise.cross_business_analytics": "Enterprise",
+  "enterprise.advanced_governance": "Enterprise",
+};
+
 function isRouteActive(pathname: string, href?: string) {
   if (!href) return false;
   return href === "/dashboard"
@@ -306,6 +323,9 @@ export default function DashboardLayout({
   const [blockedCapability, setBlockedCapability] =
     useState<string | null>(null);
 
+  const [authorizationReady, setAuthorizationReady] =
+    useState(false);
+
   const [role, setRole] =
     useState<string | null>(null);
 
@@ -340,7 +360,10 @@ export default function DashboardLayout({
         });
 
         if (!response.ok) {
-          if (!cancelled) setPermissions([]);
+          if (!cancelled) {
+            setPermissions([]);
+            setAuthorizationReady(true);
+          }
           return;
         }
 
@@ -386,9 +409,13 @@ export default function DashboardLayout({
           } else {
             setBlockedCapability(null);
           }
+          setAuthorizationReady(true);
         }
       } catch {
-        if (!cancelled) setPermissions([]);
+        if (!cancelled) {
+          setPermissions([]);
+          setAuthorizationReady(true);
+        }
       }
     }
 
@@ -404,13 +431,18 @@ export default function DashboardLayout({
     [pathname],
   );
 
-  useEffect(() => {
-    if (!activeGroup) return;
-    setExpandedGroups((current) => ({
-      ...current,
-      [activeGroup]: true,
-    }));
-  }, [activeGroup]);
+  const [syncedActiveGroup, setSyncedActiveGroup] =
+    useState<string | undefined>(undefined);
+
+  if (activeGroup !== syncedActiveGroup) {
+    setSyncedActiveGroup(activeGroup);
+    if (activeGroup) {
+      setExpandedGroups((current) => ({
+        ...current,
+        [activeGroup]: true,
+      }));
+    }
+  }
 
   async function switchBusiness(businessId: string) {
     if (!businessId || businessId === selectedBusinessId || switchingBusiness) {
@@ -711,12 +743,14 @@ export default function DashboardLayout({
 
       {/* Main Content Area */}
       <div className="lg:pl-[260px]">
-        {blockedCapability ? (
+        {!authorizationReady ? (
+          <main className="flex min-h-screen items-center justify-center px-6 py-12 text-white/50">Loading workspace access...</main>
+        ) : blockedCapability ? (
           <main className="flex min-h-screen items-center justify-center px-6 py-12 text-white">
             <section className="w-full max-w-xl rounded-3xl border border-amber-300/20 bg-amber-300/[0.05] p-8">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/70">Upgrade required</p>
               <h1 className="mt-3 text-3xl font-black">{blockedCapability.replace(/[._]/g, " ")}</h1>
-              <p className="mt-3 text-sm leading-6 text-white/60">This capability is not included in your current {entitlements?.planName || "plan"} plan. Upgrade to unlock it for this business.</p>
+              <p className="mt-3 text-sm leading-6 text-white/60">This capability is not included in your current {entitlements?.planName || "plan"} plan. Upgrade to {capabilityRequiredPlans[blockedCapability] || "a higher plan"} to unlock it for this business.</p>
               <Link href="/dashboard/billing/plans" className="mt-6 inline-flex rounded-xl bg-cyan-400 px-4 py-3 text-sm font-bold text-black">View plans</Link>
             </section>
           </main>
