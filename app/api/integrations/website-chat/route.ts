@@ -23,6 +23,57 @@ import { runAutomationTrigger } from "@/lib/automations/engine";
 import { createAuditLog } from "@/lib/auth/audit";
 
 
+function classifyWebsiteChatError(
+  error: unknown,
+) {
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : "";
+
+  if (
+    message.includes(
+      "not null constraint failed",
+    )
+  ) {
+    return "not_null_constraint";
+  }
+
+  if (
+    message.includes(
+      "foreign key constraint failed",
+    )
+  ) {
+    return "foreign_key_constraint";
+  }
+
+  if (
+    message.includes(
+      "unique constraint failed",
+    )
+  ) {
+    return "unique_constraint";
+  }
+
+  if (
+    message.includes("no such table")
+  ) {
+    return "missing_table";
+  }
+
+  if (
+    message.includes("no such column") ||
+    message.includes(
+      "has no column named",
+    )
+  ) {
+    return "missing_column";
+  }
+
+  return "database_or_provider_error";
+}
+
+
 export async function GET() {
   try {
     const { headers } = await import("next/headers");
@@ -1107,6 +1158,10 @@ Answer naturally, helpfully and professionally.
           "WEBSITE_CHAT_RESPONSE_FAILED",
         stage:
           responseStage,
+        failureType:
+          classifyWebsiteChatError(
+            error,
+          ),
       },
       { status: 500 },
     );
