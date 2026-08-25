@@ -1,31 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {
+  capabilityMinimumPlan,
+  defaultLimitsForPlan,
+  getPlanDefinition,
+  planDefinitions,
+} from "../lib/billing/plan-definitions.ts";
 
-const starter = new Set([
-  "command_center.basic",
-  "ai_workforce.core",
-  "customer_ops.core",
-  "customer_ops.inbox",
-  "customer_ops.customers",
-  "customer_ops.leads",
-  "customer_ops.followups",
-  "integrations.core",
-  "integrations.communication",
-  "business_brain.core",
-  "business_brain.sources",
-  "admin.team_staff",
-  "admin.billing",
-]);
-const growth = new Set([...starter, "ai_workforce.builder", "ai_workforce.teams", "ai_workforce.deployment", "ai_workforce.monitoring", "customer_ops.conversations", "customer_ops.handoffs", "business_ops.core", "business_ops.tasks", "business_ops.approvals", "business_ops.automations", "intelligence.basic", "business_brain.documents", "business_brain.memory", "business_brain.instructions"]);
-const pro = new Set([...growth, "human_workforce.core", "human_workforce.hr", "human_workforce.attendance", "human_workforce.leave", "human_workforce.payroll", "human_workforce.teams", "ai_workforce.orchestration", "ai_workforce.performance", "ai_workforce.voice", "ai_workforce.simulator", "ai_workforce.marketplace", "business_ops.workflows", "business_ops.documents", "business_ops.alerts", "intelligence.advanced", "intelligence.sales", "intelligence.customer", "intelligence.ai_workforce", "intelligence.human_workforce", "intelligence.operations", "intelligence.reports", "integrations.social", "integrations.calendar", "integrations.payments", "integrations.accounting", "integrations.crm", "integrations.external_apps", "integrations.developer_api", "business_brain.management"]);
-const enterprise = new Set([...pro, "command_center.advanced", "ai_workforce.collections", "enterprise.organization", "enterprise.multi_business", "enterprise.group_command_center", "enterprise.cross_business_analytics", "enterprise.advanced_governance", "admin.roles_permissions", "admin.branches"]);
+// Capability sets and limits are derived directly from the canonical
+// definitions in lib/billing/plan-definitions.ts (no DB import there) so
+// this suite can't silently drift from the real plan/capability matrix.
+const starter = new Set(getPlanDefinition("starter").capabilities);
+const growth = new Set(getPlanDefinition("growth").capabilities);
+const pro = new Set(getPlanDefinition("pro").capabilities);
+const enterprise = new Set(getPlanDefinition("enterprise").capabilities);
 const plans = { starter, growth, pro, enterprise };
-const limits = {
-  starter: { max_ai_employees: 1, max_businesses: 1, max_branches: 1, max_automations: 5 },
-  growth: { max_ai_employees: 3, max_businesses: 1, max_branches: 3, max_automations: 20 },
-  pro: { max_ai_employees: 10, max_businesses: 1, max_branches: null, max_automations: 100 },
-  enterprise: { max_ai_employees: null, max_businesses: null, max_branches: null, max_automations: null },
-};
+const limits = Object.fromEntries(
+  planDefinitions.map((plan) => [plan.id, defaultLimitsForPlan(plan)]),
+);
 
 function resolve(plan, overrides = []) {
   const capabilities = new Set(plans[plan]);
@@ -222,6 +214,18 @@ test("Starter is denied a Pro-only route and Growth is denied an Enterprise-only
 test("Pro carries the accounting integration capability consistent with its required-plan label", () => {
   assert.equal(pro.has("integrations.accounting"), true);
   assert.equal(growth.has("integrations.accounting"), false);
+});
+
+test("capabilityMinimumPlan is derived from the real plan matrix, not hand-maintained", () => {
+  assert.equal(capabilityMinimumPlan["integrations.accounting"], "pro");
+  assert.equal(capabilityMinimumPlan["human_workforce.core"], "pro");
+  assert.equal(capabilityMinimumPlan["enterprise.multi_business"], "enterprise");
+  assert.equal(capabilityMinimumPlan["command_center.basic"], "starter");
+  assert.equal(capabilityMinimumPlan["intelligence.basic"], "growth");
+  // Every capability that exists anywhere in a plan resolves to a minimum plan.
+  for (const capability of enterprise) {
+    assert.equal(typeof capabilityMinimumPlan[capability], "string");
+  }
 });
 
 test("Enterprise-only governance stays hidden from Pro", () => {

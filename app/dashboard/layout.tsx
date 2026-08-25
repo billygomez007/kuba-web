@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { capabilityMinimumPlan, planDefinitions } from "@/lib/billing/plan-definitions";
 
 type NavigationItem = {
   label: string;
@@ -269,22 +270,14 @@ const navigationItemCapabilities: Record<string, string> = {
   "Roles & Permissions": "admin.roles_permissions",
 };
 
-const capabilityRequiredPlans: Record<string, string> = {
-  "human_workforce.core": "Pro",
-  "human_workforce.hr": "Pro",
-  "human_workforce.payroll": "Pro",
-  "integrations.calendar": "Pro",
-  "integrations.payments": "Pro",
-  "integrations.accounting": "Pro",
-  "integrations.crm": "Pro",
-  "integrations.external_apps": "Pro",
-  "integrations.developer_api": "Pro",
-  "enterprise.organization": "Enterprise",
-  "enterprise.multi_business": "Enterprise",
-  "enterprise.group_command_center": "Enterprise",
-  "enterprise.cross_business_analytics": "Enterprise",
-  "enterprise.advanced_governance": "Enterprise",
-};
+const planNameById = Object.fromEntries(
+  planDefinitions.map((plan) => [plan.id, plan.name]),
+);
+
+function requiredPlanNameForCapability(capability: string) {
+  const planId = capabilityMinimumPlan[capability];
+  return planId ? planNameById[planId] : undefined;
+}
 
 function isRouteActive(pathname: string, href?: string) {
   if (!href) return false;
@@ -750,7 +743,7 @@ export default function DashboardLayout({
             <section className="w-full max-w-xl rounded-3xl border border-amber-300/20 bg-amber-300/[0.05] p-8">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/70">Upgrade required</p>
               <h1 className="mt-3 text-3xl font-black">{blockedCapability.replace(/[._]/g, " ")}</h1>
-              <p className="mt-3 text-sm leading-6 text-white/60">This capability is not included in your current {entitlements?.planName || "plan"} plan. Upgrade to {capabilityRequiredPlans[blockedCapability] || "a higher plan"} to unlock it for this business.</p>
+              <p className="mt-3 text-sm leading-6 text-white/60">This capability is not included in your current {entitlements?.planName || "plan"} plan. Upgrade to {requiredPlanNameForCapability(blockedCapability) || "a higher plan"} to unlock it for this business.</p>
               <Link href="/dashboard/billing/plans" className="mt-6 inline-flex rounded-xl bg-cyan-400 px-4 py-3 text-sm font-bold text-black">View plans</Link>
             </section>
           </main>
