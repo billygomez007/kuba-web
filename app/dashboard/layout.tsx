@@ -304,6 +304,14 @@ export default function DashboardLayout({
     [pathname],
   );
 
+  useEffect(() => {
+    if (!activeGroup) return;
+    setExpandedGroups((current) => ({
+      ...current,
+      [activeGroup]: true,
+    }));
+  }, [activeGroup]);
+
   async function switchBusiness(businessId: string) {
     if (!businessId || businessId === selectedBusinessId || switchingBusiness) {
       return;
@@ -342,7 +350,6 @@ export default function DashboardLayout({
 
   function toggleGroup(title: string) {
     setExpandedGroups((current) => {
-      if (title === activeGroup && current[title]) return current;
       return { ...current, [title]: !current[title] };
     });
   }
@@ -350,7 +357,7 @@ export default function DashboardLayout({
   function renderNavigationGroup(group: NavigationGroup, mobile = false) {
     const items = group.items.filter(canShowItem);
     const groupActive = group.title === activeGroup;
-    const expanded = groupActive || Boolean(expandedGroups[group.title]);
+    const expanded = Boolean(expandedGroups[group.title]);
 
     return (
       <section key={group.title} className="mb-1">
@@ -377,8 +384,14 @@ export default function DashboardLayout({
           </span>
         </button>
 
-        {expanded && (
-          <div className="ml-7 mt-1 border-l border-white/[0.08] pl-3">
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+            expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          }`}
+          aria-hidden={!expanded}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="ml-7 mt-1 border-l border-white/[0.08] pl-3">
             {items.map((item) => {
               const active = isRouteActive(pathname, item.href);
 
@@ -432,8 +445,9 @@ export default function DashboardLayout({
                 </div>
               );
             })}
+            </div>
           </div>
-        )}
+        </div>
       </section>
     );
   }
