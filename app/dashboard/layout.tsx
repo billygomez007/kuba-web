@@ -3,18 +3,21 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type NavigationItem = {
   label: string;
-  href: string;
+  href?: string;
   icon: string;
   ownerOnly?: boolean;
   permission?: string;
+  status?: "Coming Soon" | "Planned";
+  children?: string[];
 };
 
 type NavigationGroup = {
-  title?: string;
+  title: string;
+  icon: string;
   items: NavigationItem[];
 };
 
@@ -25,267 +28,129 @@ type AccessibleBusiness = {
   branchId: string | null;
 };
 
-let navigationGroups: NavigationGroup[] = [
-
-  {
-    title: "Super Admin",
-
-    items: [
-      {
-        label: "Admin Command Center",
-        href: "/admin",
-        icon: "⌂",
-      },
-      {
-        label: "Businesses",
-        href: "/admin/businesses",
-        icon: "▣",
-      },
-    ],
-  },
-
-
-  {
-    title: "Business Operations",
-    items: [
-      {
-        label: "Command Center",
-        href: "/dashboard",
-        icon: "⌂",
-      },
-      {
-        label: "AI Workforce",
-        href: "/dashboard/workforce",
-        icon: "✦",
-        permission: "workforce.view",
-      },
-      {
-        label: "Workforce Command Center",
-        href: "/dashboard/workforce-command-center",
-        icon: "◉",
-        permission: "workforce.view",
-      },
-      {
-        label: "AI Workforce Control Center",
-        href: "/dashboard/workforce/control-center",
-        icon: "▣",
-        permission: "workforce.view",
-      },
-      {
-        label: "Workforce Team",
-        href: "/dashboard/workforce/team",
-        icon: "♙",
-        permission: "workforce.view",
-      },
-      {
-        label: "Orchestration",
-        href: "/dashboard/workforce/orchestration",
-        icon: "⇄",
-        permission: "workforce.view",
-      },
-      {
-        label: "Simulator",
-        href: "/dashboard/workforce/simulator",
-        icon: "◌",
-        permission: "workforce.view",
-      },
-      {
-        label: "Certification",
-        href: "/dashboard/workforce/certification",
-        icon: "✓",
-        permission: "workforce.view",
-      },
-      {
-        label: "Monitoring",
-        href: "/dashboard/workforce/monitoring",
-        icon: "◉",
-        permission: "workforce.view",
-      },
-      {
-        label: "Automation",
-        href: "/dashboard/automations",
-        icon: "⚙",
-      },
-      {
-        label: "Billing & Usage",
-        href: "/dashboard/billing",
-        icon: "$",
-        permission: "workforce.view",
-      },
-      {
-        label: "Approvals",
-        href: "/dashboard/approvals",
-        icon: "✓",
-        permission: "messaging.manage",
-      },
-      {
-        label: "Analytics",
-        href: "/dashboard/analytics",
-        icon: "▥",
-      },
-      {
-        label: "Integrations",
-        href: "/dashboard/integrations",
-        icon: "⌘",
-        permission: "integrations.view",
-      },
-    ],
-  },
-  {
-    title: "Customer Operations",
-    items: [
-      {
-        label: "Inbox",
-        href: "/dashboard/inbox",
-        icon: "✉",
-        permission: "messaging.view",
-      },
-      {
-        label: "Customers",
-        href: "/dashboard/customers",
-        icon: "◎",
-        permission: "customers.view",
-      },
-      {
-        label: "Follow-ups",
-        href: "/dashboard/follow-ups",
-        icon: "◌",
-        permission: "followups.view",
-      },
-    ],
-  },
-  {
-    title: "AI Workforce",
-    items: [
-      {
-        label: "Employees",
-        href: "/dashboard/ai-employees",
-        icon: "✦",
-        permission: "workforce.view",
-      },
-      {
-        label: "Approvals",
-        href: "/dashboard/approvals",
-        icon: "✓",
-        permission: "messaging.manage",
-      },
-      {
-        label: "Tasks",
-        href: "/dashboard/tasks",
-        icon: "✓",
-        permission: "tasks.view",
-      },
-      {
-        label: "Knowledge",
-        href: "/dashboard/knowledge",
-        icon: "▤",
-        permission: "knowledge.view",
-      },
-      {
-        label: "Business Brain",
-        href: "/dashboard/business-brain",
-        icon: "◈",
-        permission: "knowledge.view",
-      },
-      {
-        label: "Memory & Learning",
-        href: "/dashboard/business-brain/memory",
-        icon: "◉",
-        permission: "knowledge.view",
-      },
-      {
-        label: "Workforce Marketplace",
-        href: "/dashboard/workforce-marketplace",
-        icon: "✺",
-        permission: "workforce.view",
-      },
-      {
-        label: "Marketplace",
-        href: "/dashboard/marketplace",
-        icon: "◫",
-        permission: "workforce.view",
-      },
-      {
-        label: "Ecosystem Marketplace",
-        href: "/dashboard/ecosystem",
-        icon: "◇",
-        permission: "workforce.view",
-      },
-    ],
-  },
-];
-
-navigationGroups = [
+const navigationGroups: NavigationGroup[] = [
   {
     title: "Command Center",
+    icon: "⌂",
     items: [
+      { label: "Organization Overview", icon: "◇", status: "Coming Soon" },
       { label: "Business Overview", href: "/dashboard", icon: "⌂" },
-      { label: "Workforce Overview", href: "/dashboard/workforce-command-center", icon: "◉", permission: "workforce.view" },
+      { label: "Branch Overview", icon: "⌖", status: "Coming Soon" },
     ],
   },
   {
     title: "AI Workforce",
+    icon: "✦",
     items: [
       { label: "AI Employees", href: "/dashboard/ai-employees", icon: "✦", permission: "workforce.view" },
       { label: "AI Employee Builder", href: "/dashboard/ai-employees/create", icon: "+", permission: "workforce.view" },
       { label: "AI Teams", href: "/dashboard/workforce/team", icon: "♙", permission: "workforce.view" },
+      { label: "Collections Agent", icon: "◫", status: "Coming Soon" },
       { label: "Deployment", href: "/dashboard/workforce/deployment", icon: "⇧", permission: "workforce.view" },
       { label: "Orchestration", href: "/dashboard/workforce/orchestration", icon: "⇄", permission: "workforce.view" },
       { label: "Monitoring", href: "/dashboard/workforce/monitoring", icon: "◉", permission: "workforce.view" },
       { label: "Performance", href: "/dashboard/ai-performance", icon: "▥", permission: "workforce.view" },
+      { label: "Voice", href: "/dashboard/settings/voice-providers", icon: "◖", permission: "workforce.view" },
+      { label: "Skills", icon: "✣", status: "Planned" },
       { label: "Simulator", href: "/dashboard/workforce/simulator", icon: "◌", permission: "workforce.view" },
-      { label: "Marketplace", href: "/dashboard/marketplace", icon: "◫", permission: "workforce.view" },
+      { label: "Marketplace", href: "/dashboard/workforce-marketplace", icon: "◫", permission: "workforce.view" },
     ],
   },
   {
     title: "Human Workforce",
+    icon: "♙",
     items: [
-      { label: "Operational Teams", href: "/dashboard/workforce/team", icon: "♙", permission: "workforce.view" },
+      { label: "Workforce Overview", href: "/dashboard/workforce", icon: "⌂", permission: "workforce.view" },
+      { label: "Employees", icon: "◎", status: "Coming Soon" },
+      { label: "HR", icon: "▤", status: "Planned", children: ["Employee Records", "Departments", "Positions", "Contracts", "Documents", "Attendance", "Leave", "Performance", "Recruitment"] },
+      { label: "Payroll", icon: "$", status: "Coming Soon" },
+      { label: "Operational Teams", icon: "♙", status: "Coming Soon" },
     ],
   },
   {
     title: "Customer Operations",
+    icon: "✉",
     items: [
       { label: "Inbox", href: "/dashboard/inbox", icon: "✉", permission: "messaging.view" },
       { label: "Customers", href: "/dashboard/customers", icon: "◎", permission: "customers.view" },
       { label: "Leads", href: "/dashboard/sales", icon: "↗", permission: "sales.view" },
+      { label: "Conversations", icon: "◌", status: "Planned" },
       { label: "Follow-ups", href: "/dashboard/follow-ups", icon: "◌", permission: "followups.view" },
+      { label: "Handoffs", icon: "⇄", status: "Planned" },
+      { label: "Appointments", icon: "□", status: "Coming Soon" },
+      { label: "Support / Tickets", icon: "◇", status: "Coming Soon" },
     ],
   },
   {
     title: "Business Operations",
+    icon: "▣",
     items: [
+      { label: "Operations Overview", icon: "⌂", status: "Planned" },
       { label: "Tasks", href: "/dashboard/tasks", icon: "✓", permission: "tasks.view" },
       { label: "Approvals", href: "/dashboard/approvals", icon: "✓", permission: "messaging.manage" },
       { label: "Automations", href: "/dashboard/automations", icon: "⚙", permission: "automations.view" },
+      { label: "Workflows", href: "/dashboard/automations/templates", icon: "⇄", permission: "automations.view" },
+      { label: "Inventory", icon: "▦", status: "Coming Soon" },
+      { label: "Documents", icon: "▤", status: "Planned" },
+      { label: "Operational Alerts", icon: "!", status: "Planned" },
     ],
   },
   {
     title: "Intelligence",
+    icon: "▥",
     items: [
       { label: "Analytics", href: "/dashboard/analytics", icon: "▥", permission: "analytics.view" },
+      { label: "Executive Intelligence", icon: "◇", status: "Planned" },
+      { label: "Business Performance", icon: "↗", status: "Planned" },
+      { label: "Sales Intelligence", icon: "↗", status: "Planned" },
+      { label: "Customer Intelligence", icon: "◎", status: "Planned" },
       { label: "AI Workforce Analytics", href: "/dashboard/ai-performance", icon: "◈", permission: "workforce.view" },
+      { label: "Human Workforce Analytics", icon: "♙", status: "Planned" },
+      { label: "Operations Analytics", icon: "▣", status: "Planned" },
+      { label: "Inventory Analytics", icon: "▦", status: "Coming Soon" },
+      { label: "Reports", icon: "▤", status: "Planned" },
+      { label: "Insights & Alerts", icon: "!", status: "Planned" },
     ],
   },
   {
     title: "Integrations",
+    icon: "⌘",
     items: [
-      { label: "All Integrations", href: "/dashboard/integrations", icon: "⌘", permission: "integrations.view" },
+      { label: "Communication Channels", href: "/dashboard/integrations", icon: "✉", permission: "integrations.view", children: ["WhatsApp", "Email", "SMS", "Voice", "Website Chat"] },
+      { label: "Social Channels", href: "/dashboard/integrations/meta", icon: "◎", permission: "integrations.view" },
+      { label: "Calendar", icon: "□", status: "Coming Soon" },
+      { label: "Payments", icon: "$", status: "Planned" },
+      { label: "Accounting", icon: "▥", status: "Coming Soon" },
+      { label: "CRM", icon: "◇", status: "Coming Soon" },
+      { label: "External Apps", icon: "⌘", status: "Planned" },
+      { label: "API / Developer Integrations", icon: "{ }", status: "Planned" },
     ],
   },
   {
     title: "Business Brain",
+    icon: "◈",
     items: [
-      { label: "Business Knowledge", href: "/dashboard/knowledge", icon: "▤", permission: "knowledge.view" },
+      { label: "Business Knowledge", href: "/dashboard/business-brain", icon: "◈", permission: "knowledge.view" },
+      { label: "Knowledge Sources", href: "/dashboard/knowledge", icon: "▤", permission: "knowledge.view" },
+      { label: "Documents", icon: "□", status: "Planned" },
       { label: "Memory", href: "/dashboard/business-brain/memory", icon: "◉", permission: "knowledge.view" },
+      { label: "AI Instructions", href: "/dashboard/settings/ai", icon: "✣", permission: "settings.view" },
+      { label: "Knowledge Management", icon: "▤", status: "Planned" },
     ],
   },
   {
     title: "Settings",
+    icon: "⚙",
     items: [
       { label: "Business Profile", href: "/dashboard/settings/profile", icon: "◎", permission: "settings.view" },
+      { label: "Organization / Business Group", icon: "◇", status: "Coming Soon" },
+      { label: "Branches & Locations", icon: "⌖", status: "Coming Soon" },
       { label: "Team Staff", href: "/dashboard/settings/team", icon: "♙", permission: "users.view" },
+      { label: "Roles & Permissions", icon: "▣", status: "Planned" },
+      { label: "Invitations", icon: "+", status: "Planned" },
+      { label: "Security", icon: "◆", status: "Planned" },
       { label: "Billing & Subscription", href: "/dashboard/billing", icon: "$", permission: "billing.view" },
+      { label: "Preferences", href: "/dashboard/settings", icon: "⚙", permission: "settings.view" },
     ],
   },
 ];
@@ -316,6 +181,19 @@ const navigationPermissions: Record<string, string> = {
   "/dashboard/integrations": "integrations.view",
 };
 
+function isRouteActive(pathname: string, href?: string) {
+  if (!href) return false;
+  return href === "/dashboard"
+    ? pathname === href
+    : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function activeGroupForPath(pathname: string) {
+  return navigationGroups.find((group) =>
+    group.items.some((item) => isRouteActive(pathname, item.href)),
+  )?.title;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -330,9 +208,6 @@ export default function DashboardLayout({
   const [role, setRole] =
     useState<string | null>(null);
 
-  const [platformRole, setPlatformRole] =
-    useState<string | null>(null);
-
   const [businesses, setBusinesses] =
     useState<AccessibleBusiness[]>([]);
 
@@ -344,6 +219,12 @@ export default function DashboardLayout({
 
   const [businessSwitchError, setBusinessSwitchError] =
     useState("");
+
+  const [expandedGroups, setExpandedGroups] =
+    useState<Record<string, boolean>>({});
+
+  const [mobileNavigationOpen, setMobileNavigationOpen] =
+    useState(false);
 
   const isStaging =
     process.env.NEXT_PUBLIC_APP_ENV === "staging";
@@ -375,10 +256,6 @@ export default function DashboardLayout({
 
           setRole(
             data.membership?.role || null,
-          );
-
-          setPlatformRole(
-            data.user?.platformRole || null,
           );
 
           setBusinesses(
@@ -418,7 +295,12 @@ export default function DashboardLayout({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathname, router]);
+
+  const activeGroup = useMemo(
+    () => activeGroupForPath(pathname),
+    [pathname],
+  );
 
   async function switchBusiness(businessId: string) {
     if (!businessId || businessId === selectedBusinessId || switchingBusiness) {
@@ -448,43 +330,111 @@ export default function DashboardLayout({
     }
   }
 
-  const visibleNavigation = navigationGroups.flatMap((group) =>
-    group.items.filter((item) => {
+  function canShowItem(item: NavigationItem) {
+    if (!item.href) return true;
+    if (item.ownerOnly && role !== "owner") return false;
 
-      if (
-        group.title === "Super Admin" &&
-        platformRole !== "super_admin"
-      ) {
-        return false;
-      }
+    const required = item.permission || navigationPermissions[item.href];
+    return !required || permissions === null || permissions.includes(required);
+  }
 
+  function toggleGroup(title: string) {
+    setExpandedGroups((current) => {
+      if (title === activeGroup && current[title]) return current;
+      return { ...current, [title]: !current[title] };
+    });
+  }
 
-      if (
-        group.title !== "Super Admin" &&
-        platformRole === "super_admin"
-      ) {
-        return true;
-      }
+  function renderNavigationGroup(group: NavigationGroup, mobile = false) {
+    const items = group.items.filter(canShowItem);
+    const groupActive = group.title === activeGroup;
+    const expanded = groupActive || Boolean(expandedGroups[group.title]);
 
+    return (
+      <section key={group.title} className="mb-1">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => toggleGroup(group.title)}
+          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+            groupActive
+              ? "bg-white/[0.08] text-white"
+              : "text-white/60 hover:bg-white/[0.04] hover:text-white/85"
+          }`}
+        >
+          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm ${
+            groupActive
+              ? "bg-gradient-to-br from-cyan-400/25 to-violet-500/25 text-cyan-200"
+              : "bg-white/[0.04] text-white/45"
+          }`}>
+            {group.icon}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{group.title}</span>
+          <span className={`text-[11px] text-white/30 transition-transform ${expanded ? "rotate-90" : ""}`}>
+            ›
+          </span>
+        </button>
 
-      if (
-        item.ownerOnly &&
-        role !== "owner"
-      ) {
-        return false;
-      }
+        {expanded && (
+          <div className="ml-7 mt-1 border-l border-white/[0.08] pl-3">
+            {items.map((item) => {
+              const active = isRouteActive(pathname, item.href);
 
+              if (!item.href) {
+                return (
+                  <div key={item.label} className="py-1">
+                    <div
+                      aria-disabled="true"
+                      className="flex cursor-not-allowed items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-white/30"
+                    >
+                      <span className="w-4 text-center text-white/20">{item.icon}</span>
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white/25">
+                        {item.status}
+                      </span>
+                    </div>
+                    {item.children && (
+                      <div className="ml-7 border-l border-white/[0.06] py-1 pl-3 text-[10px] leading-5 text-white/20">
+                        {item.children.map((child) => (
+                          <div key={child}>{child}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
-      const required =
-        navigationPermissions[item.href];
-
-      if (!required) return true;
-
-      return permissions === null ||
-        permissions.includes(required);
-
-    })
-  );
+              return (
+                <div key={`${group.title}-${item.label}`}>
+                  <Link
+                    href={item.href}
+                    onClick={() => mobile && setMobileNavigationOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium transition ${
+                      active
+                        ? "bg-cyan-400/[0.09] text-cyan-100"
+                        : "text-white/45 hover:bg-white/[0.04] hover:text-white/75"
+                    }`}
+                  >
+                    <span className="w-4 text-center text-white/35">{item.icon}</span>
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {active && <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />}
+                  </Link>
+                  {item.children && (
+                    <div className="ml-7 border-l border-white/[0.06] py-1 pl-3 text-[10px] leading-5 text-white/20">
+                      {item.children.map((child) => (
+                        <div key={child}>{child}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#050507] text-white">
@@ -539,124 +489,15 @@ export default function DashboardLayout({
         )}
 
         {/* Navigation Workspace */}
-        <nav className="flex-1 overflow-y-auto px-4 py-6">
-          {navigationGroups.map((group) => {
-
-            if (
-              group.title === "Super Admin" &&
-              platformRole !== "super_admin"
-            ) {
-              return null;
-            }
-
-            const items = group.items.filter((item) => {
-
-              if (
-                item.ownerOnly &&
-                role !== "owner"
-              ) {
-                return false;
-              }
-
-              const required =
-                navigationPermissions[item.href];
-
-              if (!required) return true;
-
-              return permissions === null ||
-                permissions.includes(required);
-
-            });
-
-
-            if (items.length === 0) return null;
-
-
-            return (
-
-              <div key={group.title || "main"} className="mb-6">
-
-                {group.title && (
-                  <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-white/20">
-                    {group.title}
-                  </p>
-                )}
-
-
-                <div className="space-y-1.5">
-
-                  {items.map((item) => {
-
-                    const active =
-                      item.href === "/dashboard"
-                        ? pathname === "/dashboard"
-                        : pathname.startsWith(item.href);
-
-
-                    return (
-
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                          active
-                            ? "bg-white/[0.08] text-white shadow-lg shadow-white/5"
-                            : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
-                        }`}
-                      >
-
-                        <span
-                          className={`flex h-8 w-8 items-center justify-center rounded-md text-base font-semibold transition ${
-                            active
-                              ? "bg-gradient-to-br from-cyan-400/25 to-violet-500/25 text-cyan-300 shadow-lg shadow-cyan-400/10"
-                              : "bg-white/[0.04] text-white/40 group-hover:bg-white/[0.08] group-hover:text-white/60"
-                          }`}
-                        >
-                          {item.icon}
-                        </span>
-
-
-                        <span className="flex-1 truncate">{item.label}</span>
-
-
-                        {active && (
-                          <>
-                            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/50" />
-                          </>
-                        )}
-
-                      </Link>
-
-                    );
-
-                  })}
-
-                </div>
-
-              </div>
-
-            );
-
-          })}
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-gutter:stable]">
+          <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/25">
+            Enterprise workspace
+          </p>
+          {navigationGroups.map((group) => renderNavigationGroup(group))}
         </nav>
 
         {/* Bottom Sidebar Section */}
         <div className="border-t border-white/[0.07] p-4">
-
-          <Link
-            href="/dashboard/settings"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-              pathname.startsWith("/dashboard/settings")
-                ? "bg-white/[0.08] text-white"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/70"
-            }`}
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-base text-white/40">
-              ⚙
-            </span>
-
-            <span>Settings</span>
-          </Link>
 
           <Link
             href="/help"
@@ -706,48 +547,47 @@ export default function DashboardLayout({
           )}
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/help"
-              aria-label="Help and Support"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] text-sm font-semibold text-white/50 transition hover:bg-white/[0.08]"
+            <button
+              type="button"
+              aria-label="Toggle enterprise navigation"
+              aria-expanded={mobileNavigationOpen}
+              onClick={() => setMobileNavigationOpen((open) => !open)}
+              className="flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 text-xs font-semibold text-white/60 transition hover:bg-white/[0.08]"
             >
-              ?
-            </Link>
-            <Link
-              href="/dashboard/settings"
-              aria-label="Dashboard settings"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] text-sm text-white/50 transition hover:bg-white/[0.08]"
-            >
-              ⚙
-            </Link>
+              <span>{mobileNavigationOpen ? "×" : "☰"}</span>
+              <span>Menu</span>
+            </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Tabs */}
-        <div className="overflow-x-auto border-t border-white/[0.05]">
-          <nav className="flex min-w-max gap-1 px-4 py-2">
-            {visibleNavigation.slice(0, 6).map((item) => {
-              const active =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname.startsWith(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                    active
-                      ? "bg-white/[0.08] text-white"
-                      : "text-white/40 hover:bg-white/[0.04] hover:text-white/60"
-                  }`}
+        {mobileNavigationOpen && (
+          <div className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/[0.07] bg-[#07070A] px-3 py-4">
+            {businesses.length > 0 && (
+              <div className="mb-4 rounded-xl border border-white/[0.07] bg-white/[0.03] p-3">
+                <label htmlFor="mobile-business-switcher" className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">
+                  Current business
+                </label>
+                <select
+                  id="mobile-business-switcher"
+                  value={selectedBusinessId}
+                  disabled={switchingBusiness}
+                  onChange={(event) => switchBusiness(event.target.value)}
+                  className="w-full rounded-lg border border-white/10 bg-[#0B0B0F] px-3 py-2 text-xs text-white outline-none disabled:opacity-50"
                 >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+                  {!selectedBusinessId && <option value="">Select a business</option>}
+                  {businesses.map((business) => (
+                    <option key={business.id} value={business.id}>
+                      {business.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <nav aria-label="Enterprise mobile navigation">
+              {navigationGroups.map((group) => renderNavigationGroup(group, true))}
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* Main Content Area */}
