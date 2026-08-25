@@ -19,6 +19,9 @@ import { getBusinessPlan, employeeLimitMessage } from "@/lib/billing/entitlement
 export async function POST(
   request: Request,
 ) {
+  let activationStage =
+    "authorize";
+
   try {
     const {
       user,
@@ -64,14 +67,20 @@ export async function POST(
       );
     }
 
+    activationStage =
+      "load_plan";
     const plan = await getBusinessPlan(membership.businessId);
     if (plan.employeeLimit !== null) {
+      activationStage =
+        "check_employee_limit";
       const activeEmployees = await db.select({ total: count() }).from(aiEmployees).where(and(eq(aiEmployees.businessId, membership.businessId), eq(aiEmployees.status, "active")));
       if (Number(activeEmployees[0]?.total || 0) >= plan.employeeLimit) {
         return NextResponse.json({ error: employeeLimitMessage(plan), upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
       }
     }
 
+    activationStage =
+      "parse_request";
     const body =
       await request.json();
 
@@ -111,7 +120,11 @@ export async function POST(
       return NextResponse.json({ error: `${type} AI requires Growth or higher.`, upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
     }
 
+    activationStage =
+      "check_existing_employee";
     const existingEmployee =
+      activationStage =
+        "insert_employee";
       await db
         .select({
           id:
@@ -218,6 +231,10 @@ export async function POST(
       {
         error:
           "Unable to activate the AI employee.",
+        code:
+          "AI_EMPLOYEE_ACTIVATION_FAILED",
+        stage:
+          activationStage,
       },
       { status: 500 },
     );
