@@ -592,8 +592,8 @@ export default function DashboardLayout({
             <Image
               src="/brand/superkuba-logo.png"
               alt="SuperKuba"
-              width={2103}
-              height={748}
+              width={2172}
+              height={724}
               priority
               className="h-auto w-[140px] object-contain"
             />
@@ -677,8 +677,8 @@ export default function DashboardLayout({
             <Image
               src="/brand/superkuba-logo.png"
               alt="SuperKuba"
-              width={2103}
-              height={748}
+              width={2172}
+              height={724}
               priority
               className="h-auto w-[125px] object-contain"
             />

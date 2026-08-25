@@ -596,8 +596,8 @@ AI workforce solutions built around how your industry operates.
   <Image
     src="/brand/superkuba-logo.png"
     alt="SuperKuba"
-    width={2131}
-    height={738}
+    width={2172}
+    height={724}
     className="h-auto w-[170px] object-contain"
   />
 </Link>
