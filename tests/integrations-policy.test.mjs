@@ -201,3 +201,36 @@ test("Restricted role cannot manage integrations", () => {
   const canManage = qaRestricted.role === "owner" || qaRestricted.role === "admin";
   assert.equal(canManage, false);
 });
+
+function classifyPaymentProvider(provider, hasMerchantConnection) {
+  if (hasMerchantConnection) return "business_merchant";
+  if (provider === "stripe" || provider === "paystack") return "platform_billing_only";
+  return "unsupported";
+}
+
+test("Platform billing cannot be mistaken for business merchant integration", () => {
+  assert.equal(classifyPaymentProvider("stripe", false), "platform_billing_only");
+  assert.equal(classifyPaymentProvider("paystack", false), "platform_billing_only");
+  assert.notEqual(classifyPaymentProvider("stripe", false), "business_merchant");
+});
+
+test("Payment page exposes no merchant capability without a real connection", () => {
+  const paymentCapabilities = {
+    paymentLinks: false,
+    invoices: false,
+    charges: false,
+    refunds: false,
+    webhookMapping: false,
+  };
+
+  assert.ok(Object.values(paymentCapabilities).every((capability) => capability === false));
+  assert.equal(classifyPaymentProvider("stripe", false), "platform_billing_only");
+  assert.equal(classifyPaymentProvider("paystack", false), "platform_billing_only");
+});
+
+test("Payment secrets are not part of a public integration status", () => {
+  const publicPaymentStatus = { provider: "stripe", status: "platform_billing_only" };
+
+  assert.equal("secretKey" in publicPaymentStatus, false);
+  assert.equal("webhookSecret" in publicPaymentStatus, false);
+});
