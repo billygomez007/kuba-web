@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { RequestContext } from "@mastra/core/request-context";
+import { randomBytes } from "node:crypto";
 
 import { db } from "@/db";
 
@@ -19,6 +20,7 @@ import { type ConversationDepartment } from "@/lib/communications/routing";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { runAutomationTrigger } from "@/lib/automations/engine";
+import { createAuditLog } from "@/lib/auth/audit";
 
 
 export async function GET() {
@@ -109,6 +111,216 @@ export async function GET() {
       {
         error:
           "Unable to load Website Chat integration.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PUT() {
+  try {
+    const { headers } = await import("next/headers");
+    const { auth } = await import("@/lib/auth");
+    const {
+      getBusinessMembership,
+      hasPermission,
+      PERMISSIONS,
+    } = await import("@/lib/auth/permissions");
+    const {
+      unauthorizedResponse,
+      forbiddenResponse,
+    } = await import("@/lib/auth/security");
+
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return unauthorizedResponse();
+    }
+
+    const membership =
+      await getBusinessMembership(session.user.id);
+
+    if (!membership) {
+      return forbiddenResponse();
+    }
+
+    if (
+      !hasPermission(
+        membership.role,
+        membership.permissions,
+        PERMISSIONS.INTEGRATIONS_MANAGE,
+      )
+    ) {
+      return forbiddenResponse();
+    }
+
+    const existingResult = await db
+      .select({
+        id: integrations.id,
+        publicKey: integrations.publicKey,
+        status: integrations.status,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(
+            integrations.businessId,
+            membership.businessId,
+          ),
+          eq(
+            integrations.provider,
+            "website_chat",
+          ),
+        ),
+      )
+      .limit(1);
+
+    const existing = existingResult[0];
+
+    if (
+      existing?.status === "active" &&
+      existing.publicKey
+    ) {
+      return NextResponse.json({
+        success: true,
+        activated: false,
+        integration: existing,
+      });
+    }
+
+    const now = new Date();
+    const generatedPublicKey =
+      existing?.publicKey ||
+      `kuba_pk_${randomBytes(32).toString("base64url")}`;
+    const integrationId =
+      existing?.id ||
+      `website_chat:${membership.businessId}`;
+
+    if (existing) {
+      await db
+        .update(integrations)
+        .set({
+          publicKey:
+            existing.publicKey ||
+            sql<string>`coalesce(${integrations.publicKey}, ${generatedPublicKey})`,
+          status: "active",
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(
+              integrations.id,
+              integrationId,
+            ),
+            eq(
+              integrations.businessId,
+              membership.businessId,
+            ),
+          ),
+        );
+    } else {
+      await db
+        .insert(integrations)
+        .values({
+          id: integrationId,
+          businessId:
+            membership.businessId,
+          provider: "website_chat",
+          status: "active",
+          publicKey: generatedPublicKey,
+          displayName: "Website Chat",
+          metadata: JSON.stringify({
+            source: "dashboard_activation",
+          }),
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing({
+          target: integrations.id,
+        });
+    }
+
+    const activatedResult = await db
+      .select({
+        id: integrations.id,
+        publicKey: integrations.publicKey,
+        status: integrations.status,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(
+            integrations.id,
+            integrationId,
+          ),
+          eq(
+            integrations.businessId,
+            membership.businessId,
+          ),
+          eq(
+            integrations.provider,
+            "website_chat",
+          ),
+        ),
+      )
+      .limit(1);
+
+    const activatedIntegration =
+      activatedResult[0];
+
+    if (!activatedIntegration?.publicKey) {
+      throw new Error(
+        "Website Chat activation did not persist.",
+      );
+    }
+
+    const created =
+      !existing &&
+      activatedIntegration.publicKey ===
+        generatedPublicKey;
+
+    if (!existing && !created) {
+      return NextResponse.json({
+        success: true,
+        activated: false,
+        integration: activatedIntegration,
+      });
+    }
+
+    await createAuditLog({
+      businessId: membership.businessId,
+      userId: session.user.id,
+      action:
+        "integration.website_chat.activated",
+      resource: "integration",
+      resourceId: integrationId,
+      description:
+        "Activated the Website Chat integration.",
+      metadata: {
+        provider: "website_chat",
+        created,
+        previousStatus:
+          existing?.status ?? null,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      activated: true,
+      integration: activatedIntegration,
+    });
+  } catch (error) {
+    console.error(
+      "Activate Website Chat integration error:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "Unable to activate Website Chat integration.",
       },
       { status: 500 },
     );
