@@ -26,10 +26,31 @@ import { createAuditLog } from "@/lib/auth/audit";
 function classifyWebsiteChatError(
   error: unknown,
 ) {
+  const messages: string[] = [];
+  let current:
+    unknown = error;
+
+  for (
+    let depth = 0;
+    depth < 4 && current;
+    depth += 1
+  ) {
+    if (current instanceof Error) {
+      messages.push(
+        current.message.toLowerCase(),
+      );
+    }
+
+    current =
+      typeof current === "object" &&
+      current !== null &&
+      "cause" in current
+        ? current.cause
+        : null;
+  }
+
   const message =
-    error instanceof Error
-      ? error.message.toLowerCase()
-      : "";
+    messages.join(" ");
 
   if (
     message.includes(
@@ -71,6 +92,58 @@ function classifyWebsiteChatError(
   }
 
   return "database_or_provider_error";
+}
+
+function getWebsiteChatDriverCode(
+  error: unknown,
+) {
+  let current:
+    unknown = error;
+
+  for (
+    let depth = 0;
+    depth < 4 && current;
+    depth += 1
+  ) {
+    if (
+      typeof current === "object" &&
+      current !== null
+    ) {
+      const record =
+        current as Record<
+          string,
+          unknown
+        >;
+
+      for (const field of [
+        "code",
+        "rawCode",
+      ] as const) {
+        const value =
+          field in record
+            ? record[field]
+            : null;
+
+        if (
+          typeof value === "string" &&
+          /^[A-Z][A-Z0-9_]{1,63}$/.test(
+            value,
+          )
+        ) {
+          return value;
+        }
+      }
+
+      current =
+        "cause" in record
+          ? record.cause
+          : null;
+    } else {
+      current = null;
+    }
+  }
+
+  return null;
 }
 
 
@@ -1160,6 +1233,10 @@ Answer naturally, helpfully and professionally.
           responseStage,
         failureType:
           classifyWebsiteChatError(
+            error,
+          ),
+        driverCode:
+          getWebsiteChatDriverCode(
             error,
           ),
       },
