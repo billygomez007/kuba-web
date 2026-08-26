@@ -7,7 +7,7 @@ import { subscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { createAuditLog } from "@/lib/auth/audit";
-import { normalizePlan } from "@/lib/billing/entitlements";
+import { getBusinessPlan, normalizePlan, planOrder } from "@/lib/billing/entitlements";
 
 export async function POST(request: Request) {
   try {
@@ -19,6 +19,10 @@ export async function POST(request: Request) {
     const plan = normalizePlan(typeof body.plan === "string" ? body.plan : "");
     if (plan === "starter" || body.plan !== plan) return NextResponse.json({ error: "Choose a paid Growth or Pro plan." }, { status: 400 });
     if (plan === "enterprise") return NextResponse.json({ error: "Enterprise plans require a sales conversation.", contactSales: true }, { status: 400 });
+    const currentPlan = await getBusinessPlan(membership.businessId);
+    if (planOrder.indexOf(plan) <= planOrder.indexOf(currentPlan.id)) {
+      return NextResponse.json({ error: "Checkout is available only for an upgrade. Manage downgrades through the provider or contact support.", code: "PLAN_CHANGE_NOT_SUPPORTED" }, { status: 409 });
+    }
     const priceId = getConfiguredPriceId(plan);
     if (!priceId) return NextResponse.json({ error: "This plan is not configured for checkout yet." }, { status: 503 });
     const current = (await db.select({ customerId: subscriptions.providerCustomerId }).from(subscriptions).where(eq(subscriptions.businessId, membership.businessId)).limit(1))[0];
