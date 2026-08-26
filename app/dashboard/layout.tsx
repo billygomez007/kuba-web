@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { capabilityMinimumPlan, planDefinitions } from "@/lib/billing/plan-definitions";
 import LogoutControl from "../components/settings/LogoutControl";
+import TrialBanner from "../components/dashboard/TrialBanner";
 
 type NavigationItem = {
   label: string;
@@ -763,7 +764,12 @@ export default function DashboardLayout({
               <Link href="/dashboard/billing/plans" className="mt-6 inline-flex rounded-xl bg-cyan-400 px-4 py-3 text-sm font-bold text-black">View plans</Link>
             </section>
           </main>
-        ) : children}
+        ) : (
+          <>
+            <TrialBanner />
+            {children}
+          </>
+        )}
       </div>
     </div>
   );

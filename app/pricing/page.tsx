@@ -1,27 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 import MarketingHeader from "@/app/components/MarketingHeader";
 
 import {
   allCapabilities,
-  defaultLimitsForPlan,
   planDefinitions,
   planOrder,
   type Capability,
-  type PlanId,
 } from "@/lib/billing/plan-definitions";
+import { cardFeatures, limitCopy, pricingCopy } from "@/lib/billing/pricing-presentation";
 
 export const metadata: Metadata = {
   title: "SuperKuba Pricing | Starter, Growth, Pro & Enterprise",
   description:
     "Compare SuperKuba Starter, Growth, Pro, and Enterprise plans and the capabilities included in each operating level.",
-};
-
-const pricingCopy: Record<PlanId, { price: string; billingLabel: string; tagline: string; positioning: string; cta: string; recommended?: boolean }> = {
-  starter: { price: "$XX", billingLabel: "/ month", tagline: "Run Your Business", positioning: "For entrepreneurs and small businesses that need the essential tools to manage customers and everyday work.", cta: "Get Started" },
-  growth: { price: "$XX", billingLabel: "/ month", tagline: "Automate Your Business", positioning: "For growing businesses that need automation and stronger customer operations.", cta: "Choose Growth" },
-  pro: { price: "$XX", billingLabel: "/ month", tagline: "Operate With AI", positioning: "For businesses running more of their operations through SuperKuba.", cta: "Choose Pro", recommended: true },
-  enterprise: { price: "Custom", billingLabel: "pricing", tagline: "Complete Business Operating System", positioning: "For organizations needing the complete operating system, governance, multi-business capability, advanced control, and enterprise support.", cta: "Contact Sales" },
 };
 
 const categoryLabels: Record<string, string> = {
@@ -114,56 +107,6 @@ const implementedCapabilities = new Set<Capability>([
   "command_center.basic", "ai_workforce.core", "ai_workforce.builder", "ai_workforce.teams", "ai_workforce.deployment", "ai_workforce.orchestration", "ai_workforce.monitoring", "ai_workforce.performance", "ai_workforce.voice", "ai_workforce.simulator", "ai_workforce.marketplace", "human_workforce.core", "human_workforce.hr", "human_workforce.attendance", "human_workforce.leave", "human_workforce.payroll", "human_workforce.teams", "customer_ops.core", "customer_ops.inbox", "customer_ops.customers", "customer_ops.leads", "customer_ops.conversations", "customer_ops.followups", "customer_ops.handoffs", "customer_ops.appointments", "customer_ops.tickets", "customer_ops.ai_assist", "business_ops.core", "business_ops.tasks", "business_ops.approvals", "business_ops.automations", "business_ops.workflows", "business_ops.documents", "business_ops.alerts", "intelligence.basic", "intelligence.advanced", "intelligence.sales", "intelligence.customer", "intelligence.ai_workforce", "intelligence.human_workforce", "intelligence.operations", "intelligence.reports", "integrations.core", "integrations.communication", "integrations.social", "integrations.calendar", "integrations.payments", "integrations.accounting", "integrations.crm", "integrations.external_apps", "integrations.developer_api", "business_brain.core", "business_brain.sources", "business_brain.documents", "business_brain.memory", "business_brain.instructions", "business_brain.management", "admin.team_staff", "admin.billing",
 ]);
 
-const cardPresentation: Partial<Record<Capability, { label: string; tier: PlanId }>> = {
-  "command_center.basic": { label: "Basic Command Center", tier: "starter" },
-  "ai_workforce.core": { label: "Basic AI Employees", tier: "starter" },
-  "customer_ops.inbox": { label: "Unified Inbox", tier: "starter" },
-  "integrations.communication": { label: "Website Live Chat", tier: "starter" },
-  "customer_ops.customers": { label: "Customer Management", tier: "starter" },
-  "customer_ops.leads": { label: "Lead Management", tier: "starter" },
-  "business_ops.tasks": { label: "Tasks", tier: "starter" },
-  "admin.team_staff": { label: "Team Access", tier: "starter" },
-  "intelligence.basic": { label: "Basic Reporting", tier: "starter" },
-  "ai_workforce.builder": { label: "AI Employee Builder", tier: "growth" },
-  "customer_ops.conversations": { label: "Conversation Management", tier: "growth" },
-  "customer_ops.appointments": { label: "Appointments", tier: "growth" },
-  "customer_ops.tickets": { label: "Support Tickets", tier: "growth" },
-  "business_ops.core": { label: "Business Operations", tier: "growth" },
-  "business_ops.automations": { label: "Automations", tier: "growth" },
-  "business_ops.approvals": { label: "Approvals", tier: "growth" },
-  "business_brain.documents": { label: "Knowledge Documents", tier: "growth" },
-  "business_brain.memory": { label: "Customer Memory", tier: "growth" },
-  "ai_workforce.teams": { label: "AI Teams", tier: "growth" },
-  "customer_ops.ai_assist": { label: "AI-assisted Appointments & Tickets", tier: "pro" },
-  "ai_workforce.orchestration": { label: "AI Orchestration", tier: "pro" },
-  "ai_workforce.voice": { label: "AI Voice", tier: "pro" },
-  "ai_workforce.monitoring": { label: "AI Monitoring & Performance", tier: "growth" },
-  "human_workforce.core": { label: "Human Workforce", tier: "pro" },
-  "human_workforce.hr": { label: "HR Operations", tier: "pro" },
-  "human_workforce.payroll": { label: "Payroll", tier: "pro" },
-  "business_ops.workflows": { label: "Advanced Business Operations", tier: "pro" },
-  "intelligence.advanced": { label: "Advanced Analytics", tier: "pro" },
-  "integrations.external_apps": { label: "Advanced Integrations", tier: "pro" },
-  "enterprise.multi_business": { label: "Multiple Businesses", tier: "enterprise" },
-  "enterprise.organization": { label: "Organization & Business Group", tier: "enterprise" },
-  "enterprise.group_command_center": { label: "Group Command Center", tier: "enterprise" },
-  "enterprise.cross_business_analytics": { label: "Cross-Business Management", tier: "enterprise" },
-  "enterprise.advanced_governance": { label: "Advanced Security & Governance", tier: "enterprise" },
-  "admin.roles_permissions": { label: "Enterprise Roles & Permissions", tier: "enterprise" },
-  "integrations.developer_api": { label: "Developer API & API Keys", tier: "enterprise" },
-  "ai_workforce.collections": { label: "Collections Agent", tier: "enterprise" },
-};
-
-const cardFeatureOrder = Object.entries(cardPresentation) as Array<[Capability, { label: string; tier: PlanId }]>;
-
-function cardFeatures(plan: typeof planDefinitions[number]) {
-  const planIndex = planOrder.indexOf(plan.id);
-  const previousPlan = planDefinitions[planIndex - 1];
-  return cardFeatureOrder
-    .filter(([capability, presentation]) => plan.capabilities.includes(capability) && presentation.tier === plan.id && (!previousPlan || !previousPlan.capabilities.includes(capability)))
-    .map(([, presentation]) => presentation);
-}
-
 function labelFor(capability: Capability) {
   return capabilityLabels[capability] || capability.split(".").at(-1)?.replaceAll("_", " ") || capability;
 }
@@ -171,17 +114,6 @@ function labelFor(capability: Capability) {
 function statusFor(plan: typeof planDefinitions[number], capability: Capability) {
   if (!plan.capabilities.includes(capability)) return "Not included";
   return implementedCapabilities.has(capability) ? "Included" : "Coming Soon";
-}
-
-function limitCopy(planId: PlanId) {
-  const plan = planDefinitions.find((item) => item.id === planId)!;
-  const limits = defaultLimitsForPlan(plan);
-  return [
-    limits.max_ai_employees === null ? "Unlimited AI employees" : `Up to ${limits.max_ai_employees} AI employee${limits.max_ai_employees === 1 ? "" : "s"}`,
-    limits.max_automations === null ? "Unlimited automations" : `Up to ${limits.max_automations} automations`,
-    limits.max_branches === null ? "Unlimited branches" : `Up to ${limits.max_branches} branch${limits.max_branches === 1 ? "" : "es"}`,
-    limits.includedVoiceMinutes > 0 ? `${limits.includedVoiceMinutes} included voice minutes` : null,
-  ].filter(Boolean) as string[];
 }
 
 export default function PricingPage() {
@@ -221,7 +153,7 @@ export default function PricingPage() {
                   <ul className="space-y-2 text-sm text-white/65">{features.map((feature) => <li key={feature.label}>✓ {feature.label}</li>)}</ul>
                   <ul className="mt-4 space-y-1 border-t border-white/[0.06] pt-4 text-xs text-white/40">{limitCopy(planId).map((item) => <li key={item}>{item}</li>)}</ul>
                 </div>
-                <Link href={planId === "enterprise" ? "/demo" : "/signup"} className="mt-auto rounded-xl bg-white px-4 py-3 text-center text-sm font-bold text-black transition hover:bg-cyan-100">{copy.cta}</Link>
+                <Link href={planId === "enterprise" ? "/demo" : `/signup?plan=${planId}`} className="mt-auto rounded-xl bg-white px-4 py-3 text-center text-sm font-bold text-black transition hover:bg-cyan-100">{copy.cta}</Link>
               </article>
             );
           })}
@@ -232,7 +164,7 @@ export default function PricingPage() {
           <div className="mt-8 overflow-x-auto rounded-2xl border border-white/10 bg-black/20">
             <table className="w-full min-w-[850px] border-collapse text-left text-sm">
               <thead><tr className="border-b border-white/10 bg-white/[0.035]"><th scope="col" className="sticky left-0 bg-[#0b0b12] px-5 py-4 text-xs font-bold uppercase tracking-wider text-white/45">Capability</th>{planOrder.map((planId) => <th scope="col" key={planId} className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-cyan-200/70">{planDefinitions.find((plan) => plan.id === planId)!.name}</th>)}</tr></thead>
-              <tbody>{Object.entries(groupedCapabilities).map(([category, capabilities]) => <>{<tr key={`${category}-heading`} className="border-b border-white/[0.06] bg-white/[0.02]"><th colSpan={5} scope="rowgroup" className="px-5 py-3 text-xs font-bold uppercase tracking-[0.18em] text-white/35">{categoryLabels[category] || category}</th></tr>}{capabilities.map((capability) => <tr key={capability} className="border-b border-white/[0.06] last:border-0"><th scope="row" className="sticky left-0 bg-[#08080d] px-5 py-3 font-medium text-white/70">{labelFor(capability)}</th>{planOrder.map((planId) => { const status = statusFor(planDefinitions.find((plan) => plan.id === planId)!, capability); return <td key={planId} className={`px-5 py-3 text-xs font-semibold ${status === "Included" ? "text-emerald-300" : status === "Coming Soon" ? "text-amber-200" : "text-white/30"}`}>{status}</td>; })}</tr>)}</>)}</tbody>
+              <tbody>{Object.entries(groupedCapabilities).map(([category, capabilities]) => <Fragment key={category}><tr className="border-b border-white/[0.06] bg-white/[0.02]"><th colSpan={5} scope="rowgroup" className="px-5 py-3 text-xs font-bold uppercase tracking-[0.18em] text-white/35">{categoryLabels[category] || category}</th></tr>{capabilities.map((capability) => <tr key={capability} className="border-b border-white/[0.06] last:border-0"><th scope="row" className="sticky left-0 bg-[#08080d] px-5 py-3 font-medium text-white/70">{labelFor(capability)}</th>{planOrder.map((planId) => { const status = statusFor(planDefinitions.find((plan) => plan.id === planId)!, capability); return <td key={planId} className={`px-5 py-3 text-xs font-semibold ${status === "Included" ? "text-emerald-300" : status === "Coming Soon" ? "text-amber-200" : "text-white/30"}`}>{status}</td>; })}</tr>)}</Fragment>)}</tbody>
             </table>
           </div>
         </section>

@@ -39,11 +39,16 @@ async function seed() {
   const now = new Date();
   const rows = [];
 
-  // biz-a and biz-b are "pro" so the existing AI-tool tests below continue to
-  // exercise tenant isolation specifically, unaffected by the entitlement
-  // gate added in this task. Dedicated tier businesses are seeded separately.
+  // biz-a and biz-b each get a real, active "pro" subscription row so the
+  // existing AI-tool tests below continue to exercise tenant isolation
+  // specifically, unaffected by the entitlement gate added in this task.
+  // (getBusinessEntitlements no longer trusts businesses.plan on its own —
+  // see the "businesses.plan fallback" tests further down — so a real
+  // subscription row is required here, not just the plan column.)
+  // Dedicated tier businesses are seeded separately below.
   for (const [biz, suffix] of [[BIZ_A, "a"], [BIZ_B, "b"]]) {
     await db.insert(schema.businesses).values({ id: biz, name: `Business ${suffix.toUpperCase()}`, slug: `business-${suffix}`, plan: "pro", status: "active", createdAt: now, updatedAt: now });
+    await db.insert(schema.subscriptions).values({ id: crypto.randomUUID(), businessId: biz, provider: "stripe", providerCustomerId: `cus_${suffix}`, providerSubscriptionId: `sub_${suffix}`, providerEventId: `evt_seed_${suffix}`, plan: "pro", status: "active", currentPeriodStart: now, currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), cancelAtPeriodEnd: false, trialEnd: null, createdAt: now, updatedAt: now });
     await db.insert(schema.users).values({ id: `user-${suffix}`, name: `User ${suffix.toUpperCase()}`, email: `user-${suffix}@example.com`, emailVerified: true, phoneVerified: true, platformRole: "user", status: "active", createdAt: now, updatedAt: now });
     await db.insert(schema.businessUsers).values({ id: `bu-${suffix}`, businessId: biz, userId: `user-${suffix}`, role: "member", permissions: null, createdAt: now });
     await db.insert(schema.customers).values({ id: `cust-${suffix}`, businessId: biz, name: `Customer ${suffix.toUpperCase()}`, email: `cust-${suffix}@example.com`, createdAt: now, updatedAt: now });
@@ -61,8 +66,13 @@ async function seed() {
   await db.insert(schema.businessUsers).values({ id: "bu-a2", businessId: BIZ_A, userId: "user-a2", role: "member", permissions: null, createdAt: now });
 
   // One dedicated business per tier, for entitlement-tier assertions specifically.
+  // BIZ_STARTER deliberately gets NO subscription row — Starter is exactly
+  // what a business with no subscription resolves to.
   for (const [id, plan] of [[BIZ_STARTER, "starter"], [BIZ_GROWTH, "growth"], [BIZ_PRO, "pro"], [BIZ_ENTERPRISE, "enterprise"]]) {
-    await db.insert(schema.businesses).values({ id, name: `Business ${plan}`, slug: `business-${plan}`, plan, status: "active", createdAt: now, updatedAt: now });
+    await db.insert(schema.businesses).values({ id, name: `Business ${plan}`, slug: `business-${plan}`, plan: "starter", status: "active", createdAt: now, updatedAt: now });
+    if (plan !== "starter") {
+      await db.insert(schema.subscriptions).values({ id: crypto.randomUUID(), businessId: id, provider: "stripe", providerCustomerId: `cus_tier_${plan}`, providerSubscriptionId: `sub_tier_${plan}`, providerEventId: `evt_seed_tier_${plan}`, plan, status: "active", currentPeriodStart: now, currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), cancelAtPeriodEnd: false, trialEnd: null, createdAt: now, updatedAt: now });
+    }
   }
 
   return rows;

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { businesses, entitlementOverrides, subscriptions } from "@/db/schema";
+import { entitlementOverrides, subscriptions } from "@/db/schema";
 import {
   allCapabilities,
   defaultLimitsForPlan,
@@ -17,17 +17,30 @@ export * from "./plan-definitions";
 export type BusinessEntitlements = { plan: PlanId; planName: string; capabilities: Capability[]; limits: EntitlementLimits; modules: string[] };
 
 export async function getBusinessEntitlements(businessId: string): Promise<BusinessEntitlements> {
-  const [businessRow, subscription] = await Promise.all([
-    db.select({ plan: businesses.plan }).from(businesses).where(eq(businesses.id, businessId)).limit(1),
-    db.select({ plan: subscriptions.plan, status: subscriptions.status, currentPeriodEnd: subscriptions.currentPeriodEnd, trialEnd: subscriptions.trialEnd }).from(subscriptions).where(eq(subscriptions.businessId, businessId)).limit(1),
-  ]);
-  const fallback = getPlanDefinition(businessRow[0]?.plan);
+  const subscription = await db.select({ plan: subscriptions.plan, status: subscriptions.status, currentPeriodEnd: subscriptions.currentPeriodEnd, trialEnd: subscriptions.trialEnd }).from(subscriptions).where(eq(subscriptions.businessId, businessId)).limit(1);
   const current = subscription[0];
   const now = Date.now();
-  const withinPeriod = !current?.currentPeriodEnd || current.currentPeriodEnd.getTime() > now;
-  const inTrial = current?.status === "trialing" && (!current.trialEnd || current.trialEnd.getTime() > now);
-  const usable = Boolean(current && ["active", "trialing", "past_due", "canceled", "enterprise_contract"].includes(current.status) && (withinPeriod || inTrial));
-  const plan = usable && current ? getPlanDefinition(current.plan) : fallback;
+  // Fail CLOSED on missing/malformed dates — a "trialing"/"past_due"/"canceled"
+  // row with no trialEnd/currentPeriodEnd must never be treated as
+  // indefinitely usable. Only "active" and admin-managed "enterprise_contract"
+  // are usable without a date check, since the provider/admin is the
+  // authority on those states directly.
+  let usable = false;
+  if (current) {
+    if (current.status === "active" || current.status === "enterprise_contract") {
+      usable = true;
+    } else if (current.status === "trialing") {
+      usable = current.trialEnd != null && current.trialEnd.getTime() > now;
+    } else if (current.status === "past_due" || current.status === "canceled") {
+      usable = current.currentPeriodEnd != null && current.currentPeriodEnd.getTime() > now;
+    }
+  }
+  // No subscription row at all, OR a subscription that isn't currently
+  // usable, both resolve to Starter — never businesses.plan. That column is
+  // set once at creation and never updated by checkout/webhook/admin paths;
+  // trusting it here would let a stale or directly-edited value grant free
+  // premium access with no subscription evidence behind it whatsoever.
+  const plan = current && usable ? getPlanDefinition(current.plan) : getPlanDefinition("starter");
   const overrides = await db.select({ feature: entitlementOverrides.feature, overrideType: entitlementOverrides.overrideType, value: entitlementOverrides.value, startsAt: entitlementOverrides.startsAt, expiresAt: entitlementOverrides.expiresAt }).from(entitlementOverrides).where(eq(entitlementOverrides.businessId, businessId));
   const nowDate = new Date();
   const activeOverrides = overrides.filter((item) => item.startsAt <= nowDate && (!item.expiresAt || item.expiresAt > nowDate));

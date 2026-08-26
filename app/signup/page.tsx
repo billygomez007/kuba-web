@@ -1,14 +1,23 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { authClient } from "../../lib/auth-client";
 import BackNavigation from "../components/BackNavigation";
 
-export default function SignupPage() {
+const SELF_SERVE_PLANS = new Set(["starter", "growth", "pro"]);
+
+function SignupPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const intendedPlan = searchParams.get("plan");
+  // Only preserved as a UX convenience to pre-select the plan step later —
+  // the actual trial activation server-side (POST /api/billing/trial)
+  // independently validates the plan against the same canonical allow-list
+  // and never trusts this value on its own.
+  const planQuery = intendedPlan && SELF_SERVE_PLANS.has(intendedPlan) ? `?plan=${intendedPlan}` : "";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -46,7 +55,7 @@ export default function SignupPage() {
       }),
     });
 
-    router.push("/onboarding");
+    router.push(`/onboarding${planQuery}`);
     router.refresh();
   }
 
@@ -133,5 +142,13 @@ export default function SignupPage() {
 
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#050507]" />}>
+      <SignupPageInner />
+    </Suspense>
   );
 }
