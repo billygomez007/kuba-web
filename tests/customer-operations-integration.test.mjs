@@ -26,6 +26,10 @@ let db, schema, customerOps, appointmentTools, ticketTools, permissions, planDef
 
 const BIZ_A = "biz-a";
 const BIZ_B = "biz-b";
+const BIZ_STARTER = "biz-tier-starter";
+const BIZ_GROWTH = "biz-tier-growth";
+const BIZ_PRO = "biz-tier-pro";
+const BIZ_ENTERPRISE = "biz-tier-enterprise";
 
 function fakeRequestContext(businessId) {
   return { get: (key) => (key === "businessId" ? businessId : undefined) };
@@ -35,7 +39,11 @@ async function seed() {
   const now = new Date();
   const rows = [];
 
+  // biz-a and biz-b are "pro" so the existing AI-tool tests below continue to
+  // exercise tenant isolation specifically, unaffected by the entitlement
+  // gate added in this task. Dedicated tier businesses are seeded separately.
   for (const [biz, suffix] of [[BIZ_A, "a"], [BIZ_B, "b"]]) {
+    await db.insert(schema.businesses).values({ id: biz, name: `Business ${suffix.toUpperCase()}`, slug: `business-${suffix}`, plan: "pro", status: "active", createdAt: now, updatedAt: now });
     await db.insert(schema.users).values({ id: `user-${suffix}`, name: `User ${suffix.toUpperCase()}`, email: `user-${suffix}@example.com`, emailVerified: true, phoneVerified: true, platformRole: "user", status: "active", createdAt: now, updatedAt: now });
     await db.insert(schema.businessUsers).values({ id: `bu-${suffix}`, businessId: biz, userId: `user-${suffix}`, role: "member", permissions: null, createdAt: now });
     await db.insert(schema.customers).values({ id: `cust-${suffix}`, businessId: biz, name: `Customer ${suffix.toUpperCase()}`, email: `cust-${suffix}@example.com`, createdAt: now, updatedAt: now });
@@ -51,6 +59,11 @@ async function seed() {
   // to distinguish "foreign user" rejection from "not a team member" rejection.
   await db.insert(schema.users).values({ id: "user-a2", name: "User A2", email: "user-a2@example.com", emailVerified: true, phoneVerified: true, platformRole: "user", status: "active", createdAt: now, updatedAt: now });
   await db.insert(schema.businessUsers).values({ id: "bu-a2", businessId: BIZ_A, userId: "user-a2", role: "member", permissions: null, createdAt: now });
+
+  // One dedicated business per tier, for entitlement-tier assertions specifically.
+  for (const [id, plan] of [[BIZ_STARTER, "starter"], [BIZ_GROWTH, "growth"], [BIZ_PRO, "pro"], [BIZ_ENTERPRISE, "enterprise"]]) {
+    await db.insert(schema.businesses).values({ id, name: `Business ${plan}`, slug: `business-${plan}`, plan, status: "active", createdAt: now, updatedAt: now });
+  }
 
   return rows;
 }
@@ -260,27 +273,163 @@ test("entitlement AND permission are both independently required for access (rea
   assert.equal(wouldGrantAccess("owner", null, permissions.PERMISSIONS.RECEPTION_MANAGE, starterCaps, "customer_ops.appointments"), false, "permission alone must not bypass the entitlement gate");
 });
 
-// --- Commercial tier state, verified against the real plan-definitions module ---
+// --- Commercial tier placement, verified against the real plan-definitions module ---
+// Approved model: Starter = no Appointments/Tickets. Growth = core (human)
+// Appointments/Tickets. Pro = Growth + AI-assisted workflows. Enterprise = Pro + governance.
 
-test("Appointments and Tickets are currently entitled at Enterprise only (current, unchanged tier placement)", () => {
-  for (const planId of ["starter", "growth", "pro"]) {
-    const caps = planDefs.getPlanDefinition(planId).capabilities;
-    assert.equal(caps.includes("customer_ops.appointments"), false, `${planId} should not have customer_ops.appointments yet`);
-    assert.equal(caps.includes("customer_ops.tickets"), false, `${planId} should not have customer_ops.tickets yet`);
+test("1-2. Starter is not entitled to Appointments or Tickets", () => {
+  const caps = planDefs.getPlanDefinition("starter").capabilities;
+  assert.equal(caps.includes("customer_ops.appointments"), false);
+  assert.equal(caps.includes("customer_ops.tickets"), false);
+});
+test("3. Starter's required plan for Appointments and Tickets is Growth (derived, not hand-coded)", () => {
+  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.appointments"], "growth");
+  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.tickets"], "growth");
+});
+test("4-5. Growth is entitled to core Appointments and Tickets", () => {
+  const caps = planDefs.getPlanDefinition("growth").capabilities;
+  assert.equal(caps.includes("customer_ops.appointments"), true);
+  assert.equal(caps.includes("customer_ops.tickets"), true);
+});
+test("6-7. Growth's core appointment/ticket workflow is unblocked at the getOperationsContext gate (permission AND entitlement)", () => {
+  function wouldGrantAccess(planCapabilities, capability) {
+    return permissions.hasPermission("owner", null, permissions.PERMISSIONS.RECEPTION_MANAGE) && planCapabilities.includes(capability);
   }
+  const growthCaps = planDefs.getPlanDefinition("growth").capabilities;
+  assert.equal(wouldGrantAccess(growthCaps, "customer_ops.appointments"), true);
+  assert.equal(wouldGrantAccess(growthCaps, "customer_ops.tickets"), true);
+});
+test("8. Growth does NOT inherit Pro AI Workforce or AI-assisted customer-ops capabilities", () => {
+  const growthCaps = planDefs.getPlanDefinition("growth").capabilities;
+  for (const proOnly of ["customer_ops.ai_assist", "ai_workforce.orchestration", "ai_workforce.voice", "ai_workforce.simulator", "ai_workforce.marketplace", "ai_workforce.performance"]) {
+    assert.equal(growthCaps.includes(proOnly), false, `growth must not have ${proOnly}`);
+  }
+});
+test("9-10. Pro is entitled to Appointments and Tickets", () => {
+  const caps = planDefs.getPlanDefinition("pro").capabilities;
+  assert.equal(caps.includes("customer_ops.appointments"), true);
+  assert.equal(caps.includes("customer_ops.tickets"), true);
+});
+test("11. Pro's AI-assisted customer-ops capability follows the existing AI Workforce tier rules (Pro-and-above only)", () => {
+  const proCaps = planDefs.getPlanDefinition("pro").capabilities;
+  assert.equal(proCaps.includes("customer_ops.ai_assist"), true);
+  assert.equal(proCaps.includes("ai_workforce.orchestration"), true, "customer_ops.ai_assist should land alongside the same tier as other Pro-level AI Workforce capabilities");
+});
+test("12. Pro lacks Enterprise governance", () => {
+  const proCaps = planDefs.getPlanDefinition("pro").capabilities;
+  for (const enterpriseOnly of ["enterprise.organization", "enterprise.multi_business", "enterprise.group_command_center", "enterprise.cross_business_analytics", "enterprise.advanced_governance"]) {
+    assert.equal(proCaps.includes(enterpriseOnly), false, `pro must not have ${enterpriseOnly}`);
+  }
+});
+test("13-15. Enterprise has Appointments, Tickets, and full capability inheritance from Pro", () => {
   const enterpriseCaps = planDefs.getPlanDefinition("enterprise").capabilities;
+  const proCaps = planDefs.getPlanDefinition("pro").capabilities;
   assert.equal(enterpriseCaps.includes("customer_ops.appointments"), true);
   assert.equal(enterpriseCaps.includes("customer_ops.tickets"), true);
+  assert.equal(proCaps.every((capability) => enterpriseCaps.includes(capability)), true, "enterprise must inherit every pro capability");
 });
-test("four-tier classification: Starter/Growth/Pro receive UPGRADE_REQUIRED, Enterprise receives AVAILABLE", () => {
-  function classify(planId, capability) {
-    const entitled = planDefs.getPlanDefinition(planId).capabilities.includes(capability);
-    return entitled ? "AVAILABLE" : "UPGRADE_REQUIRED";
+test("Monotonic tier ladder: starter ⊂ growth ⊂ pro ⊂ enterprise", () => {
+  const starter = planDefs.getPlanDefinition("starter").capabilities;
+  const growth = planDefs.getPlanDefinition("growth").capabilities;
+  const pro = planDefs.getPlanDefinition("pro").capabilities;
+  const enterprise = planDefs.getPlanDefinition("enterprise").capabilities;
+  assert.equal(starter.every((c) => growth.includes(c)), true);
+  assert.equal(growth.every((c) => pro.includes(c)), true);
+  assert.equal(pro.every((c) => enterprise.includes(c)), true);
+});
+
+// --- 18. Direct foreign ticket lookup (mirrors the appointment version above) ---
+
+test("18. direct foreign ticket lookup returns nothing when scoped to the wrong business", async () => {
+  const { eq, and } = await import("drizzle-orm");
+  const now = new Date();
+  await db.insert(schema.tickets).values({ id: "ticket-lookup-seed", businessId: BIZ_A, ticketReference: "SUP-LOOKUP01", subject: "lookup test", description: "d", status: "open", priority: "normal", source: "manual", openedAt: now, createdBy: "user-a", createdAt: now, updatedAt: now });
+  const row = await db.select().from(schema.tickets).where(and(eq(schema.tickets.id, "ticket-lookup-seed"), eq(schema.tickets.businessId, BIZ_B))).limit(1);
+  assert.equal(row.length, 0);
+});
+
+// --- 21. Business switch refreshes entitlements (same render-time-invalidation contract as tests/four-tier-qa.test.mjs) ---
+
+test("21. switching a session's business from Enterprise to Starter immediately drops Appointments/Tickets access", () => {
+  function pageAccessAfterSwitch(capability, newPlanCapabilities) {
+    return newPlanCapabilities.includes(capability) ? "renders" : "upgrade_required";
   }
-  for (const planId of ["starter", "growth", "pro"]) {
-    assert.equal(classify(planId, "customer_ops.appointments"), "UPGRADE_REQUIRED");
-    assert.equal(classify(planId, "customer_ops.tickets"), "UPGRADE_REQUIRED");
+  const enterpriseCaps = planDefs.getPlanDefinition("enterprise").capabilities;
+  const starterCaps = planDefs.getPlanDefinition("starter").capabilities;
+  assert.equal(pageAccessAfterSwitch("customer_ops.appointments", enterpriseCaps), "renders");
+  assert.equal(pageAccessAfterSwitch("customer_ops.appointments", starterCaps), "upgrade_required");
+});
+test("21b. switching from Growth to Pro immediately grants AI-assisted customer-ops access", () => {
+  function pageAccessAfterSwitch(capability, newPlanCapabilities) {
+    return newPlanCapabilities.includes(capability) ? "renders" : "upgrade_required";
   }
-  assert.equal(classify("enterprise", "customer_ops.appointments"), "AVAILABLE");
-  assert.equal(classify("enterprise", "customer_ops.tickets"), "AVAILABLE");
+  const growthCaps = planDefs.getPlanDefinition("growth").capabilities;
+  const proCaps = planDefs.getPlanDefinition("pro").capabilities;
+  assert.equal(pageAccessAfterSwitch("customer_ops.ai_assist", growthCaps), "upgrade_required");
+  assert.equal(pageAccessAfterSwitch("customer_ops.ai_assist", proCaps), "renders");
+});
+
+// --- 22-23. Pricing page and dashboard billing plan comparison stay canonical, not duplicated ---
+
+test("22. the public pricing page derives its capability matrix from the real plan-definitions module, not a hand-copied list", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(path.join(REPO_ROOT, "app/pricing/page.tsx"), "utf8");
+  assert.match(source, /from ["']@\/lib\/billing\/plan-definitions["']/);
+  assert.match(source, /planDefinitions/);
+  assert.match(source, /"customer_ops\.ai_assist":/, "the new capability must have a pricing label, not just an internal ID");
+});
+test("23. the dashboard billing plan comparison derives from the real plan-definitions module", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(path.join(REPO_ROOT, "app/dashboard/billing/plans/PlansExperience.tsx"), "utf8");
+  assert.match(source, /from ["']@\/lib\/billing\/plan-definitions["']/);
+});
+
+// --- 24-25. capabilityMinimumPlan resolves automatically from the canonical matrix ---
+
+test("24. capabilityMinimumPlan(Appointments) = Growth", () => {
+  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.appointments"], "growth");
+});
+test("25. capabilityMinimumPlan(Tickets) = Growth", () => {
+  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.tickets"], "growth");
+});
+test("capabilityMinimumPlan(AI-assisted customer ops) = Pro", () => {
+  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.ai_assist"], "pro");
+});
+
+// --- Direct URL / sidebar gate for Appointments and Tickets is wired (not just entitlement at the API layer) ---
+
+test("the dashboard layout's direct-URL capability gate covers /dashboard/appointments and /dashboard/tickets", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(path.join(REPO_ROOT, "app/dashboard/layout.tsx"), "utf8");
+  assert.match(source, /"\/dashboard\/appointments":\s*"customer_ops\.appointments"/);
+  assert.match(source, /"\/dashboard\/tickets":\s*"customer_ops\.tickets"/);
+});
+
+// --- AI tool entitlement gate: Growth (core only) vs Pro (AI-assisted) ---
+
+test("AI createAppointmentTool is denied for a Growth-tier business (core only, no AI assist)", async () => {
+  await assert.rejects(
+    () => appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-03-01T09:00:00Z", endAt: "2027-03-01T09:30:00Z", timezone: "UTC" }, { requestContext: fakeRequestContext(BIZ_GROWTH) }),
+    /Pro plan or higher/,
+  );
+});
+test("AI createAppointmentTool succeeds for a Pro-tier business", async () => {
+  const result = await appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-03-01T09:00:00Z", endAt: "2027-03-01T09:30:00Z", timezone: "UTC" }, { requestContext: fakeRequestContext(BIZ_PRO) });
+  assert.equal(result.success, true);
+});
+test("AI createSupportTicketTool is denied for a Growth-tier business (core only, no AI assist)", async () => {
+  await assert.rejects(
+    () => ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue" }, { requestContext: fakeRequestContext(BIZ_GROWTH) }),
+    /Pro plan or higher/,
+  );
+});
+test("AI createSupportTicketTool succeeds for an Enterprise-tier business", async () => {
+  const result = await ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue" }, { requestContext: fakeRequestContext(BIZ_ENTERPRISE) });
+  assert.equal(result.success, true);
+});
+test("AI requestTicketEscalationTool is denied for a Starter-tier business", async () => {
+  await assert.rejects(
+    () => ticketTools.requestTicketEscalationTool.execute({ ticketId: "ticket-lookup-seed", reason: "x" }, { requestContext: fakeRequestContext(BIZ_STARTER) }),
+    /Pro plan or higher/,
+  );
 });

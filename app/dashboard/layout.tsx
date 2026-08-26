@@ -224,6 +224,8 @@ const navigationCapabilities: Record<string, string> = {
   "/dashboard/conversations": "customer_ops.conversations",
   "/dashboard/follow-ups": "customer_ops.followups",
   "/dashboard/handoffs": "customer_ops.handoffs",
+  "/dashboard/appointments": "customer_ops.appointments",
+  "/dashboard/tickets": "customer_ops.tickets",
   "/dashboard/business-operations": "business_ops.core",
   "/dashboard/tasks": "business_ops.tasks",
   "/dashboard/approvals": "business_ops.approvals",

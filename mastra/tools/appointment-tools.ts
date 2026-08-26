@@ -6,8 +6,16 @@ import { db } from "@/db";
 import { appointments } from "@/db/schema";
 import { assertAppointmentConflict, appointmentTransitions, assertTransition, parseDate, validateReferences, validateTimezone } from "@/lib/customer-operations";
 import { requireBusinessId } from "@/mastra/tools/business-context";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 const appointmentInput = z.object({ appointmentId: z.string() });
+
+async function requireAiAssist(businessId: string) {
+  const entitlements = await getBusinessEntitlements(businessId);
+  if (!hasCapability(entitlements, "customer_ops.ai_assist")) {
+    throw new Error("AI-assisted appointment scheduling requires the Pro plan or higher.");
+  }
+}
 
 export const getAppointmentsTool = createTool({
   id: "get-appointments",
@@ -15,6 +23,7 @@ export const getAppointmentsTool = createTool({
   inputSchema: z.object({ status: z.string().optional(), customerId: z.string().optional() }),
   execute: async ({ status, customerId }, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    await requireAiAssist(businessId);
     const conditions = [eq(appointments.businessId, businessId)];
     if (status) conditions.push(eq(appointments.status, status));
     if (customerId) conditions.push(eq(appointments.customerId, customerId));
@@ -28,6 +37,7 @@ export const createAppointmentTool = createTool({
   inputSchema: z.object({ title: z.string(), startAt: z.string(), endAt: z.string(), timezone: z.string(), customerId: z.string().optional(), leadId: z.string().optional(), conversationId: z.string().optional(), branchId: z.string().optional(), assignedUserId: z.string().optional(), assignedAiEmployeeId: z.string().optional() }),
   execute: async (input, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    await requireAiAssist(businessId);
     const startAt = parseDate(input.startAt, "startAt"); const endAt = parseDate(input.endAt, "endAt");
     if (startAt >= endAt) throw new Error("startAt must be before endAt.");
     const timezone = validateTimezone(input.timezone);
@@ -45,6 +55,7 @@ export const updateAppointmentTool = createTool({
   inputSchema: appointmentInput.extend({ status: z.enum(["confirmed", "cancelled"]).optional(), startAt: z.string().optional(), endAt: z.string().optional(), cancellationReason: z.string().optional() }),
   execute: async ({ appointmentId, status, startAt, endAt, cancellationReason }, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    await requireAiAssist(businessId);
     const current = (await db.select().from(appointments).where(and(eq(appointments.id, appointmentId), eq(appointments.businessId, businessId))).limit(1))[0];
     if (!current) return { success: false, error: "Appointment not found." };
     if (status) assertTransition(appointmentTransitions, current.status as keyof typeof appointmentTransitions, status);
