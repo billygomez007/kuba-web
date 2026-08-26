@@ -8,6 +8,8 @@ import {
   leads,
   followUps,
   customerTags,
+  appointments,
+  tickets,
 } from "@/db/schema";
 import { requireBusinessMembership } from "@/lib/auth/tenant";
 
@@ -90,6 +92,10 @@ export async function GET(
     ? await db.select().from(followUps).where(and(eq(followUps.businessId, membership.businessId), inArray(followUps.leadId, leadIds)))
     : [];
   const tags = await db.select().from(customerTags).where(eq(customerTags.customerId, customerId));
+  const customerAppointments = await db.select({ id: appointments.id, title: appointments.title, startAt: appointments.startAt, status: appointments.status })
+    .from(appointments).where(and(eq(appointments.customerId, customerId), eq(appointments.businessId, membership.businessId)));
+  const customerTickets = await db.select({ id: tickets.id, ticketReference: tickets.ticketReference, subject: tickets.subject, status: tickets.status, priority: tickets.priority })
+    .from(tickets).where(and(eq(tickets.customerId, customerId), eq(tickets.businessId, membership.businessId)));
 
 
   return NextResponse.json({
@@ -98,6 +104,8 @@ export async function GET(
     leads:customerLeads,
     followUps:customerFollowUps,
     tags,
+    appointments: customerAppointments,
+    tickets: customerTickets,
   });
 
 }

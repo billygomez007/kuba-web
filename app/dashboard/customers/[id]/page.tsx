@@ -13,7 +13,7 @@ type Customer = {
   createdAt: string | number | Date;
   updatedAt: string | number | Date;
 };
-type Relationship = { conversations: Array<{ id: string; status: string }>; leads: Array<{ id: string; stage: string }>; followUps: Array<{ id: string; status: string }>; tags: Array<{ id: string; tag: string }> };
+type Relationship = { conversations: Array<{ id: string; status: string }>; leads: Array<{ id: string; stage: string }>; followUps: Array<{ id: string; status: string }>; tags: Array<{ id: string; tag: string }>; appointments: Array<{ id: string; title: string; startAt: string; status: string }>; tickets: Array<{ id: string; ticketReference: string; subject: string; status: string; priority: string }> };
 
 export default function CustomerProfilePage({
   params,
@@ -23,7 +23,7 @@ export default function CustomerProfilePage({
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [relationship, setRelationship] = useState<Relationship>({ conversations: [], leads: [], followUps: [], tags: [] });
+  const [relationship, setRelationship] = useState<Relationship>({ conversations: [], leads: [], followUps: [], tags: [], appointments: [], tickets: [] });
 
   useEffect(() => {
     async function loadCustomer() {
@@ -41,7 +41,7 @@ export default function CustomerProfilePage({
         }
 
         setCustomer(data.customer);
-        setRelationship({ conversations: data.conversations || [], leads: data.leads || [], followUps: data.followUps || [], tags: data.tags || [] });
+        setRelationship({ conversations: data.conversations || [], leads: data.leads || [], followUps: data.followUps || [], tags: data.tags || [], appointments: data.appointments || [], tickets: data.tickets || [] });
       } catch (error) {
         setError(
           error instanceof Error
@@ -217,6 +217,10 @@ export default function CustomerProfilePage({
           />
 
           <RelationshipPanel icon="◉" title="Business Brain memory" count={relationship.leads.length + relationship.conversations.length} description="Customer context is derived from scoped lead and conversation history." href="/dashboard/business-brain/memory" />
+
+          <RelationshipPanel icon="□" title="Appointments" count={relationship.appointments.length} description={`${relationship.appointments.filter((item) => item.status !== "cancelled").length} active appointment(s)`} href="/dashboard/appointments" />
+
+          <RelationshipPanel icon="◇" title="Support tickets" count={relationship.tickets.length} description={`${relationship.tickets.filter((item) => !["resolved", "closed"].includes(item.status)).length} unresolved ticket(s)`} href="/dashboard/tickets" />
         </section>
 
         {/* Future intelligence */}

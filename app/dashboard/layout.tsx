@@ -86,8 +86,8 @@ const navigationGroups: NavigationGroup[] = [
       { label: "Conversations", href: "/dashboard/conversations", icon: "◌", permission: "messaging.view" },
       { label: "Follow-ups", href: "/dashboard/follow-ups", icon: "◌", permission: "followups.view" },
       { label: "Handoffs", href: "/dashboard/handoffs", icon: "⇄", permission: "messaging.manage" },
-      { label: "Appointments", icon: "□", status: "Coming Soon" },
-      { label: "Support / Tickets", icon: "◇", status: "Coming Soon" },
+      { label: "Appointments", href: "/dashboard/appointments", icon: "□", permission: "reception.view" },
+      { label: "Support / Tickets", href: "/dashboard/tickets", icon: "◇", permission: "messaging.view" },
     ],
   },
   {
