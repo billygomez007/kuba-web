@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessLocalization } from "@/lib/localization";
 
 import {
   leads,
@@ -126,8 +127,14 @@ export async function GET() {
           )
         : 0;
 
+    // Reflects the business's configured operational currency. Individual
+    // deals carry their own `currency` field (schema.ts) which is not
+    // currently enforced to match; this label does not imply per-deal
+    // currency conversion.
+    const localization = await getBusinessLocalization(business.businessId);
+
     return NextResponse.json({
-      currency: "GHS",
+      currency: localization.currencyCode,
 
       pipeline: {
         totalValue: pipelineValue,

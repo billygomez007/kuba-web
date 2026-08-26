@@ -205,10 +205,10 @@ function MetricCard({
   );
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-GH", {
+function formatMoney(value: number, currencyCode: string = "GHS", locale: string = "en-GH") {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "GHS",
+    currency: currencyCode,
     maximumFractionDigits: 0,
   }).format(value);
 }
@@ -479,6 +479,22 @@ export default function AnalyticsPage() {
       | "salesActivities"
       | "wonDeals"
     >("leads");
+
+  const [localization, setLocalization] =
+    useState<{ currencyCode: string; locale: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((result) => {
+        if (result?.membership?.localization) setLocalization(result.membership.localization);
+      })
+      .catch(() => { /* falls back to formatMoney's defaults */ });
+  }, []);
+
+  function money(value: number) {
+    return formatMoney(value, localization?.currencyCode, localization?.locale);
+  }
 
   useEffect(() => {
     async function loadAnalytics() {
@@ -1223,7 +1239,7 @@ export default function AnalyticsPage() {
                 </p>
 
                 <p className="mt-3 text-2xl font-black">
-                  {formatMoney(
+                  {money(
                     financialAnalytics.pipeline.totalValue,
                   )}
                 </p>
@@ -1246,7 +1262,7 @@ export default function AnalyticsPage() {
                 </p>
 
                 <p className="mt-3 text-2xl font-black">
-                  {formatMoney(
+                  {money(
                     financialAnalytics.pipeline.openValue,
                   )}
                 </p>
@@ -1272,7 +1288,7 @@ export default function AnalyticsPage() {
                 </p>
 
                 <p className="mt-3 text-2xl font-black text-emerald-300">
-                  {formatMoney(
+                  {money(
                     financialAnalytics.revenue.wonValue,
                   )}
                 </p>
@@ -1332,7 +1348,7 @@ export default function AnalyticsPage() {
                     </p>
 
                     <p className="mt-2 text-xl font-black">
-                      {formatMoney(
+                      {money(
                         financialAnalytics.losses.lostValue,
                       )}
                     </p>
@@ -1363,7 +1379,7 @@ export default function AnalyticsPage() {
                     </p>
 
                     <p className="mt-2 text-xl font-black">
-                      {formatMoney(
+                      {money(
                         financialAnalytics.pipeline.openValue,
                       )}
                     </p>
@@ -1504,7 +1520,7 @@ export default function AnalyticsPage() {
                       <div className="text-left lg:text-right">
 
                         <p className="text-lg font-black">
-                          {formatMoney(
+                          {money(
                             deal.estimatedValue,
                           )}
                         </p>
@@ -1796,7 +1812,7 @@ export default function AnalyticsPage() {
               </p>
 
               <p className="mt-1 text-lg font-black text-cyan-300">
-                {formatMoney(
+                {money(
                   sales.pipelineValue,
                 )}
               </p>
@@ -1848,7 +1864,7 @@ export default function AnalyticsPage() {
                           </div>
 
                           <span className="text-xs text-white/40">
-                            {formatMoney(
+                            {money(
                               item.value,
                             )}
                           </span>
@@ -1894,7 +1910,7 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Open Deals"
               value={sales.dealStatus.open}
-              detail={formatMoney(
+              detail={money(
                 sales.dealStatus.openValue,
               )}
             />
@@ -1902,7 +1918,7 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Won Deals"
               value={sales.dealStatus.won}
-              detail={formatMoney(
+              detail={money(
                 sales.dealStatus.wonValue,
               )}
             />
@@ -1910,7 +1926,7 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Lost Deals"
               value={sales.dealStatus.lost}
-              detail={formatMoney(
+              detail={money(
                 sales.dealStatus.lostValue,
               )}
             />
@@ -2172,7 +2188,7 @@ export default function AnalyticsPage() {
             qualified opportunities. The estimated
             sales pipeline is{" "}
             <span className="font-bold text-white">
-              {formatMoney(
+              {money(
                 sales.pipelineValue,
               )}
             </span>

@@ -18,6 +18,7 @@ import {
   salesActivities,
 } from "@/db/schema";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
+import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
 
 export async function POST(request: Request) {
   try {
@@ -163,6 +164,9 @@ export async function POST(request: Request) {
     // 6. Business context
     // ---------------------------------------------------------
 
+    const localization = await getBusinessLocalization(business.id);
+    const nowInBusinessTimezone = formatDateTime(new Date(), localization.timezone, localization.locale);
+
     const businessContext = `
 BUSINESS CONTEXT
 
@@ -182,6 +186,16 @@ Business size: ${
       "Not specified"
     }
 Business status: ${business.status}
+
+CURRENT DATE AND TIME
+
+Business timezone: ${localization.timezone}
+Current date and time in the business's timezone: ${nowInBusinessTimezone}
+
+When the customer uses relative dates or times such as "today", "tomorrow",
+"next week", or "2 PM", resolve them against the business timezone above —
+never assume UTC or any other timezone. If the customer's intended date or
+time is genuinely ambiguous, ask them to confirm rather than guessing.
 
 BUSINESS KNOWLEDGE
 

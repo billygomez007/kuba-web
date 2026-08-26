@@ -6,6 +6,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { businesses } from "@/db/schema";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessLocalization } from "@/lib/localization/business";
+import { COMMON_TIMEZONES, COUNTRY_ORDER, CURRENCY_ORDER, SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES } from "@/lib/localization/registry";
 
 export default async function BusinessProfilePage() {
   const session = await auth.api.getSession({
@@ -24,6 +26,8 @@ export default async function BusinessProfilePage() {
   if (!membership || !business) {
     redirect("/onboarding");
   }
+
+  const localization = await getBusinessLocalization(membership.businessId);
 
   const canEdit =
     membership.role === "owner" ||
@@ -132,6 +136,49 @@ export default async function BusinessProfilePage() {
             </section>
 
             <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-6 sm:p-8">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-400">
+                Regional settings
+              </p>
+
+              <h2 className="mt-2 text-xl font-black">
+                Country, currency, and timezone
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-white/40">
+                Controls how amounts and dates are formatted, and the
+                operational timezone used for appointments and daily
+                reporting. This is separate from your SuperKuba subscription
+                billing currency, which is unaffected by these settings.
+              </p>
+
+              <div className="mt-6 grid gap-5 md:grid-cols-3">
+                <SelectField
+                  label="Country"
+                  name="localizationCountry"
+                  defaultValue={localization.countryCode}
+                  disabled={!canEdit}
+                  options={COUNTRY_ORDER.map((code) => ({ value: code, label: SUPPORTED_COUNTRIES[code].name }))}
+                />
+
+                <SelectField
+                  label="Currency"
+                  name="localizationCurrency"
+                  defaultValue={localization.currencyCode}
+                  disabled={!canEdit}
+                  options={CURRENCY_ORDER.map((code) => ({ value: code, label: `${SUPPORTED_CURRENCIES[code].name} (${code})` }))}
+                />
+
+                <SelectField
+                  label="Timezone"
+                  name="localizationTimezone"
+                  defaultValue={localization.timezone}
+                  disabled={!canEdit}
+                  options={(COMMON_TIMEZONES.includes(localization.timezone) ? COMMON_TIMEZONES : [localization.timezone, ...COMMON_TIMEZONES]).map((zone) => ({ value: zone, label: zone.replaceAll("_", " ") }))}
+                />
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-6 sm:p-8">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
                 Business identity
               </p>
@@ -231,6 +278,41 @@ function Field({
         disabled={disabled}
         className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
       />
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  name,
+  defaultValue,
+  disabled,
+  options,
+}: {
+  label: string;
+  name: string;
+  defaultValue: string;
+  disabled: boolean;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-semibold text-white/70">
+        {label}
+      </span>
+
+      <select
+        name={name}
+        defaultValue={defaultValue}
+        disabled={disabled}
+        className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

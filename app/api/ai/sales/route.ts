@@ -9,6 +9,7 @@ import { getCurrentMembership } from "@/lib/auth/tenant";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { businesses, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
+import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
 
 export async function POST(request: Request) {
   try {
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
         { status: 404 },
       );
     }
+
+    const localization = await getBusinessLocalization(business.id);
 
     const businessKnowledge =
       await db
@@ -132,9 +135,10 @@ If you need more information about the business, ask the user.
 
 CURRENT DATE AND TIME
 
-Current date: ${new Date().toISOString()}
+Business timezone: ${localization.timezone}
+Current date and time in the business's timezone: ${formatDateTime(new Date(), localization.timezone, localization.locale)}
 
-When the user uses relative dates such as "today", "tomorrow", "next week", or "Monday", calculate them from the current date and time above.
+When the user uses relative dates such as "today", "tomorrow", "next week", or "Monday", calculate them from the current date and time above, in the business's timezone — never assume UTC or the server's timezone.
 
 Never use a date from your training data or assume a different year.
 

@@ -11,6 +11,8 @@ import {
   aiBusinessSettings,
   users,
 } from "@/db/schema";
+import { upsertBusinessLocalization } from "@/lib/localization/business";
+import { isSupportedCountry, isSupportedCurrency, isValidTimezone, SUPPORTED_COUNTRIES } from "@/lib/localization/registry";
 
 const onboardingIndustries = new Set([
   "Travel",
@@ -130,6 +132,12 @@ export async function POST(request: Request) {
     const phone = String(body.phone || "").trim();
     const industry = String(body.industry || "").trim();
     const businessSize = String(body.businessSize || "").trim();
+    const countryCodeInput = String(body.countryCode || "").trim().toUpperCase();
+    const currencyCodeInput = String(body.currencyCode || "").trim().toUpperCase();
+    const timezoneInput = String(body.timezone || "").trim();
+    const countryCode = isSupportedCountry(countryCodeInput) ? countryCodeInput : null;
+    const currencyCode = isSupportedCurrency(currencyCodeInput) ? currencyCodeInput : (countryCode ? SUPPORTED_COUNTRIES[countryCode].defaultCurrency : null);
+    const timezone = isValidTimezone(timezoneInput) ? timezoneInput : (countryCode ? SUPPORTED_COUNTRIES[countryCode].defaultTimezone : null);
     const goals = Array.isArray(body.goals)
       ? body.goals
           .filter((goal: unknown): goal is string => typeof goal === "string")
@@ -188,6 +196,7 @@ export async function POST(request: Request) {
       slug,
       website: website || null,
       industry: industry || null,
+      country: countryCode ? SUPPORTED_COUNTRIES[countryCode].name : null,
       businessSize: businessSize || null,
       plan: "starter",
       status: "active",
@@ -202,6 +211,10 @@ export async function POST(request: Request) {
       role: "owner",
       createdAt: now,
     });
+
+    if (countryCode && currencyCode && timezone) {
+      await upsertBusinessLocalization(businessId, { countryCode, currencyCode, timezone });
+    }
 
     if (goals.length > 0) {
       await db.insert(aiBusinessSettings).values({

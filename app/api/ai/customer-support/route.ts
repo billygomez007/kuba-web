@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
+import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
 
 export async function POST(request: Request) {
   try {
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
     const knowledge =
       businessKnowledgeResult[0];
 
+    const localization = await getBusinessLocalization(business.id);
+
     const businessContext = `
 BUSINESS CONTEXT
 
@@ -157,7 +160,10 @@ IMPORTANT:
 
 CURRENT DATE AND TIME
 
-${new Date().toISOString()}
+Business timezone: ${localization.timezone}
+Current date and time in the business's timezone: ${formatDateTime(new Date(), localization.timezone, localization.locale)}
+
+When resolving relative dates or times, use the business timezone above — never assume UTC or the server's timezone.
 `;
 
     const prompt = `

@@ -33,6 +33,7 @@ import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { getEffectivePermissions, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { canViewPayroll } from "@/lib/human-workforce/policy";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +51,9 @@ export async function GET() {
     if (!hasCapability(entitlements, "human_workforce.core")) {
       return NextResponse.json({ error: "Human Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const soon = new Date(today);
-    soon.setDate(soon.getDate() + 30);
+    const localization = await getBusinessLocalization(businessId);
+    const { start: today, end: tomorrow } = getBusinessDayBounds(localization.timezone);
+    const soon = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const [employees, departments, positions, contracts, documents, attendance, corrections, policies, schedules, leaveTypes, leaveBalances, leaveRequests, teams, branchRows] = await Promise.all([
       db.select().from(hrEmployees).where(eq(hrEmployees.businessId, businessId)),

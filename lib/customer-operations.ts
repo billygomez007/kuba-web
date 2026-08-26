@@ -13,6 +13,7 @@ import {
   hrEmployees,
   leads,
 } from "@/db/schema";
+import { isValidTimezone as isValidIanaTimezone } from "@/lib/localization/registry";
 
 export const APPOINTMENT_STATUSES = ["scheduled", "confirmed", "completed", "cancelled", "no_show"] as const;
 export const TICKET_STATUSES = ["open", "in_progress", "waiting_customer", "waiting_internal", "resolved", "closed"] as const;
@@ -30,11 +31,7 @@ export function parseDate(value: unknown, label: string) {
 
 export function validateTimezone(value: unknown) {
   if (typeof value !== "string" || !value.trim()) throw new Error("Timezone is required.");
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-  } catch {
-    throw new Error("Timezone is invalid.");
-  }
+  if (!isValidIanaTimezone(value)) throw new Error("Timezone is invalid.");
   return value;
 }
 

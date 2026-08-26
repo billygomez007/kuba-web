@@ -15,6 +15,7 @@ import {
   integrations,
 } from "@/db/schema";
 import { getChannelAdapter } from "@/lib/channels/router";
+import { getBusinessLocalization } from "@/lib/localization";
 import type { ChannelType } from "@/lib/channels/types";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
@@ -311,6 +312,7 @@ export async function runAutomationTrigger({
         }
 
         else if (action.type === "create_lead") {
+          const localization = await getBusinessLocalization(businessId);
           await db.insert(leads).values({
             id: crypto.randomUUID(),
             businessId,
@@ -330,7 +332,7 @@ export async function runAutomationTrigger({
             source: `automation:${automation.id}`,
             stage: action.stage || "new",
             estimatedValue: null,
-            currency: "GHS",
+            currency: localization.currencyCode,
             dealStatus: "open",
             closedAt: null,
             assignedEmployeeId: null,

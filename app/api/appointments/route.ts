@@ -7,6 +7,7 @@ import { PERMISSIONS } from "@/lib/auth/permissions";
 import { getOperationsContext } from "@/lib/customer-operations-auth";
 import { assertAppointmentConflict, parseDate, validateReferences, validateTimezone } from "@/lib/customer-operations";
 import { createAuditLog } from "@/lib/auth/audit";
+import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
 
 const errorResponse = (error: unknown) => NextResponse.json({ error: error instanceof Error ? error.message : "Unable to process appointment." }, { status: 400 });
 
@@ -26,8 +27,8 @@ export async function GET(request: Request) {
   if (branchId) conditions.push(eq(appointments.branchId, branchId));
   if (assignee) conditions.push(or(eq(appointments.assignedUserId, assignee), eq(appointments.assignedAiEmployeeId, assignee))!);
   if (params.get("today") === "true") {
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    const end = new Date(start); end.setDate(end.getDate() + 1);
+    const localization = await getBusinessLocalization(businessId);
+    const { start, end } = getBusinessDayBounds(localization.timezone);
     conditions.push(gte(appointments.startAt, start), lte(appointments.startAt, end));
   }
   if (params.get("upcoming") === "true") conditions.push(gte(appointments.startAt, new Date()));

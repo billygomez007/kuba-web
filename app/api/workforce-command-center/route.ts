@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
 import {
   aiBusinessSettings,
   aiEmployeeActivities,
@@ -50,8 +51,8 @@ export async function GET() {
       db.select({ frequentlyAskedQuestions: aiBusinessSettings.frequentlyAskedQuestions }).from(aiBusinessSettings).where(eq(aiBusinessSettings.businessId, businessId)).limit(1),
     ]);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const localization = await getBusinessLocalization(businessId);
+    const { start: today } = getBusinessDayBounds(localization.timezone);
     const todayMessages = messagesData.filter((message) => message.createdAt >= today);
     const completedToday = activities.filter((activity) => activity.createdAt >= today && activity.status === "completed").length;
     const employeeMetrics = employees.map((employee) => {

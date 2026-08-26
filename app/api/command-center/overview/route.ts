@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
 
 import {
   aiEmployees,
@@ -54,8 +55,8 @@ export async function GET() {
     }
 
     const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
+    const localization = await getBusinessLocalization(business.businessId);
+    const { start: startOfDay } = getBusinessDayBounds(localization.timezone, now);
 
     const [
       employeeData,

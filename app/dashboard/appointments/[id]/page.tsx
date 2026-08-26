@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { formatDateTime, formatTime } from "@/lib/localization/format";
 
 type Appointment = {
   id: string; title: string; description: string | null; status: string; appointmentType: string; meetingMode: string;
@@ -61,7 +62,7 @@ export default function AppointmentDetailPage({ params }: { params: Promise<{ id
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300/70">{appointment.appointmentType}</p>
             <h1 className="mt-2 text-3xl font-black">{appointment.title}</h1>
-            <p className="mt-2 text-sm text-white/40">{new Date(appointment.startAt).toLocaleString()} — {new Date(appointment.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ({appointment.timezone})</p>
+            <p className="mt-2 text-sm text-white/40">{formatDateTime(new Date(appointment.startAt), appointment.timezone)} — {formatTime(new Date(appointment.endAt), appointment.timezone)} ({appointment.timezone})</p>
           </div>
           <span className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase text-white/60">{appointment.status.replace("_", " ")}</span>
         </header>

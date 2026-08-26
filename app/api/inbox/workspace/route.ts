@@ -17,6 +17,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireBusinessMembership } from "@/lib/auth/tenant";
+import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
 
 export async function GET() {
   try {
@@ -62,8 +63,8 @@ export async function GET() {
 
     const routingByConversation = new Map(routingRows.map((routing) => [routing.conversationId, routing]));
     const handoffByConversation = new Map(handoffRows.map((handoff) => [handoff.conversationId, handoff]));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const localization = await getBusinessLocalization(membership.businessId);
+    const { start: today } = getBusinessDayBounds(localization.timezone);
 
     const inbox = conversationRows.map((conversation) => {
       const routing = routingByConversation.get(conversation.id);

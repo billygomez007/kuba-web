@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { COUNTRY_ORDER, CURRENCY_ORDER, SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, isValidTimezone, type CountryCode, type CurrencyCode } from "@/lib/localization/registry";
+
 type Role = { type: string; name: string; description: string };
 const roles: Role[] = [
   { type: "receptionist", name: "AI Receptionist", description: "Customer enquiries, appointments, and phone calls." },
@@ -15,8 +17,25 @@ const steps = ["Welcome", "Business information", "Setup choice", "First AI empl
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1); const [businessName, setBusinessName] = useState(""); const [industry, setIndustry] = useState("Professional Services"); const [country, setCountry] = useState("Ghana"); const [location, setLocation] = useState(""); const [website, setWebsite] = useState(""); const [description, setDescription] = useState(""); const [products, setProducts] = useState(""); const [customers, setCustomers] = useState(""); const [role, setRole] = useState(roles[0]); const [employeeId, setEmployeeId] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
-  async function createBusiness() { const response = await fetch("/api/businesses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessName, website, industry, country, businessSize: "Solo", goals: ["Automate customer support"], location }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to save business profile."); }
+  const [step, setStep] = useState(1); const [businessName, setBusinessName] = useState(""); const [industry, setIndustry] = useState("Professional Services"); const [countryCode, setCountryCode] = useState<CountryCode>("GH"); const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(SUPPORTED_COUNTRIES.GH.defaultCurrency); const [timezone, setTimezone] = useState(SUPPORTED_COUNTRIES.GH.defaultTimezone); const [timezoneTouched, setTimezoneTouched] = useState(false);
+  // Browser timezone is read once (synchronously, no permission prompt) as a
+  // SUGGESTION only — never applied automatically. See applyDetectedTimezone.
+  const [detectedTimezone] = useState(() => { try { const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone; return browserZone && isValidTimezone(browserZone) ? browserZone : ""; } catch { return ""; } });
+  const [location, setLocation] = useState(""); const [website, setWebsite] = useState(""); const [description, setDescription] = useState(""); const [products, setProducts] = useState(""); const [customers, setCustomers] = useState(""); const [role, setRole] = useState(roles[0]); const [employeeId, setEmployeeId] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+
+  function selectCountry(nextCode: CountryCode) {
+    setCountryCode(nextCode);
+    const defaults = SUPPORTED_COUNTRIES[nextCode];
+    setCurrencyCode(defaults.defaultCurrency);
+    if (!timezoneTouched) setTimezone(defaults.defaultTimezone);
+  }
+
+  function applyDetectedTimezone() {
+    setTimezone(detectedTimezone);
+    setTimezoneTouched(true);
+  }
+
+  async function createBusiness() { const response = await fetch("/api/businesses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessName, website, industry, countryCode, currencyCode, timezone, businessSize: "Solo", goals: ["Automate customer support"], location }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to save business profile."); }
   async function saveBrain() { const form = new FormData(); form.set("businessDescription", `${description}${location ? ` Location: ${location}.` : ""}`); form.set("productsAndServices", products); form.set("targetCustomers", customers); form.set("frequentlyAskedQuestions", ""); form.set("aiInstructions", ""); form.set("tone", "professional"); const response = await fetch("/api/businesses/ai-settings", { method: "POST", body: form, redirect: "manual" }); if (!response.ok && response.status !== 307) throw new Error("Unable to save Business Brain."); }
   async function createEmployee() { const response = await fetch("/api/ai-employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Kuba ${role.name.replace("AI ", "")}`, type: role.type, description: role.description, templateId: role.type }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to create AI employee."); if (data.employee?.id) { setEmployeeId(data.employee.id); const settings = new FormData(); settings.set("employeeId", data.employee.id); settings.set("responsibilities", role.description); settings.set("communicationStyle", "Professional and helpful"); settings.set("roleInstructions", "Use Business Brain and approved tools. Escalate when human support is needed."); await fetch("/api/ai-employees/settings", { method: "POST", body: settings }); } }
   async function next() { setError(""); if (step === 2 && !businessName.trim()) { setError("Business name is required."); return; } setLoading(true); try { if (step === 2) await createBusiness(); if (step === 5) await saveBrain(); if (step === 4) await createEmployee(); if (step === 3) { setStep(4); setLoading(false); return; } setStep((current) => Math.min(10, current + 1)); } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "Unable to continue setup."); } finally { setLoading(false); } }
@@ -67,9 +86,20 @@ export default function OnboardingPage() {
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <Field label="Business name" value={businessName} onChange={setBusinessName} />
               <Field label="Industry" value={industry} onChange={setIndustry} />
-              <Field label="Country" value={country} onChange={setCountry} />
+              <Select label="Country" value={countryCode} onChange={(value) => selectCountry(value as CountryCode)} options={COUNTRY_ORDER.map((code) => ({ value: code, label: SUPPORTED_COUNTRIES[code].name }))} />
+              <Select label="Currency" value={currencyCode} onChange={(value) => setCurrencyCode(value as CurrencyCode)} options={CURRENCY_ORDER.map((code) => ({ value: code, label: `${SUPPORTED_CURRENCIES[code].name} (${code})` }))} />
+              <Select label="Timezone" value={timezone} onChange={(value) => { setTimezone(value); setTimezoneTouched(true); }} options={Array.from(new Set([timezone, SUPPORTED_COUNTRIES[countryCode].defaultTimezone, detectedTimezone].filter(Boolean))).map((zone) => ({ value: zone, label: zone.replaceAll("_", " ") }))} />
               <Field label="Location (optional)" value={location} onChange={setLocation} />
               <Field label="Website (optional)" value={website} onChange={setWebsite} />
+              {detectedTimezone && detectedTimezone !== timezone && (
+                <p className="md:col-span-2 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.05] px-4 py-3 text-sm text-cyan-100">
+                  We detected your browser is in {detectedTimezone.replaceAll("_", " ")}.{" "}
+                  <button type="button" onClick={applyDetectedTimezone} className="font-semibold underline underline-offset-2">
+                    Use this timezone?
+                  </button>{" "}
+                  You can always change it later in Settings.
+                </p>
+              )}
             </div>
           )}
 
@@ -190,4 +220,5 @@ export default function OnboardingPage() {
 }
 function Heading({ title }: { title: string }) { return <><h1 className="mt-4 text-3xl font-black tracking-[-0.04em]">{title}</h1></>; }
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className="text-sm font-semibold text-white/70">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-cyan-300/40" /></label>; }
+function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) { return <label className="block"><span className="text-sm font-semibold text-white/70">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-cyan-300/40">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>; }
 function Checklist({ items }: { items: string[] }) { return <div className="mt-7 space-y-3">{items.map((item) => <div key={item} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/65"><span className="h-2 w-2 rounded-full bg-cyan-300" />{item}<span className="ml-auto text-xs text-white/30">Configure later</span></div>)}</div>; }

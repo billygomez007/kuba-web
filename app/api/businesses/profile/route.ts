@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { businesses } from "@/db/schema";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { createAuditLog } from "@/lib/auth/audit";
+import { InvalidLocalizationError, upsertBusinessLocalization } from "@/lib/localization/business";
 
 export async function POST(request: Request) {
   try {
@@ -58,12 +59,30 @@ export async function POST(request: Request) {
     const logoUrl = String(
       formData.get("logoUrl") || "",
     ).trim();
+    const localizationCountry = String(formData.get("localizationCountry") || "").trim();
+    const localizationCurrency = String(formData.get("localizationCurrency") || "").trim();
+    const localizationTimezone = String(formData.get("localizationTimezone") || "").trim();
 
     if (!name) {
       return NextResponse.json(
         { error: "Business name is required." },
         { status: 400 },
       );
+    }
+
+    if (localizationCountry || localizationCurrency || localizationTimezone) {
+      try {
+        await upsertBusinessLocalization(business.businessId, {
+          countryCode: localizationCountry,
+          currencyCode: localizationCurrency,
+          timezone: localizationTimezone,
+        });
+      } catch (error) {
+        if (error instanceof InvalidLocalizationError) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        throw error;
+      }
     }
 
     const now = new Date();
@@ -86,7 +105,7 @@ export async function POST(request: Request) {
       action: "business.profile.updated",
       resource: "business",
       resourceId: business.businessId,
-      metadata: { fields: ["name", "industry", "country", "businessSize", "logoUrl"] },
+      metadata: { fields: ["name", "industry", "country", "businessSize", "logoUrl", "localizationCountry", "localizationCurrency", "localizationTimezone"] },
     });
 
     return NextResponse.redirect(
