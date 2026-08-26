@@ -12,7 +12,6 @@ import {
   customers,
   hrEmployees,
   leads,
-  tickets,
 } from "@/db/schema";
 
 export const APPOINTMENT_STATUSES = ["scheduled", "confirmed", "completed", "cancelled", "no_show"] as const;

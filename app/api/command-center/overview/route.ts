@@ -16,6 +16,8 @@ import {
   tasks,
   actionApprovals,
   aiEmployeeActivities,
+  appointments,
+  tickets,
 } from "@/db/schema";
 
 import { and, desc, eq, gte } from "drizzle-orm";
@@ -64,6 +66,8 @@ export async function GET() {
       todayCompletedTasks,
       pendingApprovalData,
       activityData,
+      appointmentData,
+      ticketData,
     ] = await Promise.all([
       db
         .select()
@@ -155,6 +159,10 @@ export async function GET() {
         )
         .orderBy(desc(aiEmployeeActivities.createdAt))
         .limit(8),
+
+      db.select({ id: appointments.id, startAt: appointments.startAt }).from(appointments).where(and(eq(appointments.businessId, business.businessId), gte(appointments.startAt, startOfDay))),
+
+      db.select({ status: tickets.status, priority: tickets.priority }).from(tickets).where(eq(tickets.businessId, business.businessId)),
     ]);
 
     const pipeline = {
@@ -228,6 +236,12 @@ export async function GET() {
           status: employee.status,
         })),
         activities: activityData,
+      },
+      customerOperations: {
+        appointmentsToday: appointmentData.length,
+        upcomingAppointments: appointmentData.filter((item) => item.startAt >= now).length,
+        openTickets: ticketData.filter((item) => !["resolved", "closed"].includes(item.status)).length,
+        urgentTickets: ticketData.filter((item) => item.priority === "urgent" && !["resolved", "closed"].includes(item.status)).length,
       },
     });
 

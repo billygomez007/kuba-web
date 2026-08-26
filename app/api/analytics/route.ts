@@ -25,6 +25,8 @@ import {
   automations,
   automationRuns,
   conversations,
+  appointments,
+  tickets,
 } from "@/db/schema";
 
 export async function GET() {
@@ -117,6 +119,8 @@ export async function GET() {
       successfulAutomationRuns,
       conversationCount,
       openConversations,
+      appointmentRows,
+      ticketRows,
     ] = await Promise.all([
       db
         .select({ count: count() })
@@ -324,6 +328,10 @@ export async function GET() {
             sql`LOWER(${conversations.status}) = 'open'`,
           ),
         ),
+
+      db.select().from(appointments).where(eq(appointments.businessId, businessId)),
+
+      db.select().from(tickets).where(eq(tickets.businessId, businessId)),
     ]);
 
     /*
@@ -697,6 +705,16 @@ export async function GET() {
             openConversations[0]?.count ||
               0,
           ),
+      },
+
+      customerOperations: {
+        appointments: appointmentRows.length,
+        completedAppointments: appointmentRows.filter((item) => item.status === "completed").length,
+        cancelledAppointments: appointmentRows.filter((item) => item.status === "cancelled").length,
+        noShowAppointments: appointmentRows.filter((item) => item.status === "no_show").length,
+        tickets: ticketRows.length,
+        openTickets: ticketRows.filter((item) => !["resolved", "closed"].includes(item.status)).length,
+        resolvedTickets: ticketRows.filter((item) => item.status === "resolved").length,
       },
 
       generatedAt:

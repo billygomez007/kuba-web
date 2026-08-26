@@ -6,6 +6,7 @@ import {
   findCustomerTool,
   createCustomerTool,
 } from "@/lib/ai/tools/receptionist-tools";
+import { createAppointmentTool, getAppointmentsTool, updateAppointmentTool } from "@/mastra/tools/appointment-tools";
 
 export const kubaReceptionistAgent = new Agent({
   id: "kuba-receptionist",
@@ -99,5 +100,9 @@ When no tool is available, explain what information or action is needed rather t
 
     createLead:
       createLeadTool,
+
+    getAppointments: getAppointmentsTool,
+    createAppointment: createAppointmentTool,
+    updateAppointment: updateAppointmentTool,
   },
 });

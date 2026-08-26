@@ -18,6 +18,7 @@ import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge"
 import { salesWorkPlanTool } from "@/mastra/tools/sales-work-plan";
 import { salesExecuteActionTool } from "@/mastra/tools/sales-execute-action";
 import { salesExternalActionTool } from "@/mastra/tools/sales-external-action";
+import { createAppointmentTool } from "@/mastra/tools/appointment-tools";
 
 const salesMemory = new Memory({
   storage: new LibSQLStore({
@@ -867,5 +868,6 @@ tools: {
   salesWorkPlan: salesWorkPlanTool,
   salesExecuteAction: salesExecuteActionTool,
   salesExternalAction: salesExternalActionTool,
+  createAppointment: createAppointmentTool,
 },
 });

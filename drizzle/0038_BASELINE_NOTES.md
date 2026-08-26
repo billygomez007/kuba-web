@@ -78,3 +78,8 @@ node --test tests/migration-reproducibility.test.mjs
 
 Remote staging or production migrations require a separately approved,
 read-only-verified target and must never use `kuba-staging` accidentally.
+
+Appointments and tickets intentionally do not ingest operational records into
+Business Brain. The repository has no general internal notification dispatcher
+to extend; this phase therefore does not send external or synthetic
+notifications.

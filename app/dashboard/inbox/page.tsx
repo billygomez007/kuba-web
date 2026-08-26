@@ -18,6 +18,7 @@ type Conversation = {
 	routingStatus: string;
 	priority: string;
 	needsHuman: boolean;
+	linkedTicket: { id: string; ticketReference: string; status: string; priority: string } | null;
 	timeline: TimelineEvent[];
 };
 type Message = { id: string; content: string; direction: string; senderType: string; createdAt: string };
@@ -92,6 +93,14 @@ export default function InboxPage() {
 		if (!selected) return;
 		const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId: selected.id, ...body }) });
 		if (response.ok) await loadWorkspace();
+	}
+
+	async function createTicket() {
+		if (!selected) return;
+		const response = await fetch("/api/tickets/from-conversation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId: selected.id }) });
+		const data = await response.json();
+		if (!response.ok) setError(data.error || "Unable to create support ticket.");
+		else await loadWorkspace();
 	}
 
 	return (

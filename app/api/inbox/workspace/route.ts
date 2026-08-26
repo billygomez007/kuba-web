@@ -13,6 +13,7 @@ import {
   leads,
   messages,
   tasks,
+  tickets,
   users,
 } from "@/db/schema";
 import { requireBusinessMembership } from "@/lib/auth/tenant";
@@ -35,7 +36,7 @@ export async function GET() {
       );
     }
 
-    const [conversationRows, employeeRows, memberRows, messageRows, routingRows, handoffRows, leadRows, followUpRows, taskRows, approvalRows] = await Promise.all([
+    const [conversationRows, employeeRows, memberRows, messageRows, routingRows, handoffRows, leadRows, followUpRows, taskRows, approvalRows, ticketRows] = await Promise.all([
       db.select().from(conversations).where(eq(conversations.businessId, membership.businessId)).orderBy(desc(conversations.updatedAt)),
       db.select({ id: aiEmployees.id, name: aiEmployees.name, type: aiEmployees.type, status: aiEmployees.status }).from(aiEmployees).where(eq(aiEmployees.businessId, membership.businessId)),
       db.select({ id: businessUsers.id, userId: users.id, name: users.name, email: users.email }).from(businessUsers).innerJoin(users, eq(users.id, businessUsers.userId)).where(eq(businessUsers.businessId, membership.businessId)),
@@ -46,6 +47,7 @@ export async function GET() {
       db.select().from(followUps).where(eq(followUps.businessId, membership.businessId)),
       db.select().from(tasks).where(eq(tasks.businessId, membership.businessId)),
       db.select({ id: actionApprovals.id }).from(actionApprovals).where(and(eq(actionApprovals.businessId, membership.businessId), eq(actionApprovals.status, "pending"))),
+      db.select({ id: tickets.id, conversationId: tickets.conversationId, ticketReference: tickets.ticketReference, status: tickets.status, priority: tickets.priority }).from(tickets).where(eq(tickets.businessId, membership.businessId)),
     ]);
 
     const employeesById = new Map(employeeRows.map((employee) => [employee.id, employee]));
@@ -99,6 +101,7 @@ export async function GET() {
           routing?.status === "human_handling" ||
           conversation.status === "escalated",
         ),
+        linkedTicket: ticketRows.find((ticket) => ticket.conversationId === conversation.id) || null,
         timeline: [
           ...relatedLeads.map((lead) => ({
             id: `lead-${lead.id}`,

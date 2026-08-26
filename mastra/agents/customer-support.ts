@@ -6,6 +6,7 @@ import {
   findCustomerTool,
   createCustomerTool,
 } from "@/lib/ai/tools/receptionist-tools";
+import { createSupportTicketTool, getTicketsTool, requestTicketEscalationTool } from "@/mastra/tools/ticket-tools";
 
 export const kubaCustomerSupportAgent = new Agent({
   id: "kuba-customer-support",
@@ -138,5 +139,8 @@ application actually performed that action.
     findCustomer: findCustomerTool,
 
     createCustomer: createCustomerTool,
+    getSupportTickets: getTicketsTool,
+    createSupportTicket: createSupportTicketTool,
+    requestTicketEscalation: requestTicketEscalationTool,
   },
 });
