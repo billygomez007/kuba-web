@@ -52,3 +52,29 @@ for the recommended production rollout (a normal `drizzle-kit migrate` /
 `migrate()` run is expected to work without any manual ledger surgery, but
 that step still needs its own explicit approval before it runs anywhere near
 production).
+
+## Clean database bootstrap
+
+The historical `0000`–`0037` chain is not a reproducible empty-database
+bootstrap: `0008` references customer columns that `0006` never created.
+Do not rewrite those applied historical migrations or use `drizzle-kit push`.
+
+For a new local database, export the authoritative current schema and seed the
+`0038_current_live_baseline` ledger row with:
+
+```bash
+CLEAN_BOOTSTRAP_DATABASE_URL=file:/tmp/kuba-clean.db \
+  node scripts/bootstrap-clean-database.mjs
+```
+
+The helper accepts only `file:` URLs, creates no application data, and refuses
+to run against Turso. Future schema changes should be generated normally after
+this baseline and applied with the generated migration files. The permanent
+reproducibility check is:
+
+```bash
+node --test tests/migration-reproducibility.test.mjs
+```
+
+Remote staging or production migrations require a separately approved,
+read-only-verified target and must never use `kuba-staging` accidentally.
