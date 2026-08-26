@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { appointments } from "@/db/schema";
+import { appointments, customers, branches, aiEmployees, users } from "@/db/schema";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { getOperationsContext } from "@/lib/customer-operations-auth";
 import { appointmentTransitions, assertAppointmentConflict, assertTransition, parseDate, validateReferences, validateTimezone } from "@/lib/customer-operations";
@@ -14,8 +14,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const context = await getOperationsContext(PERMISSIONS.RECEPTION_VIEW, "customer_ops.appointments");
   if ("error" in context) return NextResponse.json(context, { status: context.status });
   const { id } = await params;
-  const row = await db.select().from(appointments).where(and(eq(appointments.id, id), eq(appointments.businessId, context.membership.businessId))).limit(1);
-  return row[0] ? NextResponse.json({ appointment: row[0] }) : NextResponse.json({ error: "Appointment not found." }, { status: 404 });
+  const businessId = context.membership.businessId;
+  const row = (await db.select({ appointment: appointments, customerName: customers.name, branchName: branches.name, assigneeName: users.name, aiEmployeeName: aiEmployees.name })
+    .from(appointments)
+    .leftJoin(customers, and(eq(customers.id, appointments.customerId), eq(customers.businessId, businessId)))
+    .leftJoin(branches, and(eq(branches.id, appointments.branchId), eq(branches.businessId, businessId)))
+    .leftJoin(users, eq(users.id, appointments.assignedUserId))
+    .leftJoin(aiEmployees, and(eq(aiEmployees.id, appointments.assignedAiEmployeeId), eq(aiEmployees.businessId, businessId)))
+    .where(and(eq(appointments.id, id), eq(appointments.businessId, businessId))).limit(1))[0];
+  if (!row) return NextResponse.json({ error: "Appointment not found." }, { status: 404 });
+  return NextResponse.json({ appointment: { ...row.appointment, customerName: row.customerName, branchName: row.branchName, assigneeName: row.assigneeName || row.aiEmployeeName } });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

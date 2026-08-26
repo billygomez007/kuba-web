@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { tickets } from "@/db/schema";
+import { tickets, customers, branches, users, aiEmployees } from "@/db/schema";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { getOperationsContext } from "@/lib/customer-operations-auth";
 import { assertTransition, TICKET_PRIORITIES, ticketTransitions, validateReferences } from "@/lib/customer-operations";
@@ -14,8 +14,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const context = await getOperationsContext(PERMISSIONS.MESSAGING_VIEW, "customer_ops.tickets");
   if ("error" in context) return NextResponse.json(context, { status: context.status });
   const { id } = await params;
-  const row = await db.select().from(tickets).where(and(eq(tickets.id, id), eq(tickets.businessId, context.membership.businessId))).limit(1);
-  return row[0] ? NextResponse.json({ ticket: row[0] }) : NextResponse.json({ error: "Ticket not found." }, { status: 404 });
+  const businessId = context.membership.businessId;
+  const row = (await db.select({ ticket: tickets, customerName: customers.name, branchName: branches.name, assigneeName: users.name, aiEmployeeName: aiEmployees.name })
+    .from(tickets)
+    .leftJoin(customers, and(eq(customers.id, tickets.customerId), eq(customers.businessId, businessId)))
+    .leftJoin(branches, and(eq(branches.id, tickets.branchId), eq(branches.businessId, businessId)))
+    .leftJoin(users, eq(users.id, tickets.assignedUserId))
+    .leftJoin(aiEmployees, and(eq(aiEmployees.id, tickets.assignedAiEmployeeId), eq(aiEmployees.businessId, businessId)))
+    .where(and(eq(tickets.id, id), eq(tickets.businessId, businessId))).limit(1))[0];
+  if (!row) return NextResponse.json({ error: "Ticket not found." }, { status: 404 });
+  return NextResponse.json({ ticket: { ...row.ticket, customerName: row.customerName, branchName: row.branchName, assigneeName: row.assigneeName || row.aiEmployeeName } });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
