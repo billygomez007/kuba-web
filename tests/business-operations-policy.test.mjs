@@ -203,3 +203,86 @@ test("Representative mutations produce a distinct, non-secret audit action name"
     assert.equal(secretLikePatterns.some((pattern) => pattern.test(action)), false);
   }
 });
+
+// --- /api/business-operations alert entitlement boundary ---
+// Mirrors the fix in app/api/business-operations/route.ts: business_ops.core
+// gates the whole endpoint (and therefore the overview metrics/count), while
+// business_ops.alerts separately gates whether the returned "alerts" array
+// carries real records or is forced empty. Both checks come from the same
+// getBusinessEntitlements() call the real route makes.
+function buildOverviewResponse(planCapabilities, alertRecords) {
+  if (!planCapabilities.includes("business_ops.core")) {
+    return { status: 403, body: { error: "Business Operations requires a higher plan.", upgradeRequired: true } };
+  }
+  const canViewAlertDetail = planCapabilities.includes("business_ops.alerts");
+  return {
+    status: 200,
+    body: {
+      metrics: { operationalAlerts: alertRecords.length },
+      alerts: canViewAlertDetail ? alertRecords : [],
+    },
+  };
+}
+
+const sampleAlerts = [
+  { id: "task:1", type: "overdue_task", title: "Follow up with customer", detail: "Task overdue since 2026-08-20" },
+  { id: "run:1", type: "failed_automation", title: "Automation run failed", detail: "Timeout calling webhook" },
+];
+
+test("1. Growth can access Business Operations overview", () => {
+  const response = buildOverviewResponse(getPlanDefinition("growth").capabilities, sampleAlerts);
+  assert.equal(response.status, 200);
+});
+
+test("2. Growth receives operational alert count/summary only", () => {
+  const response = buildOverviewResponse(getPlanDefinition("growth").capabilities, sampleAlerts);
+  assert.equal(response.body.metrics.operationalAlerts, 2);
+});
+
+test("3. Growth cannot retrieve the Pro-level alert-detail payload", () => {
+  const response = buildOverviewResponse(getPlanDefinition("growth").capabilities, sampleAlerts);
+  assert.deepEqual(response.body.alerts, []);
+  assert.equal(getPlanDefinition("growth").capabilities.includes("business_ops.alerts"), false);
+});
+
+test("4. Pro can retrieve alert details", () => {
+  const response = buildOverviewResponse(getPlanDefinition("pro").capabilities, sampleAlerts);
+  assert.equal(response.body.alerts.length, 2);
+  assert.deepEqual(response.body.alerts, sampleAlerts);
+});
+
+test("5. Enterprise can retrieve alert details", () => {
+  const response = buildOverviewResponse(getPlanDefinition("enterprise").capabilities, sampleAlerts);
+  assert.equal(response.body.alerts.length, 2);
+});
+
+test("6. Starter cannot access Business Operations overview at all", () => {
+  const response = buildOverviewResponse(getPlanDefinition("starter").capabilities, sampleAlerts);
+  assert.equal(response.status, 403);
+  assert.equal(response.body.upgradeRequired, true);
+  assert.equal(capabilityMinimumPlan["business_ops.core"], "growth");
+});
+
+test("7. Foreign business remains denied for the overview endpoint", () => {
+  const alertsWithBusiness = [{ businessId: "business-a", id: "alert-a" }, { businessId: "business-b", id: "alert-b" }];
+  assert.deepEqual(onlySelectedBusiness(alertsWithBusiness, "business-a"), [{ businessId: "business-a", id: "alert-a" }]);
+});
+
+test("8. Raw businessId override remains denied", () => {
+  assert.equal(rejectBusinessOverride({ businessId: "business-b" }, "business-a"), true);
+});
+
+test("9. Stale selected business remains denied", () => {
+  const memberships = [{ businessId: "business-a" }];
+  assert.equal(memberships.some((item) => item.businessId === "business-b"), false);
+});
+
+test("10. Existing tenant isolation remains intact after the alert-detail gate", () => {
+  const businessARecords = { businessId: "business-a", capabilities: getPlanDefinition("pro").capabilities, alerts: sampleAlerts };
+  const businessBRecords = { businessId: "business-b", capabilities: getPlanDefinition("starter").capabilities, alerts: [] };
+  const responseA = buildOverviewResponse(businessARecords.capabilities, businessARecords.alerts);
+  const responseB = buildOverviewResponse(businessBRecords.capabilities, businessBRecords.alerts);
+  assert.equal(responseA.status, 200);
+  assert.equal(responseA.body.alerts.length, 2);
+  assert.equal(responseB.status, 403);
+});

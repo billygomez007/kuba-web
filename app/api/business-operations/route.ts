@@ -17,9 +17,11 @@ export async function GET() {
     if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.DASHBOARD_VIEW)) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
-    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "business_ops.core")) {
+    const entitlements = await getBusinessEntitlements(membership.businessId);
+    if (!hasCapability(entitlements, "business_ops.core")) {
       return NextResponse.json({ error: "Business Operations requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["business_ops.core"] }, { status: 403 });
     }
+    const canViewAlertDetail = hasCapability(entitlements, "business_ops.alerts");
 
     const businessId = membership.businessId;
     const [taskRows, approvalRows, automationRows, runRows, notificationRows, aiActivityRows, auditRows] = await Promise.all([
@@ -41,10 +43,17 @@ export async function GET() {
       ...notificationRows.filter((notification) => !notification.readAt && !notification.archivedAt && ["operational", "integration_failure", "handoff"].includes(notification.type)).map((notification) => ({ id: `notification:${notification.id}`, type: notification.type, title: notification.title, detail: notification.body, occurredAt: notification.createdAt, href: notification.actionUrl || "/dashboard/business-operations/alerts" })),
     ].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 
+    // Alert detail (title/detail/href per record) is a Pro-tier capability
+    // (business_ops.alerts). The count above is safe at business_ops.core
+    // since /dashboard/business-operations only ever renders metrics, never
+    // the alerts array itself — that's exclusively consumed by the Pro-gated
+    // /dashboard/business-operations/alerts page. Without this gate, a
+    // Growth-plan session could call this endpoint directly and read full
+    // alert content the Alerts page itself would correctly block.
     return NextResponse.json({
       metrics: { ...metrics, operationalAlerts: alerts.length },
       recentRuns: runRows.slice(0, 10),
-      alerts: alerts.slice(0, 50),
+      alerts: canViewAlertDetail ? alerts.slice(0, 50) : [],
       activity: [
         ...aiActivityRows.map((item) => ({ id: `ai:${item.id}`, actor: "AI", title: item.title, detail: item.description, occurredAt: item.createdAt })),
         ...auditRows.map((item) => ({ id: `audit:${item.id}`, actor: "Human/System", title: item.action, detail: item.description, occurredAt: item.createdAt })),
