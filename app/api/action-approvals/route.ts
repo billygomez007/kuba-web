@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { actionApprovals } from "@/db/schema";
 import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 export async function GET() {
   const [user, membership] = await Promise.all([getCurrentUser(), getCurrentMembership()]);
@@ -22,6 +24,9 @@ export async function GET() {
     );
   }
   if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  if (!hasCapability(await getBusinessEntitlements(membership.businessId), "business_ops.approvals")) {
+    return NextResponse.json({ error: "Approvals require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["business_ops.approvals"] }, { status: 403 });
+  }
 
   const approvals = await db
     .select()

@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { automationRuns, automations } from "@/db/schema";
 import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 export async function GET(
   _request: Request,
@@ -15,6 +17,9 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!membership) return NextResponse.json({ error: "Business access denied." }, { status: 403 });
     if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "business_ops.automations")) {
+      return NextResponse.json({ error: "Automations require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["business_ops.automations"] }, { status: 403 });
+    }
 
     const { id } = await context.params;
     const automationResult = await db

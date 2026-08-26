@@ -9,6 +9,8 @@ import { runAutomationTrigger } from "@/lib/automations/engine";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { createAuditLog } from "@/lib/auth/audit";
 import { rejectBusinessOverride } from "@/lib/operations/policy";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 import {
   aiEmployees,
@@ -18,6 +20,15 @@ import {
   leads,
   tasks,
 } from "@/db/schema";
+
+async function tasksNotEntitledResponse(businessId: string) {
+  const entitlements = await getBusinessEntitlements(businessId);
+  if (hasCapability(entitlements, "business_ops.tasks")) return null;
+  return NextResponse.json(
+    { error: "Tasks require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["business_ops.tasks"] },
+    { status: 403 },
+  );
+}
 
 async function invalidTaskRelation(body: Record<string, unknown>, businessId: string) {
   const checks = [
@@ -80,6 +91,8 @@ export async function GET() {
       );
     }
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    const notEntitled = await tasksNotEntitledResponse(businessId);
+    if (notEntitled) return notEntitled;
 
     const result = await db
       .select()
@@ -131,6 +144,8 @@ export async function POST(
       );
     }
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    const notEntitled = await tasksNotEntitledResponse(businessId);
+    if (notEntitled) return notEntitled;
 
     const body = await request.json();
     if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
@@ -315,6 +330,8 @@ export async function PATCH(
       );
     }
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    const notEntitled = await tasksNotEntitledResponse(businessId);
+    if (notEntitled) return notEntitled;
 
     const body = await request.json();
     if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });
@@ -540,6 +557,8 @@ export async function DELETE(
       );
     }
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.TASKS_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    const notEntitled = await tasksNotEntitledResponse(businessId);
+    if (notEntitled) return notEntitled;
 
     const body = await request.json();
     if (rejectBusinessOverride(body, businessId)) return NextResponse.json({ error: "Business context override is not allowed." }, { status: 400 });

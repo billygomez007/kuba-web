@@ -6,6 +6,8 @@ import { actionApprovals, aiEmployeeActivities, auditLogs, automationRuns, autom
 import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { buildOperationalMetrics } from "@/lib/operations/policy";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 export async function GET() {
   try {
@@ -14,6 +16,9 @@ export async function GET() {
     if (!membership) return NextResponse.json({ error: "Business access denied." }, { status: 403 });
     if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.DASHBOARD_VIEW)) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "business_ops.core")) {
+      return NextResponse.json({ error: "Business Operations requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["business_ops.core"] }, { status: 403 });
     }
 
     const businessId = membership.businessId;

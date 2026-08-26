@@ -11,6 +11,8 @@ import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { createAuditLog } from "@/lib/auth/audit";
 import { getChannelAdapter } from "@/lib/channels/router";
 import { type ChannelType } from "@/lib/channels/types";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 export async function POST(
   request: Request,
@@ -29,6 +31,9 @@ export async function POST(
   const { id } = await context.params;
 
   if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  if (!hasCapability(await getBusinessEntitlements(membership.businessId), "business_ops.approvals")) {
+    return NextResponse.json({ error: "Approvals require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["business_ops.approvals"] }, { status: 403 });
+  }
   const approval = await db
     .select()
     .from(actionApprovals)
