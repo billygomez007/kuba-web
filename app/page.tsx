@@ -574,7 +574,7 @@ AI workforce solutions built around how your industry operates.
             </Link>
 
             <Link
-              href="/#pricing"
+              href="/pricing"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-8 py-4 font-semibold text-white/75 transition hover:bg-white/[0.08] hover:text-white"
             >
               View pricing
@@ -626,9 +626,9 @@ AI workforce solutions built around how your industry operates.
                   Solutions
                 </a>
 
-                <a className="block hover:text-white" href="#pricing">
+                <Link className="block hover:text-white" href="/pricing">
                   Pricing
-                </a>
+                </Link>
               </div>
             </div>
 

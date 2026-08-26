@@ -131,7 +131,7 @@ export default function MarketingHeader() {
             </div>
           ))}
 
-          <Link href="/#pricing" onClick={closeMenus} className="text-sm font-medium text-white/65 transition hover:text-white">
+          <Link href="/pricing" onClick={closeMenus} className="text-sm font-medium text-white/65 transition hover:text-white">
             Pricing
           </Link>
         </nav>
@@ -167,7 +167,7 @@ export default function MarketingHeader() {
               )}
             </div>
           ))}
-          <Link href="/#pricing" onClick={closeMenus} className="block border-b border-white/[0.06] py-5 font-semibold text-white">Pricing</Link>
+          <Link href="/pricing" onClick={closeMenus} className="block border-b border-white/[0.06] py-5 font-semibold text-white">Pricing</Link>
           <div className="grid grid-cols-2 gap-3 pt-5">
             <Link href="/login" onClick={closeMenus} className="rounded-full border border-white/15 px-4 py-3 text-center text-sm font-bold text-white">Log in</Link>
             <Link href="/signup" onClick={closeMenus} className="rounded-full bg-white px-4 py-3 text-center text-sm font-bold text-black">Start for Free</Link>
