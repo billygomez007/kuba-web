@@ -34,3 +34,31 @@ test("public pricing page is metadata-addressable", async () => {
   assert.match(source, /SuperKuba Pricing \| Starter, Growth, Pro & Enterprise/);
   assert.match(source, /export default function PricingPage/);
 });
+
+test("progressive cards use customer-friendly tier-specific presentation", async () => {
+  const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /Run Your Business/);
+  assert.match(source, /Automate Your Business/);
+  assert.match(source, /Operate With AI/);
+  assert.match(source, /Complete Business Operating System/);
+  assert.match(source, /Everything in \{planDefinitions\.find/);
+  assert.match(source, /AI-assisted Appointments & Tickets/);
+  assert.doesNotMatch(source, /Global currency|Business Profile|Business Brain.*tier/);
+});
+
+test("requested operations and AI-assist placements follow canonical tiers", () => {
+  const growth = new Set(planDefinitions.find((plan) => plan.id === "growth")?.capabilities);
+  const pro = new Set(planDefinitions.find((plan) => plan.id === "pro")?.capabilities);
+  const enterprise = new Set(planDefinitions.find((plan) => plan.id === "enterprise")?.capabilities);
+  assert.equal(growth.has("customer_ops.appointments"), true);
+  assert.equal(growth.has("customer_ops.tickets"), true);
+  assert.equal(growth.has("customer_ops.ai_assist"), false);
+  assert.equal(pro.has("customer_ops.ai_assist"), true);
+  assert.equal(enterprise.has("enterprise.multi_business"), true);
+});
+
+test("pricing amounts remain unchanged placeholders", async () => {
+  const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  assert.equal((source.match(/price: "\$XX"/g) || []).length, 3);
+  assert.match(source, /price: "Custom"/);
+});
