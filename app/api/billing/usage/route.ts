@@ -13,7 +13,7 @@ export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const membership = await getBusinessMembership(session.user.id);
-  if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.BILLING_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const plan = await getBusinessPlan(membership.businessId);
   const subscription = (await db.select({ provider: subscriptions.provider, status: subscriptions.status, currentPeriodStart: subscriptions.currentPeriodStart, currentPeriodEnd: subscriptions.currentPeriodEnd, cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd, trialEnd: subscriptions.trialEnd }).from(subscriptions).where(eq(subscriptions.businessId, membership.businessId)).limit(1))[0] || null;
   const provider = getBillingProvider();

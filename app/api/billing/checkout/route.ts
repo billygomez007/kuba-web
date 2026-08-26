@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const membership = await getBusinessMembership(session.user.id);
-    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.BILLING_MANAGE)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const body = await request.json();
     const plan = normalizePlan(typeof body.plan === "string" ? body.plan : "");
     if (plan === "starter" || body.plan !== plan) return NextResponse.json({ error: "Choose a paid Growth or Pro plan." }, { status: 400 });

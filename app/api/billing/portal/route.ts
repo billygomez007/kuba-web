@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const membership = await getBusinessMembership(session.user.id);
-    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.BILLING_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const subscription = (await db.select({ customerId: subscriptions.providerCustomerId }).from(subscriptions).where(eq(subscriptions.businessId, membership.businessId)).limit(1))[0];
     if (!subscription?.customerId) return NextResponse.json({ error: "Billing provider not connected." }, { status: 409 });
     const provider = activeBillingProvider();
