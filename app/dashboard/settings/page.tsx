@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { businesses, businessUsers } from "@/db/schema";
+import { businesses } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import LogoutControl from "../../components/settings/LogoutControl";
 import AccountSecurity from "../../components/settings/AccountSecurity";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 export default async function SettingsPage() {
   const session = await auth.api.getSession({
@@ -17,21 +18,11 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
-  const result = await db
-    .select({
-      business: businesses,
-      role: businessUsers.role,
-    })
-    .from(businessUsers)
-    .innerJoin(
-      businesses,
-      eq(businessUsers.businessId, businesses.id),
-    )
-    .where(eq(businessUsers.userId, session.user.id))
-    .limit(1);
-
-  const business = result[0]?.business;
-  const role = result[0]?.role;
+  const membership = await getCurrentMembership();
+  const business = membership
+    ? (await db.select().from(businesses).where(eq(businesses.id, membership.businessId)).limit(1))[0]
+    : undefined;
+  const role = membership?.role;
 
   if (!business) {
     redirect("/onboarding");

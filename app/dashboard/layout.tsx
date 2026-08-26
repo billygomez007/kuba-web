@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { capabilityMinimumPlan, planDefinitions } from "@/lib/billing/plan-definitions";
+import LogoutControl from "../components/settings/LogoutControl";
 
 type NavigationItem = {
   label: string;
@@ -108,16 +109,16 @@ const navigationGroups: NavigationGroup[] = [
     icon: "▥",
     items: [
       { label: "Analytics", href: "/dashboard/analytics", icon: "▥", permission: "analytics.view" },
-      { label: "Executive Intelligence", icon: "◇", status: "Planned" },
-      { label: "Business Performance", icon: "↗", status: "Planned" },
-      { label: "Sales Intelligence", icon: "↗", status: "Planned" },
-      { label: "Customer Intelligence", icon: "◎", status: "Planned" },
-      { label: "AI Workforce Analytics", href: "/dashboard/ai-performance", icon: "◈", permission: "workforce.view" },
-      { label: "Human Workforce Analytics", icon: "♙", status: "Planned" },
-      { label: "Operations Analytics", icon: "▣", status: "Planned" },
-      { label: "Inventory Analytics", icon: "▦", status: "Coming Soon" },
-      { label: "Reports", icon: "▤", status: "Planned" },
-      { label: "Insights & Alerts", icon: "!", status: "Planned" },
+      { label: "Executive Intelligence", href: "/dashboard/intelligence/executive", icon: "◇", permission: "analytics.view" },
+      { label: "Business Performance", href: "/dashboard/intelligence/business-performance", icon: "↗", permission: "analytics.view" },
+      { label: "Sales Intelligence", href: "/dashboard/intelligence/sales", icon: "↗", permission: "analytics.view" },
+      { label: "Customer Intelligence", href: "/dashboard/intelligence/customers", icon: "◎", permission: "analytics.view" },
+      { label: "AI Workforce Analytics", href: "/dashboard/intelligence/ai-workforce", icon: "◈", permission: "workforce.view" },
+      { label: "Human Workforce Analytics", href: "/dashboard/intelligence/human-workforce", icon: "♙", permission: "workforce.view" },
+      { label: "Operations Analytics", href: "/dashboard/intelligence/operations", icon: "▣", permission: "analytics.view" },
+      { label: "Inventory Analytics", href: "/dashboard/intelligence/inventory", icon: "▦", permission: "analytics.view" },
+      { label: "Reports", href: "/dashboard/intelligence/reports", icon: "▤", permission: "analytics.view" },
+      { label: "Insights & Alerts", href: "/dashboard/intelligence/insights", icon: "!", permission: "analytics.view" },
     ],
   },
   {
@@ -189,6 +190,16 @@ const navigationPermissions: Record<string, string> = {
   "/dashboard/automations": "automations.view",
   "/dashboard/analytics": "analytics.view",
   "/dashboard/integrations": "integrations.view",
+  "/dashboard/intelligence/executive": "analytics.view",
+  "/dashboard/intelligence/business-performance": "analytics.view",
+  "/dashboard/intelligence/sales": "analytics.view",
+  "/dashboard/intelligence/customers": "analytics.view",
+  "/dashboard/intelligence/ai-workforce": "workforce.view",
+  "/dashboard/intelligence/human-workforce": "workforce.view",
+  "/dashboard/intelligence/operations": "analytics.view",
+  "/dashboard/intelligence/inventory": "analytics.view",
+  "/dashboard/intelligence/reports": "analytics.view",
+  "/dashboard/intelligence/insights": "analytics.view",
 };
 
 const navigationCapabilities: Record<string, string> = {
@@ -222,6 +233,16 @@ const navigationCapabilities: Record<string, string> = {
   "/dashboard/business-operations/documents": "business_ops.documents",
   "/dashboard/business-operations/alerts": "business_ops.alerts",
   "/dashboard/analytics": "intelligence.basic",
+  "/dashboard/intelligence/executive": "intelligence.advanced",
+  "/dashboard/intelligence/business-performance": "intelligence.advanced",
+  "/dashboard/intelligence/sales": "intelligence.sales",
+  "/dashboard/intelligence/customers": "intelligence.customer",
+  "/dashboard/intelligence/ai-workforce": "intelligence.ai_workforce",
+  "/dashboard/intelligence/human-workforce": "intelligence.human_workforce",
+  "/dashboard/intelligence/operations": "intelligence.operations",
+  "/dashboard/intelligence/inventory": "intelligence.inventory",
+  "/dashboard/intelligence/reports": "intelligence.reports",
+  "/dashboard/intelligence/insights": "intelligence.advanced",
   "/dashboard/integrations": "integrations.core",
   "/dashboard/integrations/meta": "integrations.social",
   "/dashboard/integrations/calendar": "integrations.calendar",
@@ -249,16 +270,6 @@ const navigationItemCapabilities: Record<string, string> = {
   "Skills": "ai_workforce.builder",
   "Appointments": "customer_ops.appointments",
   "Support / Tickets": "customer_ops.tickets",
-  "Executive Intelligence": "intelligence.advanced",
-  "Business Performance": "intelligence.advanced",
-  "Sales Intelligence": "intelligence.sales",
-  "Customer Intelligence": "intelligence.customer",
-  "AI Workforce Analytics": "intelligence.ai_workforce",
-  "Human Workforce Analytics": "intelligence.human_workforce",
-  "Operations Analytics": "intelligence.operations",
-  "Inventory Analytics": "intelligence.inventory",
-  "Reports": "intelligence.reports",
-  "Insights & Alerts": "intelligence.advanced",
   "Calendar": "integrations.calendar",
   "Payments": "integrations.payments",
   "Accounting": "integrations.accounting",
@@ -654,6 +665,8 @@ export default function DashboardLayout({
             <span>Help</span>
           </Link>
 
+          <LogoutControl compact />
+
           {/* AI Workforce Status */}
           <div className="mt-4 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] p-3">
             <div className="flex items-center gap-2">
@@ -730,6 +743,7 @@ export default function DashboardLayout({
             <nav aria-label="Enterprise mobile navigation">
               {navigationGroups.map((group) => renderNavigationGroup(group, true))}
             </nav>
+            <LogoutControl compact />
           </div>
         )}
       </header>

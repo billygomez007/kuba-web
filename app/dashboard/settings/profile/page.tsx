@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { businesses, businessUsers } from "@/db/schema";
+import { businesses } from "@/db/schema";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 export default async function BusinessProfilePage() {
   const session = await auth.api.getSession({
@@ -15,32 +16,18 @@ export default async function BusinessProfilePage() {
     redirect("/login");
   }
 
-  const result = await db
-    .select({
-      business: businesses,
-      role: businessUsers.role,
-    })
-    .from(businessUsers)
-    .innerJoin(
-      businesses,
-      eq(businessUsers.businessId, businesses.id),
-    )
-    .where(
-      eq(businessUsers.userId, session.user.id),
-    )
-    .limit(1);
+  const membership = await getCurrentMembership();
+  const business = membership
+    ? (await db.select().from(businesses).where(eq(businesses.id, membership.businessId)).limit(1))[0]
+    : undefined;
 
-  const account = result[0];
-
-  if (!account) {
+  if (!membership || !business) {
     redirect("/onboarding");
   }
 
-  const business = account.business;
-
   const canEdit =
-    account.role === "owner" ||
-    account.role === "admin";
+    membership.role === "owner" ||
+    membership.role === "admin";
 
   return (
     <main className="min-h-screen bg-[#07070A] text-white">

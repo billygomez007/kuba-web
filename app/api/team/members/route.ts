@@ -17,6 +17,7 @@ import {
   canManageRole,
   filterGrantablePermissions,
 } from "@/lib/auth/permissions";
+import { getBranchForBusiness } from "@/lib/auth/tenant";
 
 import {
   createAuditLog,
@@ -319,6 +320,19 @@ export async function PATCH(
         body.branchId === null
           ? null
           : body.branchId.trim() || null;
+      if (updates.branchId && !(await getBranchForBusiness(updates.branchId, membership.businessId))) {
+        return NextResponse.json({ error: "Branch does not belong to the selected business." }, { status: 400 });
+      }
+    }
+
+    if (member.role === "owner" && updates.role && updates.role !== "owner") {
+      const owners = await db
+        .select({ id: businessUsers.id })
+        .from(businessUsers)
+        .where(and(eq(businessUsers.businessId, membership.businessId), eq(businessUsers.role, "owner")));
+      if (owners.length <= 1) {
+        return NextResponse.json({ error: "The last business owner cannot be demoted." }, { status: 409 });
+      }
     }
 
     if (
@@ -454,6 +468,7 @@ export async function DELETE(
           id: businessUsers.id,
           userId:
             businessUsers.userId,
+          role: businessUsers.role,
         })
         .from(businessUsers)
         .where(
@@ -491,6 +506,16 @@ export async function DELETE(
         },
         { status: 400 },
       );
+    }
+
+    if (member.role === "owner") {
+      const owners = await db
+        .select({ id: businessUsers.id })
+        .from(businessUsers)
+        .where(and(eq(businessUsers.businessId, membership.businessId), eq(businessUsers.role, "owner")));
+      if (owners.length <= 1) {
+        return NextResponse.json({ error: "The last business owner cannot be removed." }, { status: 409 });
+      }
     }
 
     await db

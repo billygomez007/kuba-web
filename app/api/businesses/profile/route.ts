@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { businesses, businessUsers } from "@/db/schema";
+import { businesses } from "@/db/schema";
+import { getCurrentMembership } from "@/lib/auth/tenant";
+import { createAuditLog } from "@/lib/auth/audit";
 
 export async function POST(request: Request) {
   try {
@@ -19,16 +21,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const membership = await db
-      .select({
-        businessId: businessUsers.businessId,
-        role: businessUsers.role,
-      })
-      .from(businessUsers)
-      .where(eq(businessUsers.userId, session.user.id))
-      .limit(1);
-
-    const business = membership[0];
+    const business = await getCurrentMembership();
 
     if (!business) {
       return NextResponse.json(
@@ -86,6 +79,15 @@ export async function POST(request: Request) {
         updatedAt: now,
       })
       .where(eq(businesses.id, business.businessId));
+
+    await createAuditLog({
+      businessId: business.businessId,
+      userId: session.user.id,
+      action: "business.profile.updated",
+      resource: "business",
+      resourceId: business.businessId,
+      metadata: { fields: ["name", "industry", "country", "businessSize", "logoUrl"] },
+    });
 
     return NextResponse.redirect(
   new URL("/dashboard/settings/profile", request.url),

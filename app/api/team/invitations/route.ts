@@ -315,15 +315,6 @@ export async function POST(
       },
     });
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      (process.env.NODE_ENV === "production"
-        ? "https://superkuba.com"
-        : "http://localhost:3000");
-
-    const invitationUrl =
-      `${baseUrl}/invite?token=${encodeURIComponent(token)}`;
-
     return NextResponse.json(
       {
         success: true,
@@ -333,8 +324,6 @@ export async function POST(
           email,
           role,
           expiresAt,
-          token,
-          invitationUrl,
         },
       },
       { status: 201 },
