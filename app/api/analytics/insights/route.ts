@@ -5,6 +5,8 @@ import { and, count, eq, lt, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 import {
   leads,
@@ -38,6 +40,11 @@ export async function GET() {
         },
         { status: 404 },
       );
+    }
+
+    if (!hasPermission(business.role, business.permissions, PERMISSIONS.ANALYTICS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "intelligence.basic")) {
+      return NextResponse.json({ error: "Insights require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
     }
 
     const businessId =

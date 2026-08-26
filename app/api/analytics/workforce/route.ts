@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import {
   aiEmployees,
   conversations,
@@ -35,6 +37,10 @@ export async function GET() {
 
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
+    if (!hasPermission(business.role, business.permissions, PERMISSIONS.ANALYTICS_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "intelligence.ai_workforce")) {
+      return NextResponse.json({ error: "AI Workforce Analytics requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
 
     const businessId = business.businessId;
     const [employeeRows, conversationRows, messageRows, leadRows, taskRows, handoffRows] = await Promise.all([
