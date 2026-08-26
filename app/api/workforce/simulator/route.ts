@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { aiBusinessSettings, aiEmployeeActivities, aiEmployees, conversations, messages } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
@@ -27,6 +28,9 @@ export async function GET() {
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.simulator")) {
+      return NextResponse.json({ error: "Simulator requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
 
     const history = await db.select().from(aiEmployeeActivities).where(and(eq(aiEmployeeActivities.businessId, business.businessId), eq(aiEmployeeActivities.type, "simulation_completed"))).orderBy(desc(aiEmployeeActivities.createdAt)).limit(30);
     return NextResponse.json({ history });
@@ -43,6 +47,9 @@ export async function POST(request: Request) {
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.simulator")) {
+      return NextResponse.json({ error: "Simulator requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
 
     const body = await request.json();
     const scenario = typeof body.scenario === "string" ? body.scenario.trim() : "";
@@ -77,18 +84,21 @@ export async function POST(request: Request) {
 
     const combined = transcript.map((item) => item.response).join(" ").toLowerCase();
     const approvalRequired = /refund|discount|payment|sensitive|legal advice/.test(`${scenario} ${combined}`);
-    const escalationDecision = /human|manager|complaint|urgent|escalat/.test(`${scenario} ${combined}`) ? "Escalation considered" : "No escalation signal detected";
-    const responseQuality = transcript.every((item) => item.response.length > 20) ? 85 : 60;
-    const routingAccuracy = selectedEmployees.length > 1 ? 80 : 75;
-    const policyCompliance = approvalRequired ? 70 : 90;
-    const resolutionLikelihood = Math.round((responseQuality + routingAccuracy + policyCompliance) / 3);
+    const escalationSignalDetected = /human|manager|complaint|urgent|escalat/.test(`${scenario} ${combined}`);
+    const emptyResponses = transcript.filter((item) => item.response === "No response returned." || item.response.length <= 20).map((item) => item.employeeName);
+    const configurationGaps = [
+      ...(knowledge?.frequentlyAskedQuestions ? [] : ["Business Brain has no confirmed FAQ answers configured for this business."]),
+      ...(emptyResponses.length ? [`${emptyResponses.join(", ")} returned an unusually short or empty response — review its instructions/knowledge access.`] : []),
+    ];
     const recommendations = [
-      ...(knowledge?.frequentlyAskedQuestions ? [] : ["Add confirmed answers to Business Brain FAQs."]),
-      ...(approvalRequired ? ["Review approval rules for high-risk actions before enabling this workflow."] : []),
+      ...(approvalRequired ? ["This scenario touched a sensitive keyword (refund/discount/payment/legal) — confirm approval rules cover it before enabling this workflow live."] : []),
       ...(selectedEmployees.length > 1 ? ["Confirm the handoff sequence and ownership between participating employees."] : []),
     ];
 
-    const summary = JSON.stringify({ scenario, employees: selectedEmployees.map((employee: typeof employees[number]) => employee.name), resolutionLikelihood, recommendations });
+    // No AI Employee Score / Quality Score / resolution-likelihood percentage is
+    // computed here — there is no authoritative methodology behind such a
+    // number. Only directly observable, deterministic signals are reported.
+    const summary = JSON.stringify({ scenario, employees: selectedEmployees.map((employee: typeof employees[number]) => employee.name), approvalRequired, escalationSignalDetected, recommendations });
     for (const employee of selectedEmployees) {
       await db.insert(aiEmployeeActivities).values({ id: crypto.randomUUID(), businessId: business.businessId, employeeId: employee.id, type: "simulation_completed", title: "Workforce simulation completed", description: summary, status: "completed", createdAt: new Date() });
     }
@@ -103,7 +113,7 @@ export async function POST(request: Request) {
       ]));
     }
 
-    return NextResponse.json({ success: true, transcript, voiceMode, evaluation: { responseQuality, routingAccuracy, policyCompliance, escalationDecision, resolutionLikelihood, approvalRequired, recommendations } });
+    return NextResponse.json({ success: true, transcript, voiceMode, evaluation: { approvalRequired, escalationSignalDetected, configurationGaps, recommendations } });
   } catch (error) {
     console.error("Workforce simulation error:", error);
     return NextResponse.json({ error: "Unable to run workforce simulation." }, { status: 500 });

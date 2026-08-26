@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 function departmentFor(type: string) {
   if (type === "sales") return "Revenue Operations";
@@ -27,9 +28,8 @@ function departmentFor(type: string) {
 function parseSimulation(description: string | null) {
   if (!description) return null;
   try {
-    const parsed = JSON.parse(description) as { resolutionLikelihood?: unknown; recommendations?: unknown };
+    const parsed = JSON.parse(description) as { recommendations?: unknown };
     return {
-      score: typeof parsed.resolutionLikelihood === "number" ? parsed.resolutionLikelihood : null,
       recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.filter((item): item is string => typeof item === "string") : [],
     };
   } catch {
@@ -45,6 +45,9 @@ export async function GET() {
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.monitoring")) {
+      return NextResponse.json({ error: "Certification readiness requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
+    }
 
     const businessId = business.businessId;
     const [employees, settings, sources, activities, connections, businessSettings] = await Promise.all([
@@ -64,7 +67,6 @@ export async function GET() {
         .filter((activity) => activity.employeeId === employee.id && activity.type === "simulation_completed")
         .map((activity) => parseSimulation(activity.description))
         .filter((simulation): simulation is NonNullable<ReturnType<typeof parseSimulation>> => Boolean(simulation));
-      const simulationScores = simulations.map((simulation) => simulation.score).filter((score): score is number => score !== null);
       const autonomyConfigured = ["assistant", "operator", "autonomous"].includes(employee.supervisionMode);
       const approvalConfigured = Boolean(employeeSettings?.roleInstructions?.includes("Autonomy controls:"));
       const hasResponsibilities = Boolean(employeeSettings?.responsibilities?.trim());
@@ -77,11 +79,14 @@ export async function GET() {
       const configurationParts = [hasResponsibilities, hasCommunicationStyle, hasWorkingHours];
       const permissionParts = [autonomyConfigured, approvalConfigured, hasEscalation];
       const average = (parts: boolean[]) => parts.some(Boolean) ? Math.round((parts.filter(Boolean).length / parts.length) * 100) : null;
+      // No "training score" is derived from simulations — a simulated
+      // conversation has no authoritative quality methodology. Completing a
+      // simulation is tracked as a real checklist fact instead of a fake
+      // percentage. See PHASE 16/24 of the AI Workforce completion brief.
       const knowledgeScore = average(knowledgeParts);
-      const trainingScore = simulationScores.length ? Math.round(simulationScores.reduce((sum, score) => sum + score, 0) / simulationScores.length) : null;
       const configurationScore = average(configurationParts);
       const permissionScore = average(permissionParts);
-      const dimensions = [knowledgeScore, trainingScore, configurationScore, permissionScore];
+      const dimensions = [knowledgeScore, configurationScore, permissionScore];
       const overallScore = dimensions.every((score): score is number => score !== null) ? Math.round(dimensions.reduce((sum, score) => sum + score, 0) / dimensions.length) : null;
       const checklist = {
         businessKnowledge: hasBusinessKnowledge,
@@ -89,20 +94,18 @@ export async function GET() {
         responsibilities: hasResponsibilities,
         communicationStyle: hasCommunicationStyle,
         simulationCompleted: simulations.length > 0,
-        simulationAcceptable: trainingScore !== null && trainingScore >= 70,
         approvalRules: approvalConfigured,
         humanEscalation: hasEscalation,
         deploymentSettings: hasIntegration && hasWorkingHours,
       };
       const complete = Object.values(checklist).every(Boolean);
-      const status = employee.status !== "active" ? "Draft" : complete && trainingScore !== null && trainingScore >= 70 ? "Ready for Certification" : simulations.length > 0 ? "Testing" : employeeSettings ? "Training" : "Draft";
+      const status = employee.status !== "active" ? "Draft" : complete ? "Ready for Certification" : simulations.length > 0 ? "Testing" : employeeSettings ? "Training" : "Draft";
       const improvements = [
         ...(!checklist.businessKnowledge ? ["Connect Business Brain information."] : []),
         ...(!checklist.knowledgeSources ? ["Add knowledge sources for this employee."] : []),
         ...(!checklist.responsibilities ? ["Define primary responsibilities."] : []),
         ...(!checklist.communicationStyle ? ["Configure communication style."] : []),
         ...(!checklist.simulationCompleted ? ["Complete at least one workforce simulation."] : []),
-        ...(checklist.simulationCompleted && !checklist.simulationAcceptable ? ["Improve simulation performance before certification."] : []),
         ...(!checklist.approvalRules ? ["Configure autonomy and approval rules."] : []),
         ...(!checklist.humanEscalation ? ["Configure human escalation guidance."] : []),
         ...(!checklist.deploymentSettings ? ["Complete deployment settings and connect an integration."] : []),
@@ -110,12 +113,11 @@ export async function GET() {
       ];
       return {
         employee: { id: employee.id, name: employee.name, type: employee.type, department: departmentFor(employee.type), status: employee.status },
-        scores: { knowledge: knowledgeScore, training: trainingScore, configuration: configurationScore, permissions: permissionScore, overall: overallScore },
+        scores: { knowledge: knowledgeScore, configuration: configurationScore, permissions: permissionScore, overall: overallScore },
         certificationStatus: status,
         checklist,
         improvements: [...new Set(improvements)],
         simulationCount: simulations.length,
-        lastSimulationScore: simulationScores.at(-1) ?? null,
       };
     });
 

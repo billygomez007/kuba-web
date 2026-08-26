@@ -14,7 +14,7 @@ import {
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
-import { getBusinessPlan, employeeLimitMessage } from "@/lib/billing/entitlements";
+import { getBusinessPlan, employeeLimitMessage, getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 export async function POST(
   request: Request,
@@ -62,6 +62,10 @@ export async function POST(
         },
         { status: 403 },
       );
+    }
+
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.core")) {
+      return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
     }
 
     const plan = await getBusinessPlan(membership.businessId);

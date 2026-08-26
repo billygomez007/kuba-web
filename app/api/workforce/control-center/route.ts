@@ -7,6 +7,7 @@ import { actionApprovals, aiBusinessSettings, aiEmployeeActivities, aiEmployeeSe
 import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 function departmentFor(type: string) {
   if (type === "sales") return "Revenue Operations";
@@ -21,6 +22,9 @@ export async function GET() {
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const membership = await getCurrentMembership();
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.core")) {
+      return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
+    }
     const businessId = membership.businessId;
     const [employees, settings, brain, sources, connections, conversationsData, leadsData, tasksData, handoffsData, approvals, runs, activities] = await Promise.all([
       db.select().from(aiEmployees).where(eq(aiEmployees.businessId, businessId)),

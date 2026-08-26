@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { actionApprovals, aiEmployeeActivities, aiEmployeeTeams, aiEmployees, auditLogs, automationRuns, businessTeamMembers, businessTeams, businessUsers, conversations, handoffs, leads, tasks, users } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 export async function GET() {
   try {
@@ -16,6 +17,9 @@ export async function GET() {
     const business = membership;
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.teams")) {
+      return NextResponse.json({ error: "AI Teams requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
+    }
 
     const businessId = business.businessId;
     const [humans, employees, departments, teamMembers, aiAssignments, handoffRows, activityRows, audits, runs, conversationRows, leadRows, taskRows, approvals] = await Promise.all([

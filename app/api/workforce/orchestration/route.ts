@@ -8,6 +8,7 @@ import { aiEmployeeActivities, aiEmployees, automations, conversationRouting, co
 import { canAccessConversation } from "@/lib/communications/conversation-access";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 export async function GET() {
   try {
@@ -16,6 +17,9 @@ export async function GET() {
     const membership = await getCurrentMembership();
     if (!membership) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.orchestration")) {
+      return NextResponse.json({ error: "Orchestration requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
 
     const businessId = membership.businessId;
     const [employees, handoffRows, activities, workflowRows, conversationRows] = await Promise.all([
@@ -61,6 +65,9 @@ export async function POST(request: Request) {
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const membership = await getCurrentMembership();
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.orchestration")) {
+      return NextResponse.json({ error: "Orchestration requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
     const body = await request.json();
     const conversationId = typeof body.conversationId === "string" ? body.conversationId.trim() : "";
     const employeeId = typeof body.employeeId === "string" ? body.employeeId.trim() : "";

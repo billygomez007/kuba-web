@@ -17,6 +17,7 @@ import {
   PERMISSIONS,
 } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 async function getContext(employeeId: string) {
   const membership = await getCurrentMembership();
@@ -51,6 +52,9 @@ export async function GET(
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(data.membership.businessId), "ai_workforce.deployment")) {
+      return NextResponse.json({ error: "Deployment requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
     }
 
     const [settings, connections, localization, teamMembers] = await Promise.all([
@@ -90,6 +94,9 @@ export async function POST(
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)) {
       return NextResponse.json({ error: "You do not have permission to configure this employee." }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(data.membership.businessId), "ai_workforce.deployment")) {
+      return NextResponse.json({ error: "Deployment requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
     }
 
     const body = await request.json();

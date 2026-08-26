@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { aiEmployeeSettings, aiEmployees } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 async function employeeContext(employeeId: string) {
   const membership = await getCurrentMembership();
@@ -23,6 +24,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const data = await employeeContext(id);
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(data.membership.businessId), "ai_workforce.core")) {
+      return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
+    }
     const settings = await db.select().from(aiEmployeeSettings).where(eq(aiEmployeeSettings.employeeId, id)).limit(1);
     return NextResponse.json({ employee: data.employee, settings: settings[0] || null });
   } catch (error) {
@@ -39,6 +43,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const data = await employeeContext(id);
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)) return NextResponse.json({ error: "You do not have permission to configure this employee." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(data.membership.businessId), "ai_workforce.core")) {
+      return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
+    }
 
     const body = await request.json();
     const autonomyLevel = ["assistant", "operator", "autonomous"].includes(body.autonomyLevel) ? body.autonomyLevel : "assistant";

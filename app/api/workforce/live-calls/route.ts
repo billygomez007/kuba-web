@@ -6,12 +6,16 @@ import { aiEmployees, conversations, handoffs } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 async function access() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const membership = await getCurrentMembership();
   if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.voice")) {
+    return { error: NextResponse.json({ error: "Voice requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 }) };
+  }
   return { membership, userId: session.user.id };
 }
 

@@ -9,7 +9,7 @@ import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { getVoiceProvider, voiceProviders } from "@/lib/voice/providers";
 import { createAuditLog } from "@/lib/auth/audit";
-import { canUseFeature, getBusinessPlan } from "@/lib/billing/entitlements";
+import { canUseFeature, getBusinessPlan, getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 const marker = "\n\nVoice capability configuration:\n";
 
@@ -79,6 +79,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const data = await getEmployee(id);
     if (!data) return NextResponse.json({ error: "AI employee not found." }, { status: 404 });
     if (!hasPermission(data.membership.role, data.membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(data.membership.businessId), "ai_workforce.voice")) {
+      return NextResponse.json({ error: "Voice requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
     const settings = await db.select({ roleInstructions: aiEmployeeSettings.roleInstructions }).from(aiEmployeeSettings).where(eq(aiEmployeeSettings.employeeId, id)).limit(1);
     return NextResponse.json({ employee: data.employee, config: parseConfig(settings[0]?.roleInstructions || null), providers: voiceProviders });
   } catch (error) {

@@ -4,12 +4,14 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
+import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import {
   aiBusinessSettings,
   aiEmployeeActivities,
   aiEmployees,
   automations,
-  businessUsers,
   conversations,
   handoffs,
   leads,
@@ -29,9 +31,12 @@ export async function GET() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const membership = await db.select({ businessId: businessUsers.businessId }).from(businessUsers).where(eq(businessUsers.userId, session.user.id)).limit(1);
-    const business = membership[0];
+    const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
+    if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.core")) {
+      return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
+    }
 
     const businessId = business.businessId;
     const [employees, conversationsData, messagesData, leadsData, handoffsData, activities, automationsData, settings] = await Promise.all([

@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { aiEmployees, automations, integrations } from "@/db/schema";
 import { getPackageTemplates, getWorkforcePackage, workforcePackages } from "@/lib/automations/packages";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-import { getBusinessPlan, employeeLimitMessage } from "@/lib/billing/entitlements";
+import { getBusinessPlan, employeeLimitMessage, getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 
 async function context() {
@@ -22,6 +22,9 @@ export async function GET() {
     const { session, membership } = await context();
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!membership) return NextResponse.json({ error: "Business not found." }, { status: 404 });
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.marketplace")) {
+      return NextResponse.json({ error: "Marketplace requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
+    }
 
     const [employeeRows, connectionRows, automationRows] = await Promise.all([
       db.select({ type: aiEmployees.type, status: aiEmployees.status }).from(aiEmployees).where(eq(aiEmployees.businessId, membership.businessId)),
@@ -55,6 +58,9 @@ export async function POST(request: Request) {
     if (!membership) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_MANAGE) || !hasPermission(membership.role, membership.permissions, PERMISSIONS.AUTOMATIONS_MANAGE)) {
       return NextResponse.json({ error: "You do not have permission to install workforce packages." }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.marketplace")) {
+      return NextResponse.json({ error: "Marketplace requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
     }
 
     const body = await request.json();

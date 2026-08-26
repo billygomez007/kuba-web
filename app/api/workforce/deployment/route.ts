@@ -8,6 +8,7 @@ import { aiBusinessSettings, aiEmployeeActivities, aiEmployeeSettings, aiEmploye
 import { createAuditLog } from "@/lib/auth/audit";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 async function getContext() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -15,6 +16,9 @@ async function getContext() {
   const membership = await getCurrentMembership();
   if (!membership) return { error: NextResponse.json({ error: "Business not found." }, { status: 404 }) };
   if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return { error: NextResponse.json({ error: "Forbidden." }, { status: 403 }) };
+  if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.deployment")) {
+    return { error: NextResponse.json({ error: "Deployment requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 }) };
+  }
   return { session, membership };
 }
 

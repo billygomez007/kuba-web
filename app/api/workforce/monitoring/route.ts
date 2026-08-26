@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 function departmentFor(type: string) {
   if (type === "sales") return "Revenue Operations";
@@ -33,6 +34,9 @@ export async function GET() {
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.monitoring")) {
+      return NextResponse.json({ error: "Monitoring requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
+    }
 
     const businessId = business.businessId;
     const [employees, activities, conversationsData, handoffsData, approvalData, runData, messageData] = await Promise.all([
