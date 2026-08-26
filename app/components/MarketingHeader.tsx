@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const navigation = [
   {
@@ -58,6 +58,30 @@ const navigation = [
 export default function MarketingHeader() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!headerRef.current?.contains(event.target as Node)) {
+        setOpenDropdown(null);
+        setMobileOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenDropdown(null);
+        setMobileOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   function closeMenus() {
     setOpenDropdown(null);
@@ -65,7 +89,7 @@ export default function MarketingHeader() {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[#060609]/90 backdrop-blur-2xl">
+    <header ref={headerRef} className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[#060609]/90 backdrop-blur-2xl">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
         <Link href="/" className="flex items-center" onClick={closeMenus}>
           <Image
@@ -80,10 +104,11 @@ export default function MarketingHeader() {
 
         <nav className="hidden items-center gap-7 md:flex" aria-label="Main navigation">
           {navigation.map((item) => (
-            <div key={item.name} className="relative">
+            <div key={item.name} className="relative" onMouseEnter={() => setOpenDropdown(item.name)} onMouseLeave={() => setOpenDropdown(null)}>
               <button
                 type="button"
                 aria-expanded={openDropdown === item.name}
+                aria-controls={`marketing-menu-${item.name.toLowerCase()}`}
                 onClick={() => setOpenDropdown(openDropdown === item.name ? null : item.name)}
                 className="flex items-center gap-1.5 text-sm font-medium text-white/65 transition hover:text-white"
               >
@@ -92,7 +117,7 @@ export default function MarketingHeader() {
               </button>
 
               {openDropdown === item.name && (
-                <div className="absolute left-1/2 top-10 w-72 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0b0b12] p-3 shadow-2xl shadow-black/50">
+                <div id={`marketing-menu-${item.name.toLowerCase()}`} className="absolute left-1/2 top-10 w-72 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0b0b12] p-3 shadow-2xl shadow-black/50">
                   <Link href={item.href} onClick={closeMenus} className="block rounded-xl px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-cyan-300 hover:bg-white/[0.06]">
                     Explore {item.name}
                   </Link>
@@ -128,12 +153,12 @@ export default function MarketingHeader() {
         <nav className="max-h-[calc(100vh-5rem)] overflow-y-auto border-t border-white/[0.06] bg-[#08080d] px-6 py-5 md:hidden" aria-label="Mobile navigation">
           {navigation.map((item) => (
             <div key={item.name} className="border-b border-white/[0.06] py-2">
-              <button type="button" aria-expanded={openDropdown === item.name} onClick={() => setOpenDropdown(openDropdown === item.name ? null : item.name)} className="flex w-full items-center justify-between py-3 text-left font-semibold text-white">
+              <button type="button" aria-expanded={openDropdown === item.name} aria-controls={`mobile-marketing-menu-${item.name.toLowerCase()}`} onClick={() => setOpenDropdown(openDropdown === item.name ? null : item.name)} className="flex w-full items-center justify-between py-3 text-left font-semibold text-white">
                 {item.name}
                 <ChevronDown className={`h-4 w-4 transition ${openDropdown === item.name ? "rotate-180" : ""}`} />
               </button>
               {openDropdown === item.name && (
-                <div className="pb-3 pl-3">
+                <div id={`mobile-marketing-menu-${item.name.toLowerCase()}`} className="pb-3 pl-3">
                   <Link href={item.href} onClick={closeMenus} className="block py-2 text-sm font-semibold text-cyan-300">Explore {item.name}</Link>
                   {item.items.map(([label, href]) => (
                     <Link key={label} href={href} onClick={closeMenus} className="block py-2 text-sm text-white/60">{label}</Link>
