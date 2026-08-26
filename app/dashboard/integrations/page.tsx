@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -125,6 +126,14 @@ export default function IntegrationsPage() {
 
   const commChannels = items.filter(i => i.category === "Communication Channels");
   const socialChannels = items.filter(i => i.category === "Social Channels");
+  const remainingIntegrations = [
+    { name: "Calendar", href: "/dashboard/integrations/calendar", status: "Coming Soon", description: "Google Calendar, Outlook, and Apple Calendar connections." },
+    { name: "Payments", href: "/dashboard/integrations/payments", status: "Platform Billing Only", description: "Business merchant payments are not configured." },
+    { name: "Accounting", href: "/dashboard/integrations/accounting", status: "Coming Soon", description: "QuickBooks, Xero, Sage, and other accounting sync." },
+    { name: "CRM", href: "/dashboard/integrations/crm", status: "Coming Soon", description: "External CRM contact, lead, and deal synchronization." },
+    { name: "External Apps", href: "/dashboard/integrations/external-apps", status: "Coming Soon", description: "Business tool and collaboration connections." },
+    { name: "API / Developer Integrations", href: "/dashboard/integrations/developer", status: "Coming Soon", description: "Tenant-safe public API and webhook tooling." },
+  ];
 
   const getIntegrationStatus = (provider: string) => {
     const integration = integrations.find((i) => i.provider === provider);
@@ -282,25 +291,18 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
-      {/* Coming Soon Section */}
+      {/* Remaining integration categories */}
       <div className="mb-12">
-        <h2 className="mb-6 text-2xl font-bold">Coming Soon</h2>
+        <h2 className="mb-6 text-2xl font-bold">Remaining Integrations</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          {[
-            { name: "Calendar", description: "Google Calendar & Outlook integration" },
-            { name: "Payments", description: "Accept payments with Stripe or Paystack" },
-            { name: "Accounting", description: "QuickBooks & Xero sync" },
-            { name: "CRM", description: "HubSpot, Salesforce, Pipedrive" },
-            { name: "External Apps", description: "Slack, Teams, Zapier & more" },
-            { name: "API & Webhooks", description: "Developer integrations & custom webhooks" },
-          ].map((item) => (
-            <div
-              key={item.name}
-              className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
-            >
-              <h3 className="font-semibold">{item.name}</h3>
+          {remainingIntegrations.map((item) => (
+            <Link key={item.name} href={item.href} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-cyan-300/25 hover:bg-white/[0.06]">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-semibold">{item.name}</h3>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-200/70">{item.status}</span>
+              </div>
               <p className="mt-2 text-sm text-white/50">{item.description}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
