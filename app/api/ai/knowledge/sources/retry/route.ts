@@ -164,6 +164,7 @@ export async function POST(
       await ingestKnowledgeSource(
         sourceId,
         buffer,
+        business.businessId,
       );
 
     await createAuditLog({ businessId: business.businessId, userId: session.user.id, action: "business_brain.source.retried", resource: "knowledge_source", resourceId: sourceId, description: `Retried processing for ${source.originalName}.`, metadata: { chunks: result.chunks } });

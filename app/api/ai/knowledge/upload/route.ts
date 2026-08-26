@@ -419,6 +419,7 @@ export async function POST(
       await ingestKnowledgeSource(
         fileId,
         buffer,
+        business.businessId,
       );
 
     } else {
@@ -485,10 +486,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to upload knowledge file.",
+        error: "Unable to upload knowledge file. Please try again.",
       },
       {
         status: 500,

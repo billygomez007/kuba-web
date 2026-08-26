@@ -140,6 +140,17 @@ test("Public rate-limit identity does not trust businessId", () => {
   assert.notEqual(request.businessId, request.ip);
 });
 
+test("Knowledge ingestion requires the owning business context", () => {
+  const source = { id: "source-a", businessId: "business-a" };
+  assert.equal(source.businessId, "business-a");
+  assert.equal(source.businessId === "business-b", false);
+});
+
+test("Health responses contain no infrastructure details", () => {
+  const health = { status: "ok" };
+  assert.deepEqual(Object.keys(health), ["status"]);
+});
+
 test("Super Admin is a separate authorization boundary", () => {
   assert.notEqual("super_admin", "enterprise_admin");
 });

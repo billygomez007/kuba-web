@@ -13,6 +13,7 @@ import { chunkKnowledgeText } from "./chunker";
 export async function ingestKnowledgeSource(
   sourceId: string,
   buffer: Buffer,
+  businessId: string,
 ): Promise<{
   chunks: number;
 }> {
@@ -22,9 +23,9 @@ export async function ingestKnowledgeSource(
       .select()
       .from(knowledgeSources)
       .where(
-        eq(
-          knowledgeSources.id,
-          sourceId,
+        and(
+          eq(knowledgeSources.id, sourceId),
+          eq(knowledgeSources.businessId, businessId),
         ),
       )
       .limit(1);
