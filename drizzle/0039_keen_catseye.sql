@@ -1,0 +1,1 @@
+ALTER TABLE `subscriptions` ADD `payment_method_summary` text;

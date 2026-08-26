@@ -155,6 +155,10 @@ export const subscriptions = sqliteTable("subscriptions", {
   providerSubscriptionId: text("provider_subscription_id").unique(),
   providerAuthorizationReference: text("provider_authorization_reference"),
   providerEventId: text("provider_event_id").unique(),
+  // Human-readable payment method display only (e.g. "Visa •••• 4242") — never
+  // raw card credentials. Persisted at authorization time since the provider does not
+  // offer a simple way to re-fetch card display metadata later.
+  paymentMethodSummary: text("payment_method_summary"),
   plan: text("plan").notNull().default("starter"),
   status: text("status").notNull().default("incomplete"),
   currentPeriodStart: integer("current_period_start", { mode: "timestamp_ms" }),

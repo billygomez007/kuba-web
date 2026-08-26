@@ -153,7 +153,7 @@ test("an active paid subscription is usable regardless of currentPeriodEnd prese
 
 // --- 5. Trial duration ---
 test("5. trial duration is 14 days", async () => {
-  const source = await readFile(path.join(REPO_ROOT, "app/api/billing/trial/route.ts"), "utf8");
+  const source = await readFile(path.join(REPO_ROOT, "lib/billing/provider.ts"), "utf8");
   assert.match(source, /TRIAL_DAYS\s*=\s*14/);
 });
 
@@ -201,10 +201,14 @@ test("Pricing presentation (labels/copy) is defined once and imported by both /p
 });
 
 // --- 14. zero-charge-today and 15. future-charge disclosure copy ---
-test("14-15. the onboarding review step discloses $0 today and the future first-charge date", async () => {
+test("14-15. the onboarding review step discloses no subscription charge today, the future first-charge date, and honestly discloses a possible verification charge", async () => {
   const source = await readFile(path.join(REPO_ROOT, "app/onboarding/page.tsx"), "utf8");
-  assert.match(source, /won&apos;t be charged today/);
   assert.match(source, /Cancel anytime before your trial ends/);
+  assert.match(source, /temporary verification charge/);
+  assert.match(source, /refunded where applicable/);
+  // Must never claim "$0 today" unconditionally without qualifying it's the
+  // SUBSCRIPTION charge — a verification charge may genuinely occur.
+  assert.doesNotMatch(source, /won&apos;t be charged today/);
 });
 
 // --- 16-17. cancellation behavior: cancel-at-period-end, never an immediate cutoff ---
@@ -218,17 +222,19 @@ test("Stripe cancelSubscription is actually implemented (was previously advertis
   assert.equal(provider.stripeProvider.capabilities.supportsCancellation, true);
 });
 
-// --- Provider trial support is real and honest, not faked for Paystack ---
-test("Stripe capability declares real trial support", () => {
+// --- Both providers now genuinely support trials, via different real mechanisms ---
+test("Stripe capability declares real trial support (one-shot checkout with trial_period_days)", () => {
   assert.equal(provider.stripeProvider.capabilities.supportsTrials, true);
+  assert.equal(provider.stripeProvider.capabilities.supportsMultiStepAuthorization, false);
 });
-test("Paystack capability honestly declares NO trial support (no free-trial-before-charge primitive exists there)", () => {
-  assert.equal(provider.paystackProvider.capabilities.supportsTrials, false);
+test("Paystack capability declares real trial support via the multi-step authorize-then-subscribe lifecycle, not a one-shot checkout", () => {
+  assert.equal(provider.paystackProvider.capabilities.supportsTrials, true);
+  assert.equal(provider.paystackProvider.capabilities.supportsMultiStepAuthorization, true);
 });
-test("Paystack checkout throws rather than silently ignoring a requested trial", async () => {
+test("Paystack's legacy one-shot createCheckoutSession still throws for a requested trial — it must go through authorizePaymentMethod instead", async () => {
   await assert.rejects(
     () => provider.paystackProvider.createCheckoutSession({ priceId: "PLN_x", successUrl: "https://x", cancelUrl: "https://x", metadata: { businessId: "b", plan: "growth", email: "a@b.com" }, trialPeriodDays: 14 }),
-    /does not support a trial-before-charge/,
+    /authorizePaymentMethod/,
   );
 });
 

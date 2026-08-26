@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2a41ce8b-4efd-43b3-b64b-3063e5e40533",
-  "prevId": "5f8bbb86-ce77-45fa-b153-f0bd15c92631",
+  "id": "c517ab09-586b-4897-9893-1a1137472e5f",
+  "prevId": "2a41ce8b-4efd-43b3-b64b-3063e5e40533",
   "tables": {
     "account": {
       "name": "account",
@@ -10142,6 +10142,13 @@
         },
         "provider_event_id": {
           "name": "provider_event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payment_method_summary": {
+          "name": "payment_method_summary",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

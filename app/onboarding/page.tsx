@@ -45,7 +45,10 @@ function OnboardingPageInner() {
 
   const [selectedPlan, setSelectedPlan] = useState<PlanId>(isSelfServePlan(initialPlan) ? initialPlan : "growth");
   const [trialLoading, setTrialLoading] = useState(false);
-  const [trialError, setTrialError] = useState<{ message: string; code?: string } | null>(null);
+  // Populated from ?trialError= when Paystack redirects back after a failed
+  // card verification/subscription-scheduling attempt, so the customer sees
+  // why they landed back here instead of the dashboard.
+  const [trialError, setTrialError] = useState<{ message: string; code?: string } | null>(() => { const fromRedirect = searchParams.get("trialError"); return fromRedirect ? { message: fromRedirect } : null; });
 
   function selectCountry(nextCode: CountryCode) {
     setCountryCode(nextCode);
@@ -191,13 +194,14 @@ function OnboardingPageInner() {
 
               <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.04] p-5">
                 <p className="text-sm font-bold text-cyan-200">Start your {TRIAL_DAYS}-day free trial</p>
-                <p className="mt-2 text-sm leading-6 text-white/65">You won&apos;t be charged today. Your {TRIAL_DAYS}-day free trial starts today. Your first payment will be charged on <strong>{firstChargeDate}</strong> if you don&apos;t cancel before then. Cancel anytime before your trial ends to avoid being charged.</p>
+                <p className="mt-2 text-sm leading-6 text-white/65">Your {TRIAL_DAYS}-day free trial starts today. Your first subscription payment will be charged on <strong>{firstChargeDate}</strong> if you don&apos;t cancel before then. Cancel anytime before your trial ends to avoid being charged.</p>
+                <p className="mt-2 text-sm leading-6 text-white/50">A small temporary verification charge may be required to securely authorize your card with our payment provider. It will be refunded where applicable, and is separate from — and never the same as — your SuperKuba subscription payment.</p>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                   <div><dt className="text-xs uppercase tracking-wide text-white/35">Plan</dt><dd className="mt-1 font-semibold">{planDefinitions.find((p) => p.id === selectedPlan)!.name}</dd></div>
-                  <div><dt className="text-xs uppercase tracking-wide text-white/35">Today</dt><dd className="mt-1 font-semibold">$0</dd></div>
+                  <div><dt className="text-xs uppercase tracking-wide text-white/35">Subscription charge today</dt><dd className="mt-1 font-semibold">$0</dd></div>
                   <div><dt className="text-xs uppercase tracking-wide text-white/35">Trial period</dt><dd className="mt-1 font-semibold">{TRIAL_DAYS} days</dd></div>
-                  <div><dt className="text-xs uppercase tracking-wide text-white/35">First charge</dt><dd className="mt-1 font-semibold">{firstChargeDate}</dd></div>
+                  <div><dt className="text-xs uppercase tracking-wide text-white/35">First subscription charge</dt><dd className="mt-1 font-semibold">{firstChargeDate}</dd></div>
                 </dl>
 
                 {trialError && !trialUnavailable && (
