@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 import {
   aiEmployees,
@@ -52,6 +54,13 @@ export async function GET() {
           status: 404,
         },
       );
+    }
+
+    if (!hasPermission(business.role, business.permissions, PERMISSIONS.DASHBOARD_VIEW)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "command_center.basic")) {
+      return NextResponse.json({ error: "Command Center requires an active plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
     }
 
 
