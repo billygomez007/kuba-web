@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export { safeCompareSecret } from "./secret-comparison";
 
 export function unauthorizedResponse() {
   return NextResponse.json(

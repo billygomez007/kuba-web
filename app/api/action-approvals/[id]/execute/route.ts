@@ -47,15 +47,12 @@ export async function POST(
     );
   }
 
-  if (approval[0].status !== "approved") {
-    return NextResponse.json(
-      {
-        error:
-          "Action must be approved before execution.",
-      },
-      { status: 400 },
-    );
-  }
+  const claimed = await db
+    .update(actionApprovals)
+    .set({ status: "executing", updatedAt: new Date() })
+    .where(and(eq(actionApprovals.id, id), eq(actionApprovals.businessId, membership.businessId), eq(actionApprovals.status, "approved")))
+    .returning({ id: actionApprovals.id });
+  if (!claimed[0]) return NextResponse.json({ error: "Action must be approved and not already executing." }, { status: 409 });
 
   const adapter = getChannelAdapter(
     approval[0].channel as ChannelType,

@@ -10,6 +10,7 @@ import {
 import {
   runAutomationTrigger,
 } from "@/lib/automations/engine";
+import { safeCompareSecret } from "@/lib/auth/security";
 
 
 function isAuthorized(request: Request) {
@@ -29,10 +30,7 @@ function isAuthorized(request: Request) {
       "x-automation-secret",
     );
 
-  return (
-    providedSecret !== null &&
-    providedSecret === configuredSecret
-  );
+  return safeCompareSecret(providedSecret, configuredSecret);
 }
 
 

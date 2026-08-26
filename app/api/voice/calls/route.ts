@@ -8,6 +8,7 @@ import { aiEmployeeActivities, aiEmployeeSettings, aiEmployees, conversations, c
 import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { safeCompareSecret } from "@/lib/auth/security";
 import { createAuditLog } from "@/lib/auth/audit";
 import { getVoiceTransport } from "@/lib/voice/providers";
 import { retryVoiceOperation, updateVoiceSession } from "@/lib/voice/session-manager";
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     if (!transport) return NextResponse.json({ error: "Unsupported voice provider." }, { status: 400 });
     if (body.action === "audio" || body.action === "end") {
       const requestHeaders = await headers();
-      if (!process.env.VOICE_WEBHOOK_SECRET || requestHeaders.get("x-voice-webhook-secret") !== process.env.VOICE_WEBHOOK_SECRET) return NextResponse.json({ error: "Unauthorized voice session" }, { status: 401 });
+      if (!safeCompareSecret(requestHeaders.get("x-voice-webhook-secret"), process.env.VOICE_WEBHOOK_SECRET)) return NextResponse.json({ error: "Unauthorized voice session" }, { status: 401 });
       const conversationId = typeof body.conversationId === "string" ? body.conversationId : "";
       const businessId = typeof body.businessId === "string" ? body.businessId : "";
       const providerCallId = typeof body.providerCallId === "string" ? body.providerCallId : "";
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
     }
     if (body.action === "turn") {
       const requestHeaders = await headers();
-      if (!process.env.VOICE_WEBHOOK_SECRET || requestHeaders.get("x-voice-webhook-secret") !== process.env.VOICE_WEBHOOK_SECRET) return NextResponse.json({ error: "Unauthorized voice session" }, { status: 401 });
+      if (!safeCompareSecret(requestHeaders.get("x-voice-webhook-secret"), process.env.VOICE_WEBHOOK_SECRET)) return NextResponse.json({ error: "Unauthorized voice session" }, { status: 401 });
       const businessId = typeof body.businessId === "string" ? body.businessId : "";
       const employeeId = typeof body.employeeId === "string" ? body.employeeId : "";
       const conversationId = typeof body.conversationId === "string" ? body.conversationId : "";
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, conversationId, call });
     }
     const requestHeaders = await headers();
-    if (!process.env.VOICE_WEBHOOK_SECRET || requestHeaders.get("x-voice-webhook-secret") !== process.env.VOICE_WEBHOOK_SECRET) return NextResponse.json({ error: "Unauthorized webhook" }, { status: 401 });
+    if (!safeCompareSecret(requestHeaders.get("x-voice-webhook-secret"), process.env.VOICE_WEBHOOK_SECRET)) return NextResponse.json({ error: "Unauthorized webhook" }, { status: 401 });
     const event = body.event;
     const businessId = typeof body.businessId === "string" ? body.businessId : "";
     const employeeId = typeof body.employeeId === "string" ? body.employeeId : "";
