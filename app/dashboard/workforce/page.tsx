@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ActivateEmployeeButton from "../../components/ActivateEmployeeButton";
 import AIEmployeeAvatar from "../../components/employees/AIEmployeeAvatar";
+import StatusBadge from "../../components/ui/StatusBadge";
 
 type Employee = {
   id: string;
@@ -383,9 +384,7 @@ export default function WorkforcePage() {
                               {generalManager.name}
                             </h3>
 
-                            <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-300">
-                              Online
-                            </span>
+                            <StatusBadge status={generalManager.status} dot />
 
                           </div>
 
@@ -885,9 +884,7 @@ function ActiveEmployeeCard({
               </span>
             )}
 
-            <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-300">
-              Online
-            </span>
+            <StatusBadge status={employee.status} dot />
 
           </div>
 

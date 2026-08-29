@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import EmptyState from "../../components/EmptyState";
 import WorkforceAnalyticsCenter from "../../components/dashboard/WorkforceAnalyticsCenter";
+import MetricCard from "../../components/ui/MetricCard";
+import LoadingState from "../../components/ui/LoadingState";
+import ErrorState from "../../components/ui/ErrorState";
 
 type PipelineItem = {
   stage: string;
@@ -176,34 +179,6 @@ type AnalyticsData = {
 
   generatedAt: string;
 };
-
-function MetricCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string | number;
-  detail?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-      <p className="text-xs font-bold uppercase tracking-wider text-white/35">
-        {label}
-      </p>
-
-      <p className="mt-3 text-3xl font-black tracking-tight">
-        {value}
-      </p>
-
-      {detail && (
-        <p className="mt-2 text-xs text-white/35">
-          {detail}
-        </p>
-      )}
-    </div>
-  );
-}
 
 function formatMoney(value: number, currencyCode: string = "GHS", locale: string = "en-GH") {
   return new Intl.NumberFormat(locale, {
@@ -804,35 +779,17 @@ export default function AnalyticsPage() {
   }, [trendRange]);
 
   if (loading) {
-    return (
-      <main className="p-6 lg:p-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-10">
-            <p className="text-sm text-white/40">
-              Loading business analytics...
-            </p>
-          </div>
-        </div>
-      </main>
-    );
+    return <LoadingState variant="page" message="Loading business analytics..." />;
   }
 
   if (error || !data) {
     return (
-      <main className="p-6 lg:p-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-3xl border border-red-400/10 bg-red-400/[0.04] p-6">
-            <p className="text-sm font-bold text-red-300">
-              Analytics unavailable
-            </p>
-
-            <p className="mt-2 text-sm text-white/40">
-              {error ||
-                "Unable to load analytics."}
-            </p>
-          </div>
-        </div>
-      </main>
+      <ErrorState
+        variant="page"
+        title="Analytics unavailable"
+        message={error || "Unable to load analytics."}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
@@ -1767,25 +1724,25 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Customers"
               value={overview.customers}
-              detail={`${overview.newCustomers} new this month`}
+              description={`${overview.newCustomers} new this month`}
             />
 
             <MetricCard
               label="Leads"
               value={overview.leads}
-              detail={`${overview.newLeads} new this month`}
+              description={`${overview.newLeads} new this month`}
             />
 
             <MetricCard
               label="Qualified Leads"
               value={overview.qualifiedLeads}
-              detail={`${overview.conversionRate}% of all leads`}
+              description={`${overview.conversionRate}% of all leads`}
             />
 
             <MetricCard
               label="Sales Activities"
               value={sales.activities}
-              detail="Recorded sales activity"
+              description="Recorded sales activity"
             />
           </div>
         </section>
@@ -1910,7 +1867,7 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Open Deals"
               value={sales.dealStatus.open}
-              detail={money(
+              description={money(
                 sales.dealStatus.openValue,
               )}
             />
@@ -1918,7 +1875,7 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Won Deals"
               value={sales.dealStatus.won}
-              detail={money(
+              description={money(
                 sales.dealStatus.wonValue,
               )}
             />
@@ -1926,7 +1883,7 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Lost Deals"
               value={sales.dealStatus.lost}
-              detail={money(
+              description={money(
                 sales.dealStatus.lostValue,
               )}
             />
@@ -2038,13 +1995,13 @@ export default function AnalyticsPage() {
             <MetricCard
               label="Overdue Tasks"
               value={overview.overdueTasks}
-              detail="Requires attention"
+              description="Requires attention"
             />
 
             <MetricCard
               label="Pending Follow-ups"
               value={overview.pendingFollowUps}
-              detail={`${overview.overdueFollowUps} overdue`}
+              description={`${overview.overdueFollowUps} overdue`}
             />
 
           </div>
@@ -2069,13 +2026,13 @@ export default function AnalyticsPage() {
             <MetricCard
               label="AI Employees"
               value={workforce.employees}
-              detail="Configured workforce"
+              description="Configured workforce"
             />
 
             <MetricCard
               label="AI Activities"
               value={workforce.activities}
-              detail="Recorded AI work"
+              description="Recorded AI work"
             />
 
           </div>
