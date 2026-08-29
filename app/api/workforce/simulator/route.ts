@@ -11,12 +11,14 @@ import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
+import { kubaMarketingAgent } from "@/mastra/agents/marketing";
 
 const agents = {
   receptionist: kubaReceptionistAgent,
   sales: kubaSalesAgent,
   "customer-support": kubaCustomerSupportAgent,
   "general-manager": kubaGeneralManagerAgent,
+  marketing: kubaMarketingAgent,
 };
 
 export async function GET() {

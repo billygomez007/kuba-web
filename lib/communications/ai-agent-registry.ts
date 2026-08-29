@@ -14,11 +14,16 @@ import {
   kubaGeneralManagerAgent,
 } from "@/mastra/agents/general-manager";
 
+import {
+  kubaMarketingAgent,
+} from "@/mastra/agents/marketing";
+
 export type KubaAgentType =
   | "receptionist"
   | "sales"
   | "customer_support"
-  | "general_manager";
+  | "general_manager"
+  | "marketing";
 
 export function getKubaAgent(
   type: string,
@@ -32,6 +37,9 @@ export function getKubaAgent(
 
     case "general_manager":
       return kubaGeneralManagerAgent;
+
+    case "marketing":
+      return kubaMarketingAgent;
 
     case "receptionist":
     default:

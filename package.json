@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "bootstrap:super-admin": "node scripts/bootstrap-super-admin.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.41",
@@ -40,6 +41,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

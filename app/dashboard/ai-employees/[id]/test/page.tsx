@@ -13,6 +13,7 @@ const scenarios: Record<string, string[]> = {
   sales: ["Customer interested in buying", "Customer needs human help"],
   "customer-support": ["Customer has a problem", "Customer needs human help"],
   "general-manager": ["Review today's business priorities", "Customer needs human help"],
+  marketing: ["Find growth opportunities from our current leads", "Create a 30-day marketing plan for this business"],
 };
 
 const capabilities: Record<string, string[]> = {
@@ -20,6 +21,7 @@ const capabilities: Record<string, string[]> = {
   sales: ["Lead qualification", "Customer follow-up", "Pipeline updates", "Opportunity discovery"],
   "customer-support": ["Issue resolution", "Customer context", "Support responses", "Escalation"],
   "general-manager": ["Business analysis", "Priority planning", "Team coordination", "Escalation"],
+  marketing: ["Growth opportunity discovery", "Campaign & content drafting", "Content calendars", "Sales handoff"],
 };
 
 export default function EmployeeTestPage() {
@@ -74,7 +76,9 @@ export default function EmployeeTestPage() {
             ? "/api/ai/general-manager"
             : employee.type === "receptionist"
               ? "/api/ai/receptionist"
-              : "";
+              : employee.type === "marketing"
+                ? "/api/ai/marketing"
+                : "";
 
       if (!endpoint) throw new Error("This employee does not have a connected test runtime yet.");
       const body = employee.type === "receptionist"
@@ -124,4 +128,4 @@ export default function EmployeeTestPage() {
 function Status({ status }: { status: string }) { const active = status === "active"; return <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${active ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-amber-400/20 bg-amber-400/10 text-amber-300"}`}><span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-400" : "bg-amber-400"}`} />{status}</span>; }
 function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3"><p className="text-xs text-white/30">{label}</p><p className="mt-1 text-sm font-semibold text-white/70">{value}</p></div>; }
 function State({ message, error = false }: { message: string; error?: boolean }) { return <main className="flex min-h-screen items-center justify-center bg-[#07070A] px-6 text-center text-sm"><p className={error ? "text-red-200" : "text-white/40"}>{message}</p></main>; }
-function departmentFor(type: string) { return type === "sales" ? "Revenue Operations" : type === "general-manager" ? "Executive Operations" : type === "customer-support" || type === "receptionist" ? "Customer Operations" : "AI Workforce"; }
+function departmentFor(type: string) { return type === "sales" ? "Revenue Operations" : type === "general-manager" ? "Executive Operations" : type === "marketing" ? "Growth Operations" : type === "customer-support" || type === "receptionist" ? "Customer Operations" : "AI Workforce"; }
