@@ -1,4 +1,4 @@
-const BRAND_NAME = "SuperKuba AI";
+const BRAND_NAME = "SuperKuba";
 const DEFAULT_APP_URL = "https://superkuba.com";
 
 type EmailTemplate = {
@@ -89,7 +89,7 @@ function renderBrandedEmail(options: BrandedEmailOptions): Omit<EmailTemplate, "
             </tr>
             <tr>
               <td align="center" style="padding:28px 24px 8px;color:#64748b;font-family:Arial,'Helvetica Neue',sans-serif;font-size:12px;line-height:19px;">
-                <p style="margin:0 0 8px;">SuperKuba AI · Your intelligent workforce platform</p>
+                <p style="margin:0 0 8px;">SuperKuba · Your intelligent workforce platform</p>
                 <p style="margin:0;">© ${new Date().getUTCFullYear()} SuperKuba. All rights reserved.</p>
               </td>
             </tr>
@@ -117,16 +117,16 @@ function renderBrandedEmail(options: BrandedEmailOptions): Omit<EmailTemplate, "
 }
 
 export function welcomeEmailTemplate({ name }: RecipientTemplateOptions): EmailTemplate {
-  const subject = "Welcome to SuperKuba AI — Your AI Workforce Starts Here";
+  const subject = "Welcome to SuperKuba — Your AI Workforce Starts Here";
   return {
     subject,
     ...renderBrandedEmail({
-      preheader: "Welcome to SuperKuba AI. Your intelligent workforce starts here.",
+      preheader: "Welcome to SuperKuba. Your intelligent workforce starts here.",
       eyebrow: "Welcome to SuperKuba",
       title: "Your AI workforce starts here",
       greeting: `Hello ${name},`,
       body: [
-        "Welcome to SuperKuba AI. We are delighted to help you build a smarter, more responsive business with an intelligent workforce that works alongside your team.",
+        "Welcome to SuperKuba. We are delighted to help you build a smarter, more responsive business with an intelligent workforce that works alongside your team.",
         "From one command center, SuperKuba helps you deploy AI employees, manage customer operations, automate workflows, and turn business activity into actionable insight.",
         "Your workspace is ready. Sign in to begin setting up your business and activating your first AI employee.",
       ],
@@ -227,6 +227,23 @@ export function aiEmployeeActivationEmailTemplate(
       body: [`${options.aiEmployeeName} has been activated successfully and is ready to support your business within its assigned permissions.`],
       ctaLabel: "View AI workforce",
       ctaUrl: options.dashboardUrl || `${appUrl()}/dashboard/ai-workforce`,
+    }),
+  };
+}
+
+export function contactSalesEmailTemplate(
+  options: { name: string; email: string; company: string; message: string },
+): EmailTemplate {
+  const subject = `New Enterprise contact request — ${options.company}`;
+  return {
+    subject,
+    ...renderBrandedEmail({
+      preheader: `${options.name} from ${options.company} asked to be contacted about SuperKuba Enterprise.`,
+      eyebrow: "Enterprise contact request",
+      title: "New Enterprise inquiry",
+      greeting: `${options.name} (${options.email}) at ${options.company} submitted the Contact Sales form:`,
+      body: [options.message],
+      notice: "Reply directly to this email to respond to the requester.",
     }),
   };
 }

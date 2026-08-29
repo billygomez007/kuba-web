@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEscapeToClose } from "../../components/useEscapeToClose";
 
 type Customer = {
   id: string;
@@ -393,6 +394,8 @@ function AddCustomerModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEscapeToClose(onClose);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -432,7 +435,12 @@ function AddCustomerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-customer-modal-title"
+    >
       <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -440,7 +448,7 @@ function AddCustomerModal({
               Customer
             </p>
 
-            <h2 className="mt-2 text-2xl font-black">
+            <h2 id="add-customer-modal-title" className="mt-2 text-2xl font-black">
               Add customer
             </h2>
 
@@ -452,6 +460,7 @@ function AddCustomerModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/40 transition hover:text-white"
           >
             ×
@@ -464,6 +473,7 @@ function AddCustomerModal({
             value={name}
             onChange={setName}
             placeholder="Customer name"
+            autoFocus
           />
 
           <Field
@@ -534,24 +544,29 @@ function Field({
   onChange,
   placeholder,
   type = "text",
+  autoFocus,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   type?: string;
+  autoFocus?: boolean;
 }) {
+  const inputId = `add-customer-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-white/70">
+      <label htmlFor={inputId} className="mb-2 block text-sm font-semibold text-white/70">
         {label}
       </label>
 
       <input
+        id={inputId}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        autoFocus={autoFocus}
         className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-400/10"
       />
     </div>

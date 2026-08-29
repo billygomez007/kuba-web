@@ -75,17 +75,16 @@ export async function POST(request: Request) {
     /*
      * EXECUTION SAFETY
      *
-     * Kuba Sales now has a real WhatsApp sending tool.
+     * Kuba Sales has no tool that sends a message to a customer
+     * directly. Its only customer-contact tool is salesExternalAction,
+     * which files a pending row in actionApprovals — a human with
+     * approval authority must review and approve it, and a separate
+     * execute step actually delivers the message, before anything
+     * reaches a real customer.
      *
-     * Generic execution requests such as "do it" are therefore
-     * allowed to reach the Sales agent.
-     *
-     * The agent must only claim that a customer was contacted when
-     * sendWhatsAppMessage returns success: true.
-     *
-     * CRM completion is still NOT available to the agent yet.
-     * Therefore sending a message must not be described as completing
-     * a follow-up.
+     * Generic execution requests such as "do it" are allowed to reach
+     * the Sales agent, but the agent must never claim a customer was
+     * contacted — only that an approval request was created.
      */
 
     const businessContext = `

@@ -1,18 +1,17 @@
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import {
-  businessUsers,
   followUps,
   leads,
 } from "@/db/schema";
-
-import { sendWhatsAppMessageTool } from "@/mastra/tools/send-whatsapp-message";
-
+import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { createAuditLog } from "@/lib/auth/audit";
+import { sendWhatsAppToPhone } from "@/lib/channels/whatsapp";
 
 export async function POST(
   request: Request,
@@ -21,11 +20,9 @@ export async function POST(
   },
 ) {
   try {
-
     const session = await auth.api.getSession({
       headers: await headers(),
     });
-
 
     if (!session?.user) {
       return NextResponse.json(
@@ -34,16 +31,13 @@ export async function POST(
       );
     }
 
-
     const { id } = await context.params;
-
 
     const body = await request.json();
 
     const message = String(
       body.message || "",
     ).trim();
-
 
     if (!message) {
       return NextResponse.json(
@@ -52,32 +46,21 @@ export async function POST(
       );
     }
 
+    const membership = await getCurrentMembership();
 
-    const membership = await db
-      .select({
-        businessId:
-          businessUsers.businessId,
-      })
-      .from(businessUsers)
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
-
-
-    const business = membership[0];
-
-
-    if (!business) {
+    if (!membership) {
       return NextResponse.json(
         { error: "Business not found" },
         { status: 404 },
       );
     }
 
+    if (!hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) {
+      return NextResponse.json(
+        { error: "You do not have permission to send messages." },
+        { status: 403 },
+      );
+    }
 
     const result = await db
       .select({
@@ -99,15 +82,13 @@ export async function POST(
           ),
           eq(
             followUps.businessId,
-            business.businessId,
+            membership.businessId,
           ),
         ),
       )
       .limit(1);
 
-
     const lead = result[0]?.lead;
-
 
     if (!lead?.phone) {
       return NextResponse.json(
@@ -119,29 +100,28 @@ export async function POST(
       );
     }
 
+    const response = await sendWhatsAppToPhone({
+      businessId: membership.businessId,
+      phone: lead.phone,
+      message,
+    });
 
-    const response =
-      await sendWhatsAppMessageTool.execute!(
-        {
-          phone: lead.phone,
-          message,
-        },
-        {
-          requestContext: new RequestContext([["businessId", business.businessId]]),
-        } as Parameters<NonNullable<typeof sendWhatsAppMessageTool.execute>>[1],
-      );
-
+    await createAuditLog({
+      businessId: membership.businessId,
+      userId: session.user.id,
+      action: "communication.whatsapp.send",
+      resource: "follow_up",
+      resourceId: id,
+      description: response.success ? `Sent a WhatsApp message to lead "${lead.name}".` : "WhatsApp message send failed.",
+      metadata: { leadId: lead.id, success: response.success, error: response.error || null },
+    });
 
     return NextResponse.json(response);
-
-
   } catch (error) {
-
     console.error(
       "Follow-up WhatsApp send error",
       error,
     );
-
 
     return NextResponse.json(
       {

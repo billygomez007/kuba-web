@@ -1,5 +1,4 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import SuperKubaAIWorkforceShowcase from "../components/SuperKubaAIWorkforceShowcase";
 import SuperKubaAnalyticsShowcase from "../components/SuperKubaAnalyticsShowcase";
@@ -59,6 +58,12 @@ const products = [
   },
 ];
 
+
+export const metadata: Metadata = {
+  title: "Products | SuperKuba",
+  description: "AI Workforce, Customer Operations, Business Operations, Automation, Analytics, and Integrations — the products that make up the SuperKuba platform.",
+  alternates: { canonical: "/products" },
+};
 
 export default function ProductsPage() {
 

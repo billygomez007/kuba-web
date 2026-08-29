@@ -1,8 +1,7 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import MarketingHeader from "./components/MarketingHeader";
+import MarketingFooter from "./components/MarketingFooter";
 import SuperKubaAIWorkforceShowcase from "./components/SuperKubaAIWorkforceShowcase";
 import SuperKubaAnalyticsShowcase from "./components/SuperKubaAnalyticsShowcase";
 import SuperKubaAutomationShowcase from "./components/SuperKubaAutomationShowcase";
@@ -111,6 +110,13 @@ const industries = [
   "E-commerce",
   "Financial Services",
 ];
+
+export const metadata: Metadata = {
+  title: "SuperKuba | Your Business Powered by an AI Workforce",
+  description:
+    "Build, deploy and manage AI employees that work alongside your human team — customer conversations, sales, appointments, tickets, and operations in one platform.",
+  alternates: { canonical: "/" },
+};
 
 export default function KubaWebsite() {
   return (
@@ -221,8 +227,8 @@ export default function KubaWebsite() {
                   </div>
 
                   <div className="flex w-fit items-center gap-2 rounded-full bg-emerald-400/10 px-4 py-2 text-xs font-bold text-emerald-400">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                    8 AI employees active
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    Example AI workforce
                   </div>
                 </div>
 
@@ -583,92 +589,7 @@ AI workforce solutions built around how your industry operates.
         </div>
       </section>
 
-      {/* =========================================================
-          FOOTER
-      ========================================================= */}
-
-      <footer className="border-t border-white/[0.06] bg-[#050507]">
-        <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
-          <div className="grid gap-12 md:grid-cols-4">
-            {/* Brand */}
-            <div className="md:col-span-2">
-              <Link href="/" className="flex items-center">
-  <Image
-    src="/brand/superkuba-logo.png"
-    alt="SuperKuba"
-    width={2172}
-    height={724}
-    className="h-auto w-[170px] object-contain"
-  />
-</Link>
-
-              <p className="mt-5 max-w-md leading-7 text-white/35">
-                Your business, powered by an AI workforce. AI employees,
-                automation, workflows, knowledge and intelligent operations
-                in one platform.
-              </p>
-            </div>
-
-            {/* Platform */}
-            <div>
-              <h3 className="font-bold">Platform</h3>
-
-              <div className="mt-5 space-y-3 text-sm text-white/40">
-                <a className="block hover:text-white" href="#workforce">
-                  AI Workforce
-                </a>
-
-                <a className="block hover:text-white" href="#platform">
-                  Platform
-                </a>
-
-                <a className="block hover:text-white" href="#solutions">
-                  Solutions
-                </a>
-
-                <Link className="block hover:text-white" href="/pricing">
-                  Pricing
-                </Link>
-              </div>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h3 className="font-bold">Kuba</h3>
-
-              <div className="mt-5 space-y-3 text-sm text-white/40">
-                <Link className="block hover:text-white" href="/login">
-                  Log in
-                </Link>
-
-                <Link className="block hover:text-white" href="/signup">
-                  Get started
-                </Link>
-
-                <Link className="block hover:text-white" href="/demo">
-                  Contact
-                </Link>
-
-                <Link className="block hover:text-white" href="/resources#documentation">
-                  Documentation
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-14 flex flex-col gap-4 border-t border-white/[0.06] pt-7 text-xs text-white/25 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              © {new Date().getFullYear()} SuperKuba. All rights reserved.
-            </span>
-
-            <div className="flex gap-5">
-              <span>Privacy</span>
-              <span>Terms</span>
-              <span>Security</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </main>
   );
 }

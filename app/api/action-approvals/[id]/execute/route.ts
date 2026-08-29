@@ -11,6 +11,7 @@ import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { createAuditLog } from "@/lib/auth/audit";
 import { getChannelAdapter } from "@/lib/channels/router";
 import { type ChannelType } from "@/lib/channels/types";
+import { sendWhatsAppToPhone } from "@/lib/channels/whatsapp";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
@@ -54,16 +55,24 @@ export async function POST(
     .returning({ id: actionApprovals.id });
   if (!claimed[0]) return NextResponse.json({ error: "Action must be approved and not already executing." }, { status: 409 });
 
-  const adapter = getChannelAdapter(
-    approval[0].channel as ChannelType,
-  );
-
-  const result = await adapter.send({
-    businessId: approval[0].businessId,
-    conversationId: "",
-    recipient: approval[0].recipient,
-    message: approval[0].message,
-  });
+  // A proposed action (e.g. Sales requesting outreach to a lead) has no
+  // existing conversation to resolve the WhatsApp 24-hour customer-service
+  // window from, so the generic conversationId-based adapter would always
+  // report the window closed. Resolve the window by phone number instead,
+  // the same way any other AI-tool-initiated WhatsApp send does.
+  const result =
+    approval[0].channel === "whatsapp"
+      ? await sendWhatsAppToPhone({
+          businessId: approval[0].businessId,
+          phone: approval[0].recipient,
+          message: approval[0].message,
+        })
+      : await getChannelAdapter(approval[0].channel as ChannelType).send({
+          businessId: approval[0].businessId,
+          conversationId: "",
+          recipient: approval[0].recipient,
+          message: approval[0].message,
+        });
 
   await db.insert(communicationLogs).values({
     id: crypto.randomUUID(),

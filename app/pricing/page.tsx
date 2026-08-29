@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   title: "SuperKuba Pricing | Starter, Growth, Pro & Enterprise",
   description:
     "Compare SuperKuba Starter, Growth, Pro, and Enterprise plans and the capabilities included in each operating level.",
+  alternates: { canonical: "/pricing" },
 };
 
 const categoryLabels: Record<string, string> = {

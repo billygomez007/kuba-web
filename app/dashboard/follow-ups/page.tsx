@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEscapeToClose } from "../../components/useEscapeToClose";
 
 type Lead = {
   id: string;
@@ -430,6 +431,8 @@ function CreateFollowUpModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  useEscapeToClose(onClose);
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -491,7 +494,12 @@ function CreateFollowUpModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-follow-up-modal-title"
+    >
       <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl sm:p-8">
         <div className="flex items-start justify-between">
           <div>
@@ -499,7 +507,7 @@ function CreateFollowUpModal({
               Sales workflow
             </p>
 
-            <h2 className="mt-2 text-2xl font-black">
+            <h2 id="create-follow-up-modal-title" className="mt-2 text-2xl font-black">
               Create follow-up
             </h2>
 
@@ -511,6 +519,7 @@ function CreateFollowUpModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/40 hover:text-white"
           >
             ×
@@ -522,7 +531,7 @@ function CreateFollowUpModal({
           className="mt-7 space-y-5"
         >
           <div>
-            <label className="mb-2 block text-sm font-semibold text-white/70">
+            <label htmlFor="follow-up-lead" className="mb-2 block text-sm font-semibold text-white/70">
               Lead
             </label>
 
@@ -532,6 +541,7 @@ function CreateFollowUpModal({
               </div>
             ) : (
               <select
+                id="follow-up-lead"
                 required
                 value={leadId}
                 onChange={(event) =>
@@ -554,11 +564,12 @@ function CreateFollowUpModal({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-white/70">
+            <label htmlFor="follow-up-title" className="mb-2 block text-sm font-semibold text-white/70">
               Follow-up title
             </label>
 
             <input
+              id="follow-up-title"
               required
               value={title}
               onChange={(event) =>
@@ -570,11 +581,12 @@ function CreateFollowUpModal({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-white/70">
+            <label htmlFor="follow-up-due-at" className="mb-2 block text-sm font-semibold text-white/70">
               Due date and time
             </label>
 
             <input
+              id="follow-up-due-at"
               required
               type="datetime-local"
               value={dueAt}
@@ -586,11 +598,12 @@ function CreateFollowUpModal({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-white/70">
+            <label htmlFor="follow-up-description" className="mb-2 block text-sm font-semibold text-white/70">
               Description
             </label>
 
             <textarea
+              id="follow-up-description"
               value={description}
               onChange={(event) =>
                 setDescription(event.target.value)

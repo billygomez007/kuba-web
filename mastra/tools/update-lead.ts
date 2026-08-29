@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { requireBusinessId } from "./business-context";
+import { createAuditLog } from "@/lib/auth/audit";
 
 export const updateLeadTool = createTool({
   id: "update-lead",
@@ -166,6 +167,8 @@ export const updateLeadTool = createTool({
         source: leads.source,
         stage: leads.stage,
       });
+
+    await createAuditLog({ businessId, userId: null, action: "ai.sales.update_lead", resource: "lead", resourceId: targetLeadId, description: `Kuba Sales updated lead "${updatedLead[0].name}".`, metadata: updates });
 
     return {
       success: true,

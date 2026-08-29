@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { followUps, leads } from "@/db/schema";
 import { requireBusinessId } from "./business-context";
+import { createAuditLog } from "@/lib/auth/audit";
 
 export const completeFollowUpTool = createTool({
   id: "complete-follow-up",
@@ -112,6 +113,8 @@ export const completeFollowUpTool = createTool({
         title: followUps.title,
         status: followUps.status,
       });
+
+    await createAuditLog({ businessId, userId: null, action: "ai.sales.complete_follow_up", resource: "follow_up", resourceId: targetFollowUpId, description: `Kuba Sales marked follow-up "${updatedFollowUp[0].title}" completed.` });
 
     return {
       success: true,

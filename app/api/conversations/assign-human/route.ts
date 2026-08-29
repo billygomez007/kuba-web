@@ -15,6 +15,8 @@ import {
   PERMISSIONS,
 } from "@/lib/auth/permissions";
 import { canAccessConversation } from "@/lib/communications/conversation-access";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 export async function POST(request: Request) {
   try {
@@ -48,6 +50,13 @@ export async function POST(request: Request) {
     const membership = await getBusinessMembership(session.user.id, targetConversation.businessId);
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.MESSAGING_MANAGE)) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+
+    if (!hasCapability(await getBusinessEntitlements(targetConversation.businessId), "customer_ops.conversations")) {
+      return NextResponse.json(
+        { error: "Conversation management requires the Growth plan or higher.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["customer_ops.conversations"] },
+        { status: 403 },
+      );
     }
 
     const access = await canAccessConversation(session.user.id, conversationId);

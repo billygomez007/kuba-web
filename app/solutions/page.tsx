@@ -1,5 +1,4 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -65,6 +64,12 @@ const solutions = [
       "Manage scheduling, reservations, reminders, and customer appointments automatically.",
   },
 ];
+
+export const metadata: Metadata = {
+  title: "Solutions | SuperKuba",
+  description: "How SuperKuba's AI workforce reduces manual work across sales, marketing, support, HR, finance, and appointments.",
+  alternates: { canonical: "/solutions" },
+};
 
 export default function SolutionsPage() {
   return (

@@ -21,6 +21,8 @@ import {
 } from "@/lib/communications/conversation-access";
 
 import { createAuditLog } from "@/lib/auth/audit";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 export async function POST(
   request: Request,
@@ -112,6 +114,13 @@ export async function POST(
           error:
             "You do not have permission to manage conversations.",
         },
+        { status: 403 },
+      );
+    }
+
+    if (!hasCapability(await getBusinessEntitlements(conversation.businessId), "customer_ops.conversations")) {
+      return NextResponse.json(
+        { error: "Conversation management requires the Growth plan or higher.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["customer_ops.conversations"] },
         { status: 403 },
       );
     }

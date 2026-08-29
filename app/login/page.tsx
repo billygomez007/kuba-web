@@ -86,7 +86,7 @@ function LoginForm() {
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-white/45">
-              Sign in to your SuperKuba AI workspace.
+              Sign in to your SuperKuba workspace.
             </p>
           </div>
 
@@ -179,7 +179,7 @@ function LoginForm() {
             </p>
 
             <p className="mt-3 text-xs text-white/20">
-              © {new Date().getFullYear()} SuperKuba AI. All rights reserved.
+              © {new Date().getFullYear()} SuperKuba. All rights reserved.
             </p>
           </div>
 

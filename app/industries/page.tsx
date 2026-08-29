@@ -1,5 +1,4 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -83,6 +82,12 @@ const industries = [
   },
 ];
 
+
+export const metadata: Metadata = {
+  title: "Industries | SuperKuba",
+  description: "AI workforce solutions built for hospitality, healthcare, education, real estate, retail, restaurants, professional services, financial services, and more.",
+  alternates: { canonical: "/industries" },
+};
 
 export default function IndustriesPage() {
 

@@ -18,6 +18,8 @@ import {
 } from "@/db/schema";
 import { requireBusinessMembership } from "@/lib/auth/tenant";
 import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
 
 export async function GET() {
   try {
@@ -33,6 +35,13 @@ export async function GET() {
     if (!membership) {
       return NextResponse.json(
         { error: error || "Business access denied." },
+        { status: 403 },
+      );
+    }
+
+    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "customer_ops.inbox")) {
+      return NextResponse.json(
+        { error: "The Inbox requires an active plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: capabilityMinimumPlan["customer_ops.inbox"] },
         { status: 403 },
       );
     }

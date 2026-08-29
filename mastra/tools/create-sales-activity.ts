@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, salesActivities } from "@/db/schema";
 import { requireBusinessId } from "./business-context";
+import { createAuditLog } from "@/lib/auth/audit";
 
 export const createSalesActivityTool = createTool({
   id: "create-sales-activity",
@@ -84,6 +85,8 @@ export const createSalesActivityTool = createTool({
         description: salesActivities.description,
         createdAt: salesActivities.createdAt,
       });
+
+    await createAuditLog({ businessId, userId: null, action: "ai.sales.create_activity", resource: "sales_activity", resourceId: result[0].id, description: `Kuba Sales recorded a ${type} activity for lead "${lead.name}".` });
 
     return {
       success: true,

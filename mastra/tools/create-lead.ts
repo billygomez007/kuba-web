@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { leads, aiEmployees } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireBusinessId } from "./business-context";
+import { createAuditLog } from "@/lib/auth/audit";
 
 export const createLeadTool = createTool({
   id: "create-lead",
@@ -86,6 +87,8 @@ export const createLeadTool = createTool({
         source: leads.source,
         stage: leads.stage,
       });
+
+    await createAuditLog({ businessId, userId: null, action: "ai.sales.create_lead", resource: "lead", resourceId: leadId, description: `Kuba Sales created lead "${name}".`, metadata: { source: source || null } });
 
     return {
       success: true,
