@@ -9,6 +9,7 @@ type WhatsAppIntegration = {
   externalAccountId: string | null;
   externalPhoneNumberId: string | null;
   displayName: string | null;
+  lastWebhookAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -271,6 +272,18 @@ export default function WhatsAppIntegrationPage() {
                   <p className="mt-2 break-all font-mono text-sm text-white/80">
                     {integration.externalPhoneNumberId ||
                       "Not available"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5 sm:col-span-2">
+                  <p className="text-xs uppercase tracking-wide text-white/40">
+                    Last Webhook Received
+                  </p>
+
+                  <p className="mt-2 text-sm text-white/80">
+                    {integration.lastWebhookAt
+                      ? new Date(integration.lastWebhookAt).toLocaleString()
+                      : "No webhook received yet"}
                   </p>
                 </div>
 

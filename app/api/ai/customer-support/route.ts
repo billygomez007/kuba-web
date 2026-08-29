@@ -15,6 +15,8 @@ import {
 
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 export async function POST(request: Request) {
   try {
@@ -61,6 +63,13 @@ export async function POST(request: Request) {
         },
         { status: 404 },
       );
+    }
+
+    if (!hasPermission(membership?.role || "", membership?.permissions || null, PERMISSIONS.MESSAGING_MANAGE)) {
+      return NextResponse.json({ error: "You do not have permission to use Customer Support AI." }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(business.id), "customer_ops.tickets")) {
+      return NextResponse.json({ error: "Customer Support AI requires the Support Tickets capability.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true }, { status: 403 });
     }
 
     const employeeResult = await db

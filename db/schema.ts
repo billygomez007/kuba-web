@@ -787,6 +787,13 @@ export const integrations = sqliteTable("integrations", {
 
   metadata: text("metadata"),
 
+  // Truthful connection-health signal for the Integrations UI — the last
+  // time this integration received a verified provider webhook. Never
+  // fabricated; null simply means no webhook has arrived yet.
+  lastWebhookAt: integer("last_webhook_at", {
+    mode: "timestamp_ms",
+  }),
+
   createdAt: integer("created_at", {
     mode: "timestamp_ms",
   }).notNull(),
@@ -1019,6 +1026,15 @@ export const messages = sqliteTable("messages", {
   content: text("content").notNull(),
 
   messageType: text("message_type").notNull().default("text"),
+
+  // Provider delivery lifecycle for outbound messages (e.g. WhatsApp
+  // "sent"/"delivered"/"read"/"failed" status callbacks). Null until a
+  // provider status webhook updates it; inbound messages never set this.
+  status: text("status"),
+
+  statusUpdatedAt: integer("status_updated_at", {
+    mode: "timestamp_ms",
+  }),
 
   createdAt: integer("created_at", {
     mode: "timestamp_ms",

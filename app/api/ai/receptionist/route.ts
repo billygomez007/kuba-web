@@ -18,6 +18,8 @@ import {
   salesActivities,
 } from "@/db/schema";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
 
 export async function POST(request: Request) {
@@ -92,6 +94,13 @@ export async function POST(request: Request) {
         },
         { status: 404 },
       );
+    }
+
+    if (!hasPermission(membership?.role || "", membership?.permissions || null, PERMISSIONS.RECEPTION_AI)) {
+      return NextResponse.json({ error: "You do not have permission to use the AI Receptionist." }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(business.id), "customer_ops.appointments")) {
+      return NextResponse.json({ error: "AI Receptionist requires the Appointments capability.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true }, { status: 403 });
     }
 
     // ---------------------------------------------------------

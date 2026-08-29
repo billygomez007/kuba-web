@@ -10,6 +10,8 @@ import { searchKnowledge } from "@/lib/knowledge/search";
 import { businesses, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
 import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 export async function POST(request: Request) {
   try {
@@ -46,6 +48,13 @@ export async function POST(request: Request) {
         { error: "No business is associated with your account." },
         { status: 404 },
       );
+    }
+
+    if (!hasPermission(membership?.role || "", membership?.permissions || null, PERMISSIONS.SALES_AI)) {
+      return NextResponse.json({ error: "You do not have permission to use Sales AI." }, { status: 403 });
+    }
+    if (!hasCapability(await getBusinessEntitlements(business.id), "customer_ops.leads")) {
+      return NextResponse.json({ error: "Sales AI requires the Leads capability.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true }, { status: 403 });
     }
 
     const localization = await getBusinessLocalization(business.id);

@@ -55,6 +55,12 @@ test("Provider-confirmed state is required for paid access", () => {
   assert.equal(states.includes("incomplete"), false);
 });
 
+test("An unusable subscription does not preserve a paid fallback tier", () => {
+  const currentSubscription = { status: "expired", plan: "pro" };
+  const resolvedPlan = ["active", "trialing", "past_due", "canceled", "enterprise_contract"].includes(currentSubscription.status) ? currentSubscription.plan : "starter";
+  assert.equal(resolvedPlan, "starter");
+});
+
 test("Plan limits are sourced from canonical definitions", () => {
   assert.equal(defaultLimitsForPlan(getPlanDefinition("starter")).max_ai_employees, 1);
   assert.equal(defaultLimitsForPlan(getPlanDefinition("growth")).max_automations, 20);

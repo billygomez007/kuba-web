@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
@@ -108,6 +108,36 @@ export async function POST(request: Request) {
           "Business ID, Phone Number ID, and Access Token are required.",
       },
       { status: 400 },
+    );
+  }
+
+  /**
+   * A Meta phone_number_id must belong to exactly one SuperKuba business.
+   * The webhook resolves tenants by this value, so allowing two businesses
+   * to register the same one would let inbound messages for one business
+   * be delivered into another's inbox.
+   */
+  const claimedByAnotherBusiness =
+    await db
+      .select({ id: integrations.id })
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.provider, "whatsapp"),
+          eq(integrations.externalPhoneNumberId, phoneNumberId),
+          eq(integrations.status, "active"),
+          ne(integrations.businessId, membership.businessId),
+        ),
+      )
+      .limit(1);
+
+  if (claimedByAnotherBusiness.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "This WhatsApp phone number is already connected to another Kuba business.",
+      },
+      { status: 409 },
     );
   }
 

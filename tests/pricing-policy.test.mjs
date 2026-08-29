@@ -23,10 +23,12 @@ test("canonical capabilities are monotonic across plan tiers", () => {
 
 test("public pricing preserves placeholder prices and Enterprise contact CTA", async () => {
   const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
-  assert.match(source, /\$XX/);
-  assert.match(source, /Custom/);
-  assert.match(source, /Contact Sales/);
-  assert.match(source, /Coming Soon/);
+  const presentation = await readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8");
+  const combined = `${source}\n${presentation}`;
+  assert.match(combined, /\$XX/);
+  assert.match(combined, /Custom/);
+  assert.match(combined, /Contact Sales/);
+  assert.match(combined, /Coming Soon/);
 });
 
 test("public pricing page is metadata-addressable", async () => {
@@ -36,14 +38,18 @@ test("public pricing page is metadata-addressable", async () => {
 });
 
 test("progressive cards use customer-friendly tier-specific presentation", async () => {
-  const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
-  assert.match(source, /Run Your Business/);
-  assert.match(source, /Automate Your Business/);
-  assert.match(source, /Operate With AI/);
-  assert.match(source, /Complete Business Operating System/);
+  const [source, presentation] = await Promise.all([
+    readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8"),
+  ]);
+  const combined = `${source}\n${presentation}`;
+  assert.match(combined, /Run Your Business/);
+  assert.match(combined, /Automate Your Business/);
+  assert.match(combined, /Operate With AI/);
+  assert.match(combined, /Complete Business Operating System/);
   assert.match(source, /Everything in \{planDefinitions\.find/);
-  assert.match(source, /AI-assisted Appointments & Tickets/);
-  assert.doesNotMatch(source, /Global currency|Business Profile|Business Brain.*tier/);
+  assert.match(combined, /AI-assisted Appointments & Tickets/);
+  assert.doesNotMatch(combined, /Global currency|Business Profile|Business Brain.*tier/);
 });
 
 test("requested operations and AI-assist placements follow canonical tiers", () => {
@@ -58,7 +64,7 @@ test("requested operations and AI-assist placements follow canonical tiers", () 
 });
 
 test("pricing amounts remain unchanged placeholders", async () => {
-  const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8");
   assert.equal((source.match(/price: "\$XX"/g) || []).length, 3);
   assert.match(source, /price: "Custom"/);
 });

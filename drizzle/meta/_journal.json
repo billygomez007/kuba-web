@@ -281,6 +281,20 @@
       "when": 1787745488338,
       "tag": "0039_keen_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1787804533069,
+      "tag": "0040_whatsapp_message_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1787805135427,
+      "tag": "0041_integration_webhook_health",
+      "breakpoints": true
     }
   ]
 }
