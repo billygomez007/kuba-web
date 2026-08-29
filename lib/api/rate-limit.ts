@@ -51,5 +51,6 @@ export const RATE_LIMIT_SENSITIVE_ENDPOINTS = [
   "/api/widget/chat",
   "/api/integrations/whatsapp/webhook",
   "/api/action-approvals/*/execute",
+  "/api/ai-action-approvals/*/execute",
   "/api/automations/process",
 ] as const;

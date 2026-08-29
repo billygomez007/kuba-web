@@ -11,7 +11,8 @@ import {
 } from "@/db/schema";
 
 import { and, eq, desc } from "drizzle-orm";
-import { requireBusinessId } from "./business-context";
+import { requireBusinessId, requireEmployeeId } from "./business-context";
+import { checkAIEmployeeAuthority } from "@/lib/ai/authority";
 
 
 export const getFollowUpContextTool = createTool({
@@ -29,6 +30,9 @@ export const getFollowUpContextTool = createTool({
 
   execute: async ({ followUpId }, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    const employeeId = requireEmployeeId(requestContext);
+    const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: "read_follow_ups" });
+    if (!decision.ok) return { error: decision.message };
 
     const followUpResult = await db
       .select({
@@ -82,9 +86,15 @@ export const getFollowUpContextTool = createTool({
             ),
           )
           .where(
-            eq(
-              conversations.customerId,
-              item.lead.customerId,
+            and(
+              eq(
+                conversations.customerId,
+                item.lead.customerId,
+              ),
+              eq(
+                conversations.businessId,
+                businessId,
+              ),
             ),
           )
           .orderBy(
@@ -98,9 +108,15 @@ export const getFollowUpContextTool = createTool({
       .select()
       .from(salesActivities)
       .where(
-        eq(
-          salesActivities.leadId,
-          item.lead?.id || "",
+        and(
+          eq(
+            salesActivities.leadId,
+            item.lead?.id || "",
+          ),
+          eq(
+            salesActivities.businessId,
+            businessId,
+          ),
         ),
       )
       .orderBy(

@@ -8,6 +8,12 @@ export const kubaGeneralManagerAgent = new Agent({
   name: "Kuba General Manager",
 
   instructions: `
+SERVER-ENFORCED AUTHORITY
+
+The getBusinessKnowledge tool below is checked against this business's real
+authority settings for you before it runs, the same as every other AI
+employee's tools. If it returns an error, treat that as authoritative.
+
 You are Kuba General Manager, an AI executive employee working
 for a business through the Kuba platform.
 

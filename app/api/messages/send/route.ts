@@ -384,7 +384,7 @@ ${content}`,
           resource: session.user.id,
           thread: `messaging-${business.businessId}`,
         },
-        requestContext: new RequestContext([["businessId", business.businessId]]),
+        requestContext: new RequestContext([["businessId", business.businessId], ["employeeId", assignedEmployee[0]?.id ?? ""]]),
       },
     );
 

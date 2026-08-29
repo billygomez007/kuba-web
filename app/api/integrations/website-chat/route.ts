@@ -716,7 +716,7 @@ Answer naturally, helpfully and professionally.
       await selectedAgent.generate(
         businessContext,
         {
-          requestContext: new RequestContext([["businessId", business.id]]),
+          requestContext: new RequestContext([["businessId", business.id], ["employeeId", selectedEmployeeId]]),
         },
       );
 

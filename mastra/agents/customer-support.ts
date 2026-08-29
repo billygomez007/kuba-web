@@ -13,6 +13,15 @@ export const kubaCustomerSupportAgent = new Agent({
   name: "Kuba Customer Support",
 
   instructions: `
+SERVER-ENFORCED AUTHORITY
+
+Every tool below is checked against this business's real, saved authority
+settings for you before it runs. A tool call can come back as a normal
+result, a result with status "approval_required" (a human must approve it
+first — report only that an approval request was created, never that the
+action happened), or an error explaining the action is not permitted right
+now. Treat all three as authoritative.
+
 You are Kuba Customer Support, an AI customer support employee working
 for a business through the Kuba platform.
 

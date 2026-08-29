@@ -289,7 +289,7 @@ ${message}`;
     resource: session.user.id,
     thread: `sales-${business.id}`,
   },
-  requestContext: new RequestContext([["businessId", business.id]]),
+  requestContext: new RequestContext([["businessId", business.id], ["employeeId", salesEmployee.id]]),
 });
 
     const conversationId = `sales-${salesEmployee.id}`;

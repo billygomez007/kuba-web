@@ -531,7 +531,7 @@ ${customerMessage}
      * Generate the response.
      */
     const result = await selectedAgent.generate(businessContext, {
-      requestContext: new RequestContext([["businessId", businessId]]),
+      requestContext: new RequestContext([["businessId", businessId], ["employeeId", selectedEmployeeId]]),
     });
 
     const responseText = String(result.text || "").trim();

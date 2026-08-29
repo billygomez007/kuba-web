@@ -191,7 +191,7 @@ ${message}
             resource: session.user.id,
             thread: `customer-support-${employee.id}`,
           },
-          requestContext: new RequestContext([["businessId", business.id]]),
+          requestContext: new RequestContext([["businessId", business.id], ["employeeId", employee.id]]),
         },
       );
 

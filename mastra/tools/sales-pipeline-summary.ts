@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { leads, followUps } from "@/db/schema";
-import { requireBusinessId } from "./business-context";
+import { requireBusinessId, requireEmployeeId } from "./business-context";
+import { checkAIEmployeeAuthority } from "@/lib/ai/authority";
 
 export const salesPipelineSummaryTool = createTool({
   id: "sales-pipeline-summary",
@@ -16,6 +17,9 @@ export const salesPipelineSummaryTool = createTool({
 
   execute: async (_input, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    const employeeId = requireEmployeeId(requestContext);
+    const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: "read_leads" });
+    if (!decision.ok) return { totalLeads: 0, stageCounts: {}, qualifiedLeads: [], convertedLeads: [], pendingFollowUps: 0, completedFollowUps: 0, overdueFollowUps: [], upcomingFollowUps: [], error: decision.message };
     const businessLeads = await db
       .select({
         id: leads.id,

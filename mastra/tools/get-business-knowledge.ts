@@ -4,7 +4,8 @@ import { z } from "zod";
 import { db } from "@/db";
 import { aiBusinessSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireBusinessId } from "./business-context";
+import { requireBusinessId, requireEmployeeId } from "./business-context";
+import { checkAIEmployeeAuthority } from "@/lib/ai/authority";
 
 
 export const getBusinessKnowledgeTool = createTool({
@@ -21,6 +22,9 @@ export const getBusinessKnowledgeTool = createTool({
   execute: async (_input, { requestContext }) => {
 
     const businessId = requireBusinessId(requestContext);
+    const employeeId = requireEmployeeId(requestContext);
+    const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: "read_business_knowledge" });
+    if (!decision.ok) return { found: false, message: decision.message };
 
     const result =
       await db

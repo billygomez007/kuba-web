@@ -351,7 +351,7 @@ GENERAL MANAGER RESPONSE RULES
             thread:
               `general-manager-${employee.id}`,
           },
-          requestContext: new RequestContext([["businessId", business.id]]),
+          requestContext: new RequestContext([["businessId", business.id], ["employeeId", employee.id]]),
         },
       );
 

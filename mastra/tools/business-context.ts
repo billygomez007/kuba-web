@@ -18,3 +18,22 @@ export function requireBusinessId(requestContext: RequestContext): string {
 
   return businessId;
 }
+
+/**
+ * Same trust model as requireBusinessId: the employee ID a tool's actions
+ * are attributed to and checked against must come from the server-pinned
+ * RequestContext set before the agent run started, never from the model's
+ * tool-call arguments. Every route that invokes an agent must resolve and
+ * tenant-verify the acting AI employee before constructing RequestContext.
+ */
+export function requireEmployeeId(requestContext: RequestContext): string {
+  const employeeId = requestContext.get("employeeId") as string | undefined;
+
+  if (!employeeId) {
+    throw new Error(
+      "Missing trusted AI employee context for tool execution.",
+    );
+  }
+
+  return employeeId;
+}

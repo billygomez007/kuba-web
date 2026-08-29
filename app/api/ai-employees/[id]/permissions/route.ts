@@ -4,10 +4,20 @@ import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiEmployeeSettings, aiEmployees } from "@/db/schema";
+import { aiEmployeeActionPolicies, aiEmployees } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { createAuditLog } from "@/lib/auth/audit";
+import {
+  ACTION_META,
+  AI_ACTIONS,
+  AUTONOMY_LEVELS,
+  getOrCreateActionPolicy,
+  type AIAction,
+  type AutonomyLevel,
+  type PolicyDecision,
+} from "@/lib/ai/authority";
 
 async function employeeContext(employeeId: string) {
   const membership = await getCurrentMembership();
@@ -27,8 +37,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     if (!hasCapability(await getBusinessEntitlements(data.membership.businessId), "ai_workforce.core")) {
       return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
     }
-    const settings = await db.select().from(aiEmployeeSettings).where(eq(aiEmployeeSettings.employeeId, id)).limit(1);
-    return NextResponse.json({ employee: data.employee, settings: settings[0] || null });
+    const { autonomyLevel, policy } = await getOrCreateActionPolicy(data.membership.businessId, id);
+    const actions = AI_ACTIONS.map((action) => ({
+      action,
+      ...ACTION_META[action],
+      decision: policy[action] ?? "denied",
+    }));
+    return NextResponse.json({ employee: data.employee, autonomyLevel, actions });
   } catch (error) {
     console.error("Employee permissions GET error:", error);
     return NextResponse.json({ error: "Unable to load autonomy settings." }, { status: 500 });
@@ -48,18 +63,37 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const body = await request.json();
-    const autonomyLevel = ["assistant", "operator", "autonomous"].includes(body.autonomyLevel) ? body.autonomyLevel : "assistant";
-    const existing = await db.select({ id: aiEmployeeSettings.id, roleInstructions: aiEmployeeSettings.roleInstructions }).from(aiEmployeeSettings).where(eq(aiEmployeeSettings.employeeId, id)).limit(1);
-    const marker = "\n\nAutonomy controls:\n";
-    const guidance = `${marker}Level: ${autonomyLevel}\nEnabled actions: ${Array.isArray(body.enabledActions) ? body.enabledActions.filter((item: unknown): item is string => typeof item === "string").join(", ") : ""}\nApproval-required actions: ${Array.isArray(body.approvalActions) ? body.approvalActions.filter((item: unknown): item is string => typeof item === "string").join(", ") : ""}`;
-    const currentInstructions = existing[0]?.roleInstructions || "";
-    const roleInstructions = currentInstructions.includes(marker) ? `${currentInstructions.slice(0, currentInstructions.indexOf(marker))}${guidance}` : `${currentInstructions}${guidance}`;
-    const now = new Date();
+    const autonomyLevel: AutonomyLevel = AUTONOMY_LEVELS.includes(body.autonomyLevel) ? body.autonomyLevel : "operator";
 
+    const submittedPolicy = (body.policy && typeof body.policy === "object" ? body.policy : {}) as Record<string, unknown>;
+    const policy: Partial<Record<AIAction, PolicyDecision>> = {};
+    for (const action of AI_ACTIONS) {
+      // Communication can never be saved as anything other than
+      // requires_approval, regardless of what the client sends — the same
+      // hard floor lib/ai/authority.ts enforces at execution time.
+      if (ACTION_META[action].kind === "communication") {
+        policy[action] = "requires_approval";
+        continue;
+      }
+      const submitted = submittedPolicy[action];
+      policy[action] = submitted === "denied" || submitted === "allowed" || submitted === "requires_approval" ? submitted : "denied";
+    }
+
+    const now = new Date();
+    const existing = await db.select({ id: aiEmployeeActionPolicies.id }).from(aiEmployeeActionPolicies).where(eq(aiEmployeeActionPolicies.employeeId, id)).limit(1);
+    if (existing[0]) {
+      await db.update(aiEmployeeActionPolicies).set({ autonomyLevel, policy: JSON.stringify(policy), updatedAt: now }).where(eq(aiEmployeeActionPolicies.id, existing[0].id));
+    } else {
+      await db.insert(aiEmployeeActionPolicies).values({ id: crypto.randomUUID(), businessId: data.membership.businessId, employeeId: id, autonomyLevel, policy: JSON.stringify(policy), createdAt: now, updatedAt: now });
+    }
+    // Kept in sync only as a legacy/display value — lib/ai/authority.ts
+    // reads aiEmployeeActionPolicies exclusively for enforcement.
     await db.update(aiEmployees).set({ supervisionMode: autonomyLevel, updatedAt: now }).where(and(eq(aiEmployees.id, id), eq(aiEmployees.businessId, data.membership.businessId)));
-    if (existing[0]) await db.update(aiEmployeeSettings).set({ roleInstructions, updatedAt: now }).where(eq(aiEmployeeSettings.id, existing[0].id));
-    else await db.insert(aiEmployeeSettings).values({ id: crypto.randomUUID(), employeeId: id, roleInstructions, createdAt: now, updatedAt: now });
-    return NextResponse.json({ success: true, autonomyLevel });
+
+    await createAuditLog({ businessId: data.membership.businessId, userId: session.user.id, action: "ai_employee.permissions.update", resource: "ai_employee", resourceId: id, description: `Updated autonomy settings for AI employee "${data.employee.name}".`, metadata: { autonomyLevel, policy } });
+
+    const actions = AI_ACTIONS.map((action) => ({ action, ...ACTION_META[action], decision: policy[action] ?? "denied" }));
+    return NextResponse.json({ success: true, autonomyLevel, actions });
   } catch (error) {
     console.error("Employee permissions POST error:", error);
     return NextResponse.json({ error: "Unable to save autonomy settings." }, { status: 500 });
