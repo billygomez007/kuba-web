@@ -11,8 +11,8 @@ import ExecutiveBriefing from "../components/command-center/ExecutiveBriefing";
 import ExecutiveActions from "../components/command-center/ExecutiveActions";
 import ExecutiveAIHub from "../components/command-center/ExecutiveAIHub";
 import RecentConversations from "../components/command-center/RecentConversations";
-import SuperKubaLoading from "../components/SuperKubaLoading";
-import SuperKubaErrorPage from "../components/SuperKubaErrorPage";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorState from "../components/ui/ErrorState";
 import BusinessGreeting from "../components/business/BusinessGreeting";
 import ExecutiveIntelligencePanels from "../components/command-center/ExecutiveIntelligencePanels";
 import ExecutiveOperationsOverview from "../components/command-center/ExecutiveOperationsOverview";
@@ -142,15 +142,15 @@ export default function DashboardPage() {
   const activeCount = employees.length;
 
   if (loading) {
-    return <SuperKubaLoading message="Getting your workspace ready..." />;
+    return <LoadingState variant="page" message="Getting your workspace ready..." />;
   }
 
   if (loadFailed) {
     return (
-      <SuperKubaErrorPage
+      <ErrorState
+        variant="page"
         title="Your workspace needs a moment."
-        description="Your AI workforce is still protected. Please try again."
-        primaryHref="/dashboard"
+        message="Your AI workforce is still protected. Please try again."
         onRetry={() => window.location.reload()}
       />
     );
