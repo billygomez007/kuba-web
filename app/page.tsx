@@ -2,12 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import MarketingHeader from "./components/MarketingHeader";
 import MarketingFooter from "./components/MarketingFooter";
-import SuperKubaAIWorkforceShowcase from "./components/SuperKubaAIWorkforceShowcase";
-import SuperKubaAnalyticsShowcase from "./components/SuperKubaAnalyticsShowcase";
-import SuperKubaAutomationShowcase from "./components/SuperKubaAutomationShowcase";
-import SuperKubaBusinessOperationsShowcase from "./components/SuperKubaBusinessOperationsShowcase";
-import SuperKubaCustomerOperationsShowcase from "./components/SuperKubaCustomerOperationsShowcase";
-import SuperKubaDashboardShowcase from "./components/SuperKubaDashboardShowcase";
+import ProductShowcase from "./components/ui/ProductShowcase";
 import {
   ArrowRight,
   Bot,
@@ -175,8 +170,8 @@ export default function KubaWebsite() {
             {/* Description */}
             <p className="mx-auto mt-9 max-w-3xl text-lg leading-8 text-white/55 sm:text-xl">
               AI employees, business automation, workflows, knowledge,
-              integrations, and intelligent operations in one powerful
-              platform.
+              and integrations — running side by side with your human
+              team in one operating platform.
             </p>
 
             {/* Buttons */}
@@ -307,12 +302,60 @@ export default function KubaWebsite() {
         </div>
       </section>
 
-      <SuperKubaDashboardShowcase />
-      <SuperKubaAIWorkforceShowcase />
-      <SuperKubaCustomerOperationsShowcase />
-      <SuperKubaAnalyticsShowcase />
-      <SuperKubaAutomationShowcase />
-      <SuperKubaBusinessOperationsShowcase />
+      <ProductShowcase
+        id="superkuba-dashboard"
+        tone="violet"
+        eyebrow="Product experience"
+        title="See SuperKuba AI in Action"
+        description="Experience your AI workforce platform designed to help businesses manage customers, automate operations, and grow from one intelligent command center."
+        imageSrc="/images/superkuba-dashboard-mockup.png"
+        imageAlt="SuperKuba AI business command center dashboard"
+      />
+      <ProductShowcase
+        id="superkuba-ai-workforce"
+        tone="violet"
+        eyebrow="AI Workforce"
+        title="Build Your AI Workforce"
+        description="Create, manage, and empower AI employees that work 24/7 across sales, customer service, operations, finance, and more."
+        imageSrc="/images/superkuba-ai-workforce-mockup.png"
+        imageAlt="SuperKuba AI Workforce management workspace"
+      />
+      <ProductShowcase
+        id="superkuba-customer-operations"
+        tone="cyan"
+        eyebrow="Customer Operations"
+        title="Intelligent Customer Operations"
+        description="Manage customers, conversations, tickets, and AI-powered support from one intelligent customer operations hub."
+        imageSrc="/images/superkuba-customer-operations-mockup.png"
+        imageAlt="SuperKuba intelligent customer operations hub"
+      />
+      <ProductShowcase
+        id="superkuba-analytics"
+        tone="cyan"
+        eyebrow="Analytics & Intelligence"
+        title="AI-Powered Business Intelligence"
+        description="Track conversations, leads, appointments, and operational performance from one place, with AI-generated summaries grounded in your real business data."
+        imageSrc="/images/superkuba-analytics-mockup.png"
+        imageAlt="SuperKuba AI-powered business analytics dashboard"
+      />
+      <ProductShowcase
+        id="superkuba-automation"
+        tone="cyan"
+        eyebrow="Automation Engine"
+        title="Intelligent Automation"
+        description="Automate repetitive business tasks, workflows, and customer interactions with AI-powered automation that works around the clock."
+        imageSrc="/images/superkuba-automation-mockup.png"
+        imageAlt="SuperKuba intelligent automation engine dashboard"
+      />
+      <ProductShowcase
+        id="superkuba-business-operations"
+        tone="violet"
+        eyebrow="Business Operations"
+        title="Run Your Business Smarter"
+        description="Manage finance, tasks, compliance, invoices, and operational workflows from one intelligent business operations hub."
+        imageSrc="/images/superkuba-business-operations-mockup.png"
+        imageAlt="SuperKuba intelligent business operations hub"
+      />
 
       {/* =========================================================
           INTRO

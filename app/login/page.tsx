@@ -174,11 +174,11 @@ function LoginForm() {
 
           {/* Footer */}
           <div className="mt-8 text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/20">
-              AI Workforce for the Future
+            <p className="text-micro font-semibold uppercase tracking-[0.3em] text-text-muted">
+              AI Employees &amp; Your Human Team, One Workspace
             </p>
 
-            <p className="mt-3 text-xs text-white/20">
+            <p className="mt-3 text-xs text-text-muted">
               © {new Date().getFullYear()} SuperKuba. All rights reserved.
             </p>
           </div>

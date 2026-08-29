@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import SuperKubaDashboardShowcase from "../components/SuperKubaDashboardShowcase";
+import ProductShowcase from "../components/ui/ProductShowcase";
 import {
   ArrowRight,
   Headphones,
@@ -103,7 +103,16 @@ export default function AIEmployeesPage() {
 
       </section>
 
-      <SuperKubaDashboardShowcase className="border-b-0" />
+      <ProductShowcase
+        id="superkuba-dashboard"
+        tone="violet"
+        eyebrow="Product experience"
+        title="See SuperKuba AI in Action"
+        description="Experience your AI workforce platform designed to help businesses manage customers, automate operations, and grow from one intelligent command center."
+        imageSrc="/images/superkuba-dashboard-mockup.png"
+        imageAlt="SuperKuba AI business command center dashboard"
+        className="border-b-0"
+      />
 
 
       <section className="px-6 pb-28 lg:px-8">
