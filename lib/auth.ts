@@ -4,6 +4,7 @@ import { db } from "../db";
 import { resend } from "@/lib/email/resend";
 import {
   emailChangeConfirmationTemplate,
+  passwordResetEmailTemplate,
   verificationEmailTemplate,
 } from "@/lib/email/templates";
 
@@ -50,6 +51,20 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      const template = passwordResetEmailTemplate({
+        name: user.name || "there",
+        actionUrl: url,
+      });
+
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM!,
+        to: user.email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+    },
   },
 
   emailVerification: {

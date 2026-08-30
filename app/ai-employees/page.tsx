@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import ProductShowcase from "../components/ui/ProductShowcase";
+import MarketingHeader from "../components/MarketingHeader";
+import BackNavigation from "../components/BackNavigation";
 import {
   ArrowRight,
   Headphones,
@@ -58,9 +60,12 @@ export default function AIEmployeesPage() {
   return (
 
     <main className="min-h-screen bg-[#060609] text-white">
+      <MarketingHeader />
+      <div className="mx-auto max-w-7xl px-6 pt-28 lg:px-8">
+        <BackNavigation label="Back to SuperKuba" />
+      </div>
 
-
-      <section className="px-6 pb-20 pt-32 lg:px-8">
+      <section className="px-6 pb-20 pt-12 lg:px-8">
 
         <div className="mx-auto max-w-7xl text-center">
 
