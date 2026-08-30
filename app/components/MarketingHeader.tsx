@@ -22,11 +22,13 @@ const navigation = [
     name: "Solutions",
     href: "/solutions",
     items: [
-      ["Increase Sales", "/solutions#increase-sales"],
-      ["Automate Customer Support", "/solutions#customer-support"],
-      ["Improve Operations", "/solutions#improve-operations"],
-      ["Reduce Manual Work", "/solutions#reduce-manual-work"],
-      ["AI Business Assistant", "/solutions#ai-business-assistant"],
+      ["Customer Service", "/solutions#customer-service"],
+      ["Sales & Lead Generation", "/solutions#sales-lead-generation"],
+      ["Marketing Automation", "/solutions#marketing-automation"],
+      ["Finance & Accounting", "/solutions#finance-accounting"],
+      ["Human Resources", "/solutions#human-resources"],
+      ["Business Operations", "/solutions#business-operations"],
+      ["Appointments & Bookings", "/solutions#appointments-bookings"],
     ],
   },
   {
@@ -39,7 +41,7 @@ const navigation = [
       ["Education", "/industries#education"],
       ["Retail", "/industries#retail"],
       ["Professional Services", "/industries#professional-services"],
-      ["Small Businesses", "/industries#small-businesses"],
+      ["Hospitality", "/industries#hospitality"],
     ],
   },
   {

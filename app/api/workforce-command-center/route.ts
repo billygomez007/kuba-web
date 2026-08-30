@@ -35,8 +35,8 @@ export async function GET() {
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.core")) {
-      return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
+    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.performance")) {
+      return NextResponse.json({ error: "AI Workforce Performance requires the Pro plan or higher.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
     }
 
     const businessId = business.businessId;

@@ -7,7 +7,28 @@ SuperKuba uses a persistent `staging` branch for user acceptance testing before 
 - `main` is the production branch and deploys to `superkuba.com` only after explicit approval.
 - `staging` deploys through the existing Vercel project's Preview environment.
 - `staging.superkuba.com` should be assigned only to the `staging` branch deployment.
-- Staging must use a dedicated Turso database whose identity is distinct from the live `kuba-staging` database.
+- Staging must use a dedicated Turso database, distinct from Production. See "Staging database identity" below before touching any database directly.
+
+## Staging database identity
+
+**REAL, CURRENT staging database hostname:** `superkuba-staging-billygomez007.aws-us-west-2.turso.io` (Turso database name: `superkuba-staging`). This is the database the real `staging`-branch Vercel Preview deployment actually uses — verified directly from the Preview environment's own `TURSO_DATABASE_URL`, not assumed from a local `.env` file.
+
+**PROHIBITED / STALE — do not use for staging work:** `kuba-staging` (and any hostname under it, e.g. `kuba-staging-billygomez007...`). This is an old, abandoned database from an earlier phase of this project. It is not what `staging`-branch deployments use today. A prior session's local `.env` incorrectly pointed at this database, causing avoidable confusion — do not assume `.env`'s `TURSO_DATABASE_URL` is correct without first confirming it against the actual deployed Preview environment variable (`vercel env pull --environment=preview --git-branch=staging`, or `turso db list` cross-checked against the required hostname above).
+
+Also never use the bare `kuba` database (no suffix) for any staging or development work — that is Production.
+
+Before running any migration or direct database command against "staging," always verify the target hostname matches `superkuba-staging-billygomez007.aws-us-west-2.turso.io` exactly. If it does not match, stop and re-derive the correct credential rather than proceeding.
+
+Never print or commit an auth token value, in this file or anywhere else. Generate short-lived, scoped credentials with `turso db tokens create <database-name> --expiration 1d` when a session needs direct database access, and let them expire naturally rather than reusing a long-lived one.
+
+## Turso credential incident (disclosed)
+
+A staging Turso auth token was previously exposed in a tool-result transcript during an earlier engineering session (a redaction pattern failed to match `.env`'s `TURSO_AUTH_TOKEN=` line format). Follow-up status:
+
+- Individual per-token revocation is not available through Turso's tooling for tokens issued against the shared default group.
+- Group-wide token invalidation for the default group was deliberately **not** performed, because it would also invalidate tokens for other, unrelated databases sharing that group.
+- Staging has since been operating on a newly generated, short-lived token, issued directly via `turso db tokens create`, independent of the exposed one.
+- Provider-level credential isolation (giving `superkuba-staging` its own token group, separate from other databases) remains an infrastructure follow-up, not resolved by this documentation change.
 
 ## Required Preview environment variables
 

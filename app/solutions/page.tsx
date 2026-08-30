@@ -16,28 +16,28 @@ import BackNavigation from "../components/BackNavigation";
 const solutions = [
   {
     title: "Customer Service",
-    id: "customer-support",
+    id: "customer-service",
     icon: Headphones,
     description:
       "AI employees that answer customer questions, provide support, and deliver instant assistance 24/7.",
   },
   {
     title: "Sales & Lead Generation",
-    id: "increase-sales",
+    id: "sales-lead-generation",
     icon: Rocket,
     description:
       "Capture leads, qualify prospects, follow up with customers, and help your team close more opportunities.",
   },
   {
     title: "Marketing Automation",
-    id: "reduce-manual-work",
+    id: "marketing-automation",
     icon: Megaphone,
     description:
       "Automate campaigns, customer engagement, content workflows, and marketing processes.",
   },
   {
     title: "Finance & Accounting",
-    id: "ai-business-assistant",
+    id: "finance-accounting",
     icon: BrainCircuit,
     description:
       "Automate finance workflows, reporting, and business processes.",
@@ -51,14 +51,14 @@ const solutions = [
   },
   {
     title: "Business Operations",
-    id: "improve-operations",
+    id: "business-operations",
     icon: Settings2,
     description:
       "Improve workflows, reduce repetitive tasks, and help teams operate efficiently.",
   },
   {
     title: "Appointments & Bookings",
-    id: "appointments",
+    id: "appointments-bookings",
     icon: CalendarCheck,
     description:
       "Manage scheduling, reservations, reminders, and customer appointments automatically.",
@@ -113,7 +113,7 @@ export default function SolutionsPage() {
               <div
                 key={solution.title}
                 id={solution.id}
-                className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 transition hover:-translate-y-1 hover:border-white/20"
+                className="scroll-mt-28 rounded-3xl border border-white/10 bg-white/[0.04] p-8 transition hover:-translate-y-1 hover:border-white/20"
               >
                 <Icon className="h-8 w-8 text-violet-300" />
 
