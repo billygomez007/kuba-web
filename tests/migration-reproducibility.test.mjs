@@ -39,7 +39,13 @@ test("clean bootstrap reproduces the current schema and accepts a generated futu
 
     const client = createClient({ url: `file:${databasePath}` });
     const tables = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
-    assert.equal(tables.rows.length, 90);
+    // 90 tables at the last time this literal was updated, +3 for the
+    // Outreach feature's own tables (outreach_prospects,
+    // outreach_research_evidence, outreach_contacts) added to db/schema.ts.
+    // Update this literal deliberately whenever a schema change legitimately
+    // adds or removes a table — it exists to catch accidental drift, not to
+    // block real schema growth.
+    assert.equal(tables.rows.length, 93);
     assert.equal(tables.rows.some((row) => row.name === "__drizzle_migrations"), true);
     const emptyTables = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '__drizzle_migrations' AND sql NOT LIKE '%WITHOUT ROWID%'");
     for (const table of emptyTables.rows) {

@@ -6,6 +6,8 @@ import { RequestContext } from "@mastra/core/request-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import {
   businesses,
   aiBusinessSettings,
@@ -91,6 +93,36 @@ export async function POST(request: Request) {
             "No business is associated with your account.",
         },
         { status: 404 },
+      );
+    }
+
+    if (
+      !membership ||
+      !hasPermission(
+        membership.role,
+        membership.permissions,
+        PERMISSIONS.RECEPTION_AI,
+      )
+    ) {
+      return NextResponse.json(
+        { error: "You do not have permission to use the AI Receptionist." },
+        { status: 403 },
+      );
+    }
+
+    if (
+      !hasCapability(
+        await getBusinessEntitlements(business.id),
+        "customer_ops.appointments",
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error: "The AI Receptionist requires a higher plan.",
+          code: "FEATURE_NOT_ENTITLED",
+          upgradeRequired: true,
+        },
+        { status: 403 },
       );
     }
 

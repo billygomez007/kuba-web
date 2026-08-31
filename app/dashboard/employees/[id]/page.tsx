@@ -16,6 +16,7 @@ import SalesWorkspace from "../../../components/employees/SalesWorkspace";
 import ReceptionistWorkspace from "../../../components/employees/ReceptionistWorkspace";
 import CustomerSupportWorkspace from "../../../components/employees/CustomerSupportWorkspace";
 import GeneralManagerWorkspace from "../../../components/employees/GeneralManagerWorkspace";
+import OutreachWorkspace from "../../../components/employees/OutreachWorkspace";
 import AIEmployeeHeader from "../../../components/employees/AIEmployeeHeader";
 
 type Props = {
@@ -258,6 +259,8 @@ export default async function EmployeeWorkspace({
               employeeId={employee.id}
               employeeName={employee.name}
             />
+          ) : employee.type === "outreach" ? (
+            <OutreachWorkspace employeeId={employee.id} />
           ) : (
             <section className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-8">
               <h2 className="text-2xl font-bold">

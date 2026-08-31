@@ -787,6 +787,10 @@ export const integrations = sqliteTable("integrations", {
 
   metadata: text("metadata"),
 
+  lastWebhookAt: integer("last_webhook_at", {
+    mode: "timestamp_ms",
+  }),
+
   createdAt: integer("created_at", {
     mode: "timestamp_ms",
   }).notNull(),
@@ -1019,6 +1023,12 @@ export const messages = sqliteTable("messages", {
   content: text("content").notNull(),
 
   messageType: text("message_type").notNull().default("text"),
+
+  status: text("status"),
+
+  statusUpdatedAt: integer("status_updated_at", {
+    mode: "timestamp_ms",
+  }),
 
   createdAt: integer("created_at", {
     mode: "timestamp_ms",
@@ -2772,5 +2782,224 @@ export const employeeSkills = sqliteTable(
 
     index("employeeSkills_skillId_idx")
       .on(table.skillId),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
+/* Kuba Outreach                                                              */
+/* -------------------------------------------------------------------------- */
+
+export const outreachProspects = sqliteTable(
+  "outreach_prospects",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+
+    companyName: text("company_name").notNull(),
+    normalizedCompanyName: text("normalized_company_name").notNull(),
+
+    website: text("website"),
+    normalizedDomain: text("normalized_domain"),
+
+    industry: text("industry"),
+    country: text("country"),
+    city: text("city"),
+    description: text("description"),
+
+    discoverySource: text("discovery_source"),
+    discoveryQuery: text("discovery_query"),
+
+    researchStatus: text("research_status")
+      .notNull()
+      .default("discovered"),
+
+    qualificationStatus: text("qualification_status")
+      .notNull()
+      .default("unqualified"),
+
+    icpFitScore: integer("icp_fit_score"),
+    qualificationReason: text("qualification_reason"),
+
+    promotedLeadId: text("promoted_lead_id"),
+
+    lastResearchedAt: integer("last_researched_at", {
+      mode: "timestamp_ms",
+    }),
+
+    qualifiedAt: integer("qualified_at", {
+      mode: "timestamp_ms",
+    }),
+
+    promotedAt: integer("promoted_at", {
+      mode: "timestamp_ms",
+    }),
+
+    createdAt: integer("created_at", {
+      mode: "timestamp_ms",
+    }).notNull(),
+
+    updatedAt: integer("updated_at", {
+      mode: "timestamp_ms",
+    }).notNull(),
+  },
+  (table) => [
+    index("outreach_prospects_business_status_idx").on(
+      table.businessId,
+      table.qualificationStatus,
+      table.updatedAt,
+    ),
+
+    index("outreach_prospects_business_research_idx").on(
+      table.businessId,
+      table.researchStatus,
+      table.updatedAt,
+    ),
+
+    index("outreach_prospects_business_employee_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.updatedAt,
+    ),
+
+    index("outreach_prospects_business_domain_idx").on(
+      table.businessId,
+      table.normalizedDomain,
+    ),
+
+    index("outreach_prospects_business_name_idx").on(
+      table.businessId,
+      table.normalizedCompanyName,
+    ),
+  ],
+);
+
+export const outreachResearchEvidence = sqliteTable(
+  "outreach_research_evidence",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+    prospectId: text("prospect_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+
+    findingType: text("finding_type").notNull(),
+    claim: text("claim").notNull(),
+
+    classification: text("classification")
+      .notNull()
+      .default("unknown"),
+
+    sourceUrl: text("source_url"),
+    sourceDomain: text("source_domain"),
+    sourceTitle: text("source_title"),
+
+    sourceTier: integer("source_tier"),
+    sourceType: text("source_type"),
+
+    buyingSignalType: text("buying_signal_type"),
+    buyingSignalStrength: text("buying_signal_strength"),
+
+    observedAt: integer("observed_at", {
+      mode: "timestamp_ms",
+    }),
+
+    createdAt: integer("created_at", {
+      mode: "timestamp_ms",
+    }).notNull(),
+  },
+  (table) => [
+    index("outreach_evidence_business_prospect_idx").on(
+      table.businessId,
+      table.prospectId,
+      table.createdAt,
+    ),
+
+    index("outreach_evidence_business_classification_idx").on(
+      table.businessId,
+      table.classification,
+      table.createdAt,
+    ),
+
+    index("outreach_evidence_business_signal_idx").on(
+      table.businessId,
+      table.buyingSignalType,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const outreachContacts = sqliteTable(
+  "outreach_contacts",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+    prospectId: text("prospect_id").notNull(),
+
+    name: text("name"),
+    jobTitle: text("job_title"),
+
+    email: text("email"),
+    phone: text("phone"),
+
+    contactPageUrl: text("contact_page_url"),
+    sourceUrl: text("source_url"),
+
+    contactType: text("contact_type")
+      .notNull()
+      .default("business"),
+
+    verificationStatus: text("verification_status")
+      .notNull()
+      .default("unverified"),
+
+    isPublic: integer("is_public", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
+
+    doNotContact: integer("do_not_contact", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
+
+    optedOutAt: integer("opted_out_at", {
+      mode: "timestamp_ms",
+    }),
+
+    createdAt: integer("created_at", {
+      mode: "timestamp_ms",
+    }).notNull(),
+
+    updatedAt: integer("updated_at", {
+      mode: "timestamp_ms",
+    }).notNull(),
+  },
+  (table) => [
+    index("outreach_contacts_business_prospect_idx").on(
+      table.businessId,
+      table.prospectId,
+      table.updatedAt,
+    ),
+
+    index("outreach_contacts_business_email_idx").on(
+      table.businessId,
+      table.email,
+    ),
+
+    index("outreach_contacts_business_phone_idx").on(
+      table.businessId,
+      table.phone,
+    ),
+
+    index("outreach_contacts_business_dnc_idx").on(
+      table.businessId,
+      table.doNotContact,
+      table.updatedAt,
+    ),
   ],
 );

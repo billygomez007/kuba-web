@@ -13,6 +13,12 @@ const scenarios: Record<string, string[]> = {
   sales: ["Customer interested in buying", "Customer needs human help"],
   "customer-support": ["Customer has a problem", "Customer needs human help"],
   "general-manager": ["Review today's business priorities", "Customer needs human help"],
+  outreach: [
+    "Help me define our ideal customer profile",
+    "What do you know about our target customers?",
+    "Prepare an outreach strategy for our business",
+    "What information do you need before researching prospects?",
+  ],
 };
 
 const capabilities: Record<string, string[]> = {
@@ -20,6 +26,13 @@ const capabilities: Record<string, string[]> = {
   sales: ["Lead qualification", "Customer follow-up", "Pipeline updates", "Opportunity discovery"],
   "customer-support": ["Issue resolution", "Customer context", "Support responses", "Escalation"],
   "general-manager": ["Business analysis", "Priority planning", "Team coordination", "Escalation"],
+  outreach: [
+    "Prospect research",
+    "Buying-signal analysis",
+    "Prospect qualification",
+    "Personalized outreach",
+    "Sales handoff",
+  ],
 };
 
 export default function EmployeeTestPage() {
@@ -74,7 +87,9 @@ export default function EmployeeTestPage() {
             ? "/api/ai/general-manager"
             : employee.type === "receptionist"
               ? "/api/ai/receptionist"
-              : "";
+              : employee.type === "outreach"
+                ? "/api/ai/outreach"
+                : "";
 
       if (!endpoint) throw new Error("This employee does not have a connected test runtime yet.");
       const body = employee.type === "receptionist"

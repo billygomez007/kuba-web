@@ -21,8 +21,23 @@ test("canonical capabilities are monotonic across plan tiers", () => {
   }
 });
 
+// Pricing copy ($XX placeholders, tier taglines, CTAs) was factored out of
+// app/pricing/page.tsx into lib/billing/pricing-presentation.ts so the
+// public pricing page and the onboarding plan-selection step can share one
+// canonical copy source instead of duplicating it (see that file's header
+// comment). These tests read both files and check the combined source, so
+// they track that intent rather than assuming everything lives inline in
+// the page component.
+async function pricingSources() {
+  const [page, presentation] = await Promise.all([
+    readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8"),
+  ]);
+  return `${page}\n${presentation}`;
+}
+
 test("public pricing preserves placeholder prices and Enterprise contact CTA", async () => {
-  const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  const source = await pricingSources();
   assert.match(source, /\$XX/);
   assert.match(source, /Custom/);
   assert.match(source, /Contact Sales/);
@@ -36,7 +51,7 @@ test("public pricing page is metadata-addressable", async () => {
 });
 
 test("progressive cards use customer-friendly tier-specific presentation", async () => {
-  const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  const source = await pricingSources();
   assert.match(source, /Run Your Business/);
   assert.match(source, /Automate Your Business/);
   assert.match(source, /Operate With AI/);
@@ -58,7 +73,7 @@ test("requested operations and AI-assist placements follow canonical tiers", () 
 });
 
 test("pricing amounts remain unchanged placeholders", async () => {
-  const source = await readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8");
   assert.equal((source.match(/price: "\$XX"/g) || []).length, 3);
   assert.match(source, /price: "Custom"/);
 });

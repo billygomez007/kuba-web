@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:outreach-adversarial-staging": "node --experimental-strip-types --test tests/staging/*.test.mjs",
     "start": "next start",
     "bootstrap:super-admin": "node scripts/bootstrap-super-admin.mjs",
     "lint": "eslint"

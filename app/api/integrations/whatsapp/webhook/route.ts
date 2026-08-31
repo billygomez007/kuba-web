@@ -6,7 +6,6 @@ import { RequestContext } from "@mastra/core/request-context";
 import { db } from "@/db";
 import {
   aiEmployees,
-  businesses,
   conversations,
   conversationRouting,
   integrations,
@@ -19,12 +18,16 @@ import {
 import type { ConversationDepartment } from "@/lib/communications/routing";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
+import { safeCompareSecret } from "@/lib/auth/security";
+import {
+  findWhatsAppMessageByExternalId,
+  getWhatsAppCredentialsForIntegration,
+  resolveWhatsAppIntegrationByPhoneNumberId,
+  sendWhatsAppText,
+} from "@/lib/channels/whatsapp";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const GRAPH_API_VERSION =
-  process.env.WHATSAPP_GRAPH_API_VERSION || "v25.0";
 
 
 function verifyMetaSignature(
@@ -79,9 +82,7 @@ export async function GET(request: Request) {
 
   if (
     mode === "subscribe" &&
-    token &&
-    VERIFY_TOKEN &&
-    token === VERIFY_TOKEN
+    safeCompareSecret(token, VERIFY_TOKEN)
   ) {
     return new Response(challenge, { status: 200 });
   }
@@ -101,12 +102,7 @@ export async function POST(request: Request) {
         "x-hub-signature-256",
       );
 
-    if (
-      !verifyMetaSignature(
-        rawBody,
-        signature,
-      )
-    ) {
+    if (!verifyMetaSignature(rawBody, signature)) {
       console.error(
         "Invalid WhatsApp webhook signature.",
       );
@@ -135,39 +131,6 @@ export async function POST(request: Request) {
     const incomingPhoneNumberId =
       value.metadata?.phone_number_id || PHONE_NUMBER_ID;
 
-    const incomingMessage = value.messages?.[0];
-
-    // Meta also sends status updates through this webhook.
-    // We don't need to process those as customer messages.
-    if (!incomingMessage) {
-      return NextResponse.json({ received: true });
-    }
-
-    const customerPhone = String(incomingMessage.from || "").trim();
-    const externalMessageId = String(incomingMessage.id || "").trim();
-    const messageType = String(incomingMessage.type || "text");
-
-    if (!customerPhone || !externalMessageId) {
-      return NextResponse.json({ received: true });
-    }
-
-    // First version supports normal text messages.
-    let customerMessage = "";
-
-    if (messageType === "text") {
-      customerMessage = String(
-        incomingMessage.text?.body || "",
-      ).trim();
-    }
-
-    if (!customerMessage) {
-      return NextResponse.json({ received: true });
-    }
-
-    const customerName =
-      value.contacts?.[0]?.profile?.name ||
-      customerPhone;
-
     if (!incomingPhoneNumberId) {
       console.error(
         "WhatsApp phone number ID is missing.",
@@ -189,40 +152,10 @@ export async function POST(request: Request) {
      * Never trust a business ID supplied by the
      * webhook request or environment variables.
      */
-    const integrationResult =
-      await db
-        .select({
-          integration: integrations,
-          business: businesses,
-        })
-        .from(integrations)
-        .innerJoin(
-          businesses,
-          eq(
-            integrations.businessId,
-            businesses.id,
-          ),
-        )
-        .where(
-          and(
-            eq(
-              integrations.provider,
-              "whatsapp",
-            ),
-            eq(
-              integrations.externalPhoneNumberId,
-              incomingPhoneNumberId,
-            ),
-            eq(
-              integrations.status,
-              "active",
-            ),
-          ),
-        )
-        .limit(1);
-
     const resolved =
-      integrationResult[0];
+      await resolveWhatsAppIntegrationByPhoneNumberId(
+        incomingPhoneNumberId,
+      );
 
     if (!resolved) {
       console.error(
@@ -266,19 +199,82 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!ACCESS_TOKEN) {
-      console.error(
-        "WhatsApp access token is not configured.",
-      );
+    /**
+     * Connection-health signal: a signature-verified webhook for a known,
+     * active tenant proves this integration is genuinely receiving Meta
+     * traffic, independent of whatever the payload actually contains.
+     */
+    await db
+      .update(integrations)
+      .set({ lastWebhookAt: new Date() })
+      .where(eq(integrations.id, integration.id));
 
-      return NextResponse.json(
-        {
-          error:
-            "WhatsApp credentials are not configured.",
-        },
-        { status: 500 },
-      );
+    /**
+     * Message status callbacks (sent/delivered/read/failed).
+     *
+     * Meta reports delivery status for messages Kuba sent through this
+     * same webhook endpoint, keyed by the outbound message's external id.
+     */
+    if (Array.isArray(value.statuses) && value.statuses.length > 0) {
+      for (const statusUpdate of value.statuses) {
+        const statusExternalId = String(statusUpdate?.id || "").trim();
+        const status = String(statusUpdate?.status || "").trim();
+
+        if (!statusExternalId || !status) {
+          continue;
+        }
+
+        await db
+          .update(messages)
+          .set({
+            status,
+            statusUpdatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(messages.integrationId, integration.id),
+              eq(messages.externalMessageId, statusExternalId),
+            ),
+          );
+      }
+
+      return NextResponse.json({ received: true });
     }
+
+    const incomingMessage = value.messages?.[0];
+
+    if (!incomingMessage) {
+      return NextResponse.json({ received: true });
+    }
+
+    const customerPhone = String(incomingMessage.from || "").trim();
+    const externalMessageId = String(incomingMessage.id || "").trim();
+    const messageType = String(incomingMessage.type || "text");
+
+    if (!customerPhone || !externalMessageId) {
+      return NextResponse.json({ received: true });
+    }
+
+    /**
+     * Only plain text messages can be handed to the AI as if they were a
+     * real customer request. Every other message type is still stored for
+     * the Unified Inbox — a human can view/handle it — but is never fed to
+     * the AI as text, and never generates an AI reply.
+     */
+    const canGenerateAiReply = messageType === "text";
+
+    const customerMessage =
+      messageType === "text"
+        ? String(incomingMessage.text?.body || "").trim()
+        : "Viewing this content type is not yet supported.";
+
+    if (canGenerateAiReply && !customerMessage) {
+      return NextResponse.json({ received: true });
+    }
+
+    const customerName =
+      value.contacts?.[0]?.profile?.name ||
+      customerPhone;
 
     /**
      * Find Kuba Receptionist.
@@ -554,23 +550,12 @@ export async function POST(request: Request) {
     /**
      * Prevent duplicate processing if Meta retries a webhook.
      */
-    const existingMessage = await db
-      .select({
-        id: messages.id,
-      })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.integrationId, integration.id),
-          eq(
-            messages.externalMessageId,
-            externalMessageId,
-          ),
-        ),
-      )
-      .limit(1);
+    const existingMessage = await findWhatsAppMessageByExternalId(
+      integration.id,
+      externalMessageId,
+    );
 
-    if (existingMessage.length > 0) {
+    if (existingMessage) {
       return NextResponse.json({
         received: true,
         duplicate: true,
@@ -711,6 +696,36 @@ ${customerMessage}
     }
 
     /**
+     * Human-takeover gate.
+     *
+     * Only generate and send an AI reply when Kuba's routing engine has
+     * actually assigned this conversation to AI, and the incoming message
+     * was real text (never feed a stored non-text placeholder to the AI as
+     * if it were the customer's real message). A human-assigned or
+     * escalated conversation, or an unsupported message type, still gets
+     * stored above for the Unified Inbox — it just never gets an
+     * autonomous AI reply.
+     */
+    if (
+      !canGenerateAiReply ||
+      routingDecision.assignmentType !== "ai"
+    ) {
+      await db
+        .update(conversations)
+        .set({
+          customerName,
+          customerPhone,
+          updatedAt: new Date(),
+        })
+        .where(eq(conversations.id, conversation.id));
+
+      return NextResponse.json({
+        received: true,
+        aiReplySkipped: true,
+      });
+    }
+
+    /**
      * Generate the response.
      *
      * Until specialized Mastra agents are
@@ -718,13 +733,9 @@ ${customerMessage}
      * Receptionist remains the safe response
      * engine.
      */
-    const result =
-      await selectedAgent.generate(
-        businessContext,
-        {
-          requestContext: new RequestContext([["businessId", businessId]]),
-        },
-      );
+    const result = await selectedAgent.generate(businessContext, {
+      requestContext: new RequestContext([["businessId", businessId]]),
+    });
 
     const responseText =
       String(result.text || "").trim();
@@ -736,36 +747,29 @@ ${customerMessage}
     }
 
     /**
-     * Send the AI response back through WhatsApp.
+     * Send the AI response back through WhatsApp, using this tenant's own
+     * resolved credentials — never a hardcoded global Authorization header.
      */
-    const sendUrl =
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/` +
-      `${incomingPhoneNumberId}/messages`;
+    const credentials =
+      getWhatsAppCredentialsForIntegration(integration);
 
-    const sendResponse = await fetch(sendUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: customerPhone,
-        type: "text",
-        text: {
-          preview_url: false,
-          body: responseText,
-        },
-      }),
-    });
+    if (!credentials) {
+      console.error(
+        "WhatsApp credentials are not configured for business:",
+        businessId,
+      );
 
-    const sendResult = await sendResponse.json();
+      throw new Error(
+        "WhatsApp credentials are not configured.",
+      );
+    }
 
-    if (!sendResponse.ok) {
+    const sendResult = await sendWhatsAppText(credentials, customerPhone, responseText);
+
+    if (!sendResult.success) {
       console.error(
         "WhatsApp send error:",
-        JSON.stringify(sendResult, null, 2),
+        sendResult.error,
       );
 
       throw new Error(
@@ -774,7 +778,7 @@ ${customerMessage}
     }
 
     const externalResponseId =
-      sendResult.messages?.[0]?.id || null;
+      sendResult.externalMessageId || null;
 
     /**
      * Save Kuba's response.

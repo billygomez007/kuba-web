@@ -23,6 +23,7 @@ export interface ChannelAdapter {
   ): Promise<{
     success: boolean;
     externalMessageId?: string;
+    error?: string;
   }>;
 
 }

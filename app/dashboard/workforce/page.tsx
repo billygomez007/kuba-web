@@ -79,6 +79,15 @@ const employeeLibrary: EmployeeDefinition[] = [
       "Plan campaigns, create content, engage customers, and support marketing workflows.",
   },
   {
+    templateId: "kuba-outreach",
+    type: "outreach",
+    name: "Kuba Outreach",
+    category: "Revenue",
+    icon: "⌁",
+    description:
+      "Find and research prospects, identify buying signals, prepare personalized outreach, and hand qualified opportunities to Sales.",
+  },
+  {
     templateId: "kuba-customer-support",
     type: "customer-support",
     name: "Kuba Customer Support",

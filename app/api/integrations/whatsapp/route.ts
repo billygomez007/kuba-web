@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
@@ -108,6 +108,38 @@ export async function POST(request: Request) {
           "Business ID, Phone Number ID, and Access Token are required.",
       },
       { status: 400 },
+    );
+  }
+
+  /*
+   * A WhatsApp phone_number_id identifies one real Meta business phone
+   * number. Two different Kuba businesses connecting the same
+   * phone_number_id would make inbound webhook tenant resolution
+   * ambiguous — the webhook must be able to trust that a phone_number_id
+   * belongs to exactly one business.
+   */
+  const claimedByAnotherBusiness =
+    await db
+      .select({
+        id: integrations.id,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.provider, "whatsapp"),
+          eq(integrations.externalPhoneNumberId, phoneNumberId),
+          ne(integrations.businessId, membership.businessId),
+        ),
+      )
+      .limit(1);
+
+  if (claimedByAnotherBusiness.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "This WhatsApp number is already connected to another Kuba business.",
+      },
+      { status: 409 },
     );
   }
 

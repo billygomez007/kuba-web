@@ -6,6 +6,8 @@ import { RequestContext } from "@mastra/core/request-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { businesses, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
@@ -45,6 +47,36 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "No business is associated with your account." },
         { status: 404 },
+      );
+    }
+
+    if (
+      !membership ||
+      !hasPermission(
+        membership.role,
+        membership.permissions,
+        PERMISSIONS.SALES_AI,
+      )
+    ) {
+      return NextResponse.json(
+        { error: "You do not have permission to use Kuba Sales." },
+        { status: 403 },
+      );
+    }
+
+    if (
+      !hasCapability(
+        await getBusinessEntitlements(business.id),
+        "customer_ops.leads",
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error: "Kuba Sales requires a higher plan.",
+          code: "FEATURE_NOT_ENTITLED",
+          upgradeRequired: true,
+        },
+        { status: 403 },
       );
     }
 
