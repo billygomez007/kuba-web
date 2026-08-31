@@ -93,6 +93,36 @@ const RESEARCHER_MODEL_PRICING_USD_PER_MILLION_TOKENS = {
   output: 10,
 };
 
+/*
+ * Bounded step budget for the researcher's tool-calling loop.
+ *
+ * `kubaOutreachResearcherAgent.generate()` runs Mastra's agentic loop
+ * (mastra/agents/outreach-researcher.ts calls generate() with
+ * structuredOutput; the loop itself lives in
+ * node_modules/@mastra/core/dist/agent-CKAVuxKN.js's `stream()`). Without an
+ * explicit `maxSteps`, that loop defaults to `stopWhen: stepCountIs(5)` —
+ * confirmed by reading the installed package source. `stepCountIs(N)` stops
+ * the loop the instant `steps.length === N`, regardless of whether the
+ * model's Nth step ended mid tool-call. That default of 5 total steps was
+ * the confirmed cause of a real Preview failure
+ * (finishReason: "tool-calls", no final object): one real research task
+ * needs roughly 1 step for getBusinessKnowledge, 1-3 for webSearch
+ * (including a refined query), 1-4 for webFetch on candidate source pages,
+ * and 1 final step to emit the structured package — 5 is not enough
+ * headroom for that, so the model was cut off mid-research before it ever
+ * reached the step where it could produce OutreachResearchPackage.
+ *
+ * This is a step-COUNT bound, not a token-budget change — modelSettings.
+ * maxOutputTokens is intentionally left unset here (provider default) since
+ * investigation found no evidence output-token budget was the constraint;
+ * the loop was terminated by step count while token usage per step was
+ * unremarkable. 12 gives comfortable headroom for the step mix above while
+ * remaining a small, explicit, bounded number — the loop still always
+ * terminates, it just gets enough turns to actually finish real research
+ * instead of being cut off mid tool-call.
+ */
+export const RESEARCH_AGENT_MAX_STEPS = 12;
+
 function estimateCostUsd(
   inputTokens: number,
   outputTokens: number,
@@ -239,6 +269,8 @@ export async function runOutreachResearchPipeline({
     const researchResult = await kubaOutreachResearcherAgent.generate(
       `${businessContext}\n\nRESEARCH TASK\n\n${task}`,
       {
+        maxSteps: RESEARCH_AGENT_MAX_STEPS,
+
         structuredOutput: {
           schema: outreachResearchPackageSchema,
           errorStrategy: "strict",
