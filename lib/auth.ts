@@ -6,6 +6,7 @@ import {
   emailChangeConfirmationTemplate,
   verificationEmailTemplate,
 } from "@/lib/email/templates";
+import { computeTrustedOrigins } from "@/lib/auth/trusted-origins";
 
 const PRODUCTION_URL = "https://superkuba.com";
 const isProduction = process.env.NODE_ENV === "production";
@@ -28,14 +29,14 @@ export const auth = betterAuth({
 
   baseURL,
 
-  trustedOrigins: [
-    PRODUCTION_URL,
-    "https://www.superkuba.com",
-    ...(configuredAuthURL ? [configuredAuthURL] : []),
-    ...(configuredAppURL ? [configuredAppURL] : []),
-    ...(vercelPreviewURL ? [vercelPreviewURL] : []),
-    ...(!isProduction ? ["http://localhost:3000", "http://localhost:3001"] : []),
-  ],
+  trustedOrigins: computeTrustedOrigins({
+    isProduction,
+    vercelEnv: process.env.VERCEL_ENV,
+    vercelUrl: process.env.VERCEL_URL,
+    vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
+    configuredAuthURL,
+    configuredAppURL,
+  }),
 
   rateLimit: {
     enabled: isProduction,
