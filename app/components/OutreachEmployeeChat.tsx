@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  mode?: "chat" | "autonomous_research";
 };
 
 type Props = {
@@ -16,7 +17,10 @@ export default function OutreachEmployeeChat({
 }: Props) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [researching, setResearching] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+
+  const busy = loading || researching;
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -86,7 +90,7 @@ export default function OutreachEmployeeChat({
 
     const trimmedMessage = message.trim();
 
-    if (!trimmedMessage || loading) {
+    if (!trimmedMessage || busy) {
       return;
     }
 
@@ -97,6 +101,7 @@ export default function OutreachEmployeeChat({
       {
         role: "user",
         content: trimmedMessage,
+        mode: "chat",
       },
     ]);
 
@@ -127,6 +132,7 @@ export default function OutreachEmployeeChat({
         {
           role: "assistant",
           content: data.response,
+          mode: "chat",
         },
       ]);
     } catch (error) {
@@ -138,10 +144,86 @@ export default function OutreachEmployeeChat({
             error instanceof Error
               ? error.message
               : "Something went wrong.",
+          mode: "chat",
         },
       ]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  /*
+   * Explicit, separate action for a full research-and-persist operation.
+   * This is the ONLY UI path that sends mode: "autonomous_research", which
+   * routes the request through the deterministic outreach research
+   * pipeline (independent database verification of every save) instead of
+   * ordinary conversational tool-calling. The user must deliberately choose
+   * this button — it is never inferred from the wording of a chat message.
+   */
+  async function handleRunResearch() {
+    const trimmedMessage = message.trim();
+
+    if (!trimmedMessage || busy) {
+      return;
+    }
+
+    setMessage("");
+
+    setMessages((current) => [
+      ...current,
+      {
+        role: "user",
+        content: trimmedMessage,
+        mode: "autonomous_research",
+      },
+    ]);
+
+    setResearching(true);
+
+    try {
+      const response = await fetch("/api/ai/outreach", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: trimmedMessage,
+          employeeId,
+          mode: "autonomous_research",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Kuba Outreach could not complete this research operation.",
+        );
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: data.response,
+          mode: "autonomous_research",
+        },
+      ]);
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content:
+            error instanceof Error
+              ? error.message
+              : "Something went wrong.",
+          mode: "autonomous_research",
+        },
+      ]);
+    } finally {
+      setResearching(false);
     }
   }
 
@@ -181,14 +263,28 @@ export default function OutreachEmployeeChat({
                 : "justify-start"
             }`}
           >
-            <div
-              className={`max-w-2xl whitespace-pre-wrap rounded-2xl px-5 py-4 text-sm leading-6 ${
-                item.role === "user"
-                  ? "bg-white text-black"
-                  : "border border-white/10 bg-white/[0.04] text-white/70"
-              }`}
-            >
-              {item.content}
+            <div className="max-w-2xl">
+              {item.mode === "autonomous_research" && (
+                <div
+                  className={`mb-1 text-[10px] font-bold uppercase tracking-wide text-cyan-300/70 ${
+                    item.role === "user"
+                      ? "text-right"
+                      : "text-left"
+                  }`}
+                >
+                  Prospect Research
+                </div>
+              )}
+
+              <div
+                className={`whitespace-pre-wrap rounded-2xl px-5 py-4 text-sm leading-6 ${
+                  item.role === "user"
+                    ? "bg-white text-black"
+                    : "border border-white/10 bg-white/[0.04] text-white/70"
+                }`}
+              >
+                {item.content}
+              </div>
             </div>
           </div>
         ))}
@@ -196,7 +292,15 @@ export default function OutreachEmployeeChat({
         {loading && (
           <div className="flex justify-start">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-sm text-white/35">
-              Kuba Outreach is researching...
+              Kuba Outreach is responding...
+            </div>
+          </div>
+        )}
+
+        {researching && (
+          <div className="flex justify-start">
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.04] px-5 py-4 text-sm text-cyan-200/70">
+              Running full prospect research — researching, verifying evidence, and persisting only what is confirmed. This can take a minute.
             </div>
           </div>
         )}
@@ -205,6 +309,17 @@ export default function OutreachEmployeeChat({
       </div>
 
       <div className="shrink-0 border-t border-white/10 bg-black/10 p-5">
+        <p className="mb-2 text-[11px] text-white/25">
+          <span className="font-semibold text-white/40">Send</span> is
+          ordinary conversation.{" "}
+          <span className="font-semibold text-white/40">
+            Run Prospect Research
+          </span>{" "}
+          launches an autonomous operation that searches the web, persists a
+          prospect, evidence, and contact route, and qualifies it — always
+          independently verified, never sent externally.
+        </p>
+
         <form
           onSubmit={handleSubmit}
           className="flex gap-3"
@@ -219,8 +334,18 @@ export default function OutreachEmployeeChat({
           />
 
           <button
+            type="button"
+            onClick={handleRunResearch}
+            disabled={busy || !message.trim()}
+            title="Run a full autonomous research operation: search, verify, persist, and qualify — independently verified, nothing sent externally."
+            className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm font-bold text-cyan-200 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {researching ? "Researching..." : "Run Prospect Research"}
+          </button>
+
+          <button
             type="submit"
-            disabled={loading || !message.trim()}
+            disabled={busy || !message.trim()}
             className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading ? "Working..." : "Send"}

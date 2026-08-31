@@ -16,6 +16,8 @@ import {
 import { kubaOutreachAgent } from "@/mastra/agents/outreach";
 import { runOutreachResearchPipeline } from "@/mastra/workflows/outreach-research-pipeline";
 import type { OutreachResearchPipelineResult } from "@/mastra/workflows/outreach-research-pipeline";
+import { enforcePersistenceTruth } from "@/mastra/lib/outreach-persistence-truth";
+import type { ToolResultLike } from "@/mastra/lib/outreach-persistence-truth";
 import {
   formatDateTime,
   getBusinessLocalization,
@@ -24,9 +26,10 @@ import {
 /*
  * Turn the deterministic pipeline's truthful result into a plain-language
  * summary for the chat surface. This never adds a claim the pipeline result
- * itself does not already make — every id, count, and status here is read
- * directly off `runOutreachResearchPipeline`'s output, which is itself
- * sourced from the workflow's own independent database verification.
+ * itself does not already make — every id, count, status, and evidence
+ * classification here is read directly off `runOutreachResearchPipeline`'s
+ * output (either the workflow's own database-verified result, or the
+ * strictly schema-validated research package), never composed by an LLM.
  */
 function summarizeResearchPipelineResult(
   result: OutreachResearchPipelineResult,
@@ -35,24 +38,45 @@ function summarizeResearchPipelineResult(
     return `Kuba Outreach could not complete verifiable research for this request, so nothing was saved. (${result.error})`;
   }
 
+  const companyName = result.researchPackage.prospect.companyName;
+
   if (result.status === "identity_conflict") {
     return `Kuba Outreach found "${result.conflict.incomingCompanyName}" but it matches an existing saved prospect, "${result.conflict.existingCompanyName}", under a conflicting identity. No evidence was attached and nothing was merged automatically — this needs manual entity-resolution review of prospect ${result.conflict.existingProspectId}.`;
   }
 
   if (result.status === "pipeline_error") {
-    return `Kuba Outreach's research completed, but the persistence workflow failed before it could be independently verified in the database. Nothing should be treated as saved. (${result.error || "no further detail"})`;
+    return `Kuba Outreach's research on "${companyName}" completed, but the persistence workflow failed before it could be independently verified in the database. Nothing should be treated as saved. (${result.error || "no further detail"})`;
   }
+
+  const evidence = result.researchPackage.evidence;
+  const confirmedCount = evidence.filter(
+    (item) => item.classification === "confirmed",
+  ).length;
+  const inferenceCount = evidence.filter(
+    (item) => item.classification === "likely_inference",
+  ).length;
+  const unknownCount = evidence.filter(
+    (item) => item.classification === "unknown",
+  ).length;
+
+  const contact = result.researchPackage.contact;
+  const contactRouteLine = !contact.available
+    ? `- Public contact route: none found (${contact.reason}); nothing was fabricated.`
+    : `- Public contact route found: ${contact.contactType} contact, ${contact.verificationStatus === "verified_public" ? "verified public" : "publicly listed but unverified"}.`;
 
   const lines = [
     result.status === "completed"
-      ? "Kuba Outreach completed research and persistence, independently verified against the database:"
-      : "Kuba Outreach partially completed this research task. Only what is confirmed below actually persisted:",
+      ? `Kuba Outreach completed research and persistence for "${companyName}", independently verified against the database:`
+      : `Kuba Outreach partially completed this research task for "${companyName}". Only what is confirmed below actually persisted:`,
     `- Prospect saved: ${result.prospectPersisted ? "yes" : "no"}${result.prospectId ? ` (id: ${result.prospectId})` : ""}`,
-    `- Evidence saved: ${result.evidenceCount} record(s)${result.evidencePersisted ? "" : " (not fully verified)"}`,
+    `- Evidence saved: ${result.evidenceCount} record(s)${result.evidencePersisted ? "" : " (not fully verified)"} — ${confirmedCount} confirmed, ${inferenceCount} likely inference, ${unknownCount} unknown.`,
+    contactRouteLine,
     result.contactUnavailable
-      ? "- Public contact: none found; none was fabricated."
+      ? "- Public contact saved: n/a (none available to save)."
       : `- Public contact saved: ${result.contactPersisted ? "yes" : "no"}${result.contactId ? ` (id: ${result.contactId})` : ""}`,
     `- Qualification: ${result.qualificationPersisted && result.qualificationStatus ? `${result.qualificationStatus} (ICP fit ${result.icpFitScore}/100)` : "not persisted"}`,
+    "- Sales promotion: not attempted — this research operation has no promotion tool; promotion requires manual review or a separate chat request with this employee's autonomy set to \"autonomous\".",
+    "- External outreach: none sent — this operation has no tool capable of sending email, WhatsApp, SMS, voice, or any other external message.",
     result.message,
   ];
 
@@ -353,7 +377,15 @@ ${message}`;
       prompt,
       {
         modelSettings: {
-          maxOutputTokens: 800,
+          /*
+           * Bounded upward from the original 800: an ordinary conversational
+           * reply plus a small number of tool calls needs more headroom than
+           * that, but this is only a usability adjustment. It is NOT the
+           * safety fix for unverified persistence claims — that is
+           * enforcePersistenceTruth() below, which does not depend on
+           * whether generation was truncated.
+           */
+          maxOutputTokens: 4000,
         },
 
         memory: {
@@ -367,6 +399,21 @@ ${message}`;
         ]),
       },
     );
+
+    /*
+     * SAFETY BOUNDARY
+     *
+     * The model's own text is never treated as proof that a persistence
+     * tool succeeded. enforcePersistenceTruth reads the real tool results
+     * Mastra returned for this turn and, if the text hedges about tool
+     * success or claims success for an action the tool results cannot
+     * confirm, replaces the entire response with a safe summary built only
+     * from those real results. See mastra/lib/outreach-persistence-truth.ts.
+     */
+    const { text: safeResponseText } = enforcePersistenceTruth({
+      text: result.text,
+      toolResults: result.toolResults as ToolResultLike[] | undefined,
+    });
 
     const conversationId =
       `outreach-${outreachEmployee.id}`;
@@ -394,7 +441,7 @@ ${message}`;
         direction: "outbound",
         senderType: "assistant",
         senderId: null,
-        content: result.text,
+        content: safeResponseText,
         messageType: "text",
         createdAt: new Date(),
       },
@@ -402,7 +449,7 @@ ${message}`;
 
     return NextResponse.json({
       success: true,
-      response: result.text,
+      response: safeResponseText,
     });
   } catch (error) {
     const apiError = error as {
