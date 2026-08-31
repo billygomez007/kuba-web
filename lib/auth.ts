@@ -38,6 +38,23 @@ export const auth = betterAuth({
     configuredAppURL,
   }),
 
+  advanced: {
+    crossSubDomainCookies: {
+      enabled: isProduction,
+      domain: isProduction
+        ? ".superkuba.com"
+        : undefined,
+    },
+    defaultCookieAttributes: isProduction
+      ? {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+          partitioned: true,
+        }
+      : {},
+  },
+
   rateLimit: {
     enabled: isProduction,
     window: 60,

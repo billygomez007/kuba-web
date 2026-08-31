@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { RequestContext } from "@mastra/core/request-context";
+import { randomBytes } from "node:crypto";
 
 import { db } from "@/db";
 
@@ -16,9 +17,135 @@ import {
 
 import { routeConversationToTeam } from "@/lib/communications/team-router";
 import { type ConversationDepartment } from "@/lib/communications/routing";
+import { routeConversation } from "@/lib/communications/router";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { runAutomationTrigger } from "@/lib/automations/engine";
+import { createAuditLog } from "@/lib/auth/audit";
+
+
+function classifyWebsiteChatError(
+  error: unknown,
+) {
+  const messages: string[] = [];
+  let current:
+    unknown = error;
+
+  for (
+    let depth = 0;
+    depth < 4 && current;
+    depth += 1
+  ) {
+    if (current instanceof Error) {
+      messages.push(
+        current.message.toLowerCase(),
+      );
+    }
+
+    current =
+      typeof current === "object" &&
+      current !== null &&
+      "cause" in current
+        ? current.cause
+        : null;
+  }
+
+  const message =
+    messages.join(" ");
+
+  if (
+    message.includes(
+      "not null constraint failed",
+    )
+  ) {
+    return "not_null_constraint";
+  }
+
+  if (
+    message.includes(
+      "foreign key constraint failed",
+    )
+  ) {
+    return "foreign_key_constraint";
+  }
+
+  if (
+    message.includes(
+      "unique constraint failed",
+    )
+  ) {
+    return "unique_constraint";
+  }
+
+  if (
+    message.includes("no such table")
+  ) {
+    return "missing_table";
+  }
+
+  if (
+    message.includes("no such column") ||
+    message.includes(
+      "has no column named",
+    )
+  ) {
+    return "missing_column";
+  }
+
+  return "database_or_provider_error";
+}
+
+function getWebsiteChatDriverCode(
+  error: unknown,
+) {
+  let current:
+    unknown = error;
+
+  for (
+    let depth = 0;
+    depth < 4 && current;
+    depth += 1
+  ) {
+    if (
+      typeof current === "object" &&
+      current !== null
+    ) {
+      const record =
+        current as Record<
+          string,
+          unknown
+        >;
+
+      for (const field of [
+        "code",
+        "rawCode",
+      ] as const) {
+        const value =
+          field in record
+            ? record[field]
+            : null;
+
+        if (
+          typeof value === "string" &&
+          /^[A-Z][A-Z0-9_]{1,63}$/.test(
+            value,
+          )
+        ) {
+          return value;
+        }
+      }
+
+      current =
+        "cause" in record
+          ? record.cause
+          : null;
+    } else {
+      current = null;
+    }
+  }
+
+  return null;
+}
 
 
 export async function GET() {
@@ -115,7 +242,220 @@ export async function GET() {
   }
 }
 
+export async function PUT() {
+  try {
+    const { headers } = await import("next/headers");
+    const { auth } = await import("@/lib/auth");
+    const {
+      getBusinessMembership,
+      hasPermission,
+      PERMISSIONS,
+    } = await import("@/lib/auth/permissions");
+    const {
+      unauthorizedResponse,
+      forbiddenResponse,
+    } = await import("@/lib/auth/security");
+
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return unauthorizedResponse();
+    }
+
+    const membership =
+      await getBusinessMembership(session.user.id);
+
+    if (!membership) {
+      return forbiddenResponse();
+    }
+
+    if (
+      !hasPermission(
+        membership.role,
+        membership.permissions,
+        PERMISSIONS.INTEGRATIONS_MANAGE,
+      )
+    ) {
+      return forbiddenResponse();
+    }
+
+    const existingResult = await db
+      .select({
+        id: integrations.id,
+        publicKey: integrations.publicKey,
+        status: integrations.status,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(
+            integrations.businessId,
+            membership.businessId,
+          ),
+          eq(
+            integrations.provider,
+            "website_chat",
+          ),
+        ),
+      )
+      .limit(1);
+
+    const existing = existingResult[0];
+
+    if (
+      existing?.status === "active" &&
+      existing.publicKey
+    ) {
+      return NextResponse.json({
+        success: true,
+        activated: false,
+        integration: existing,
+      });
+    }
+
+    const now = new Date();
+    const generatedPublicKey =
+      existing?.publicKey ||
+      `kuba_pk_${randomBytes(32).toString("base64url")}`;
+    const integrationId =
+      existing?.id ||
+      `website_chat:${membership.businessId}`;
+
+    if (existing) {
+      await db
+        .update(integrations)
+        .set({
+          publicKey:
+            existing.publicKey ||
+            sql<string>`coalesce(${integrations.publicKey}, ${generatedPublicKey})`,
+          status: "active",
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(
+              integrations.id,
+              integrationId,
+            ),
+            eq(
+              integrations.businessId,
+              membership.businessId,
+            ),
+          ),
+        );
+    } else {
+      await db
+        .insert(integrations)
+        .values({
+          id: integrationId,
+          businessId:
+            membership.businessId,
+          provider: "website_chat",
+          status: "active",
+          publicKey: generatedPublicKey,
+          displayName: "Website Chat",
+          metadata: JSON.stringify({
+            source: "dashboard_activation",
+          }),
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing({
+          target: integrations.id,
+        });
+    }
+
+    const activatedResult = await db
+      .select({
+        id: integrations.id,
+        publicKey: integrations.publicKey,
+        status: integrations.status,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(
+            integrations.id,
+            integrationId,
+          ),
+          eq(
+            integrations.businessId,
+            membership.businessId,
+          ),
+          eq(
+            integrations.provider,
+            "website_chat",
+          ),
+        ),
+      )
+      .limit(1);
+
+    const activatedIntegration =
+      activatedResult[0];
+
+    if (!activatedIntegration?.publicKey) {
+      throw new Error(
+        "Website Chat activation did not persist.",
+      );
+    }
+
+    const created =
+      !existing &&
+      activatedIntegration.publicKey ===
+        generatedPublicKey;
+
+    if (!existing && !created) {
+      return NextResponse.json({
+        success: true,
+        activated: false,
+        integration: activatedIntegration,
+      });
+    }
+
+    await createAuditLog({
+      businessId: membership.businessId,
+      userId: session.user.id,
+      action:
+        "integration.website_chat.activated",
+      resource: "integration",
+      resourceId: integrationId,
+      description:
+        "Activated the Website Chat integration.",
+      metadata: {
+        provider: "website_chat",
+        created,
+        previousStatus:
+          existing?.status ?? null,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      activated: true,
+      integration: activatedIntegration,
+    });
+  } catch (error) {
+    console.error(
+      "Activate Website Chat integration error:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "Unable to activate Website Chat integration.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(request: Request) {
+  let responseStage =
+    "parse_request";
+
   try {
     const body = await request.json();
 
@@ -155,6 +495,8 @@ export async function POST(request: Request) {
      * Resolve the tenant exclusively through
      * the public website integration key.
      */
+    responseStage =
+      "resolve_integration";
     const integrationResult = await db
       .select({
         integration: integrations,
@@ -213,6 +555,8 @@ export async function POST(request: Request) {
     /**
      * Load business-specific AI configuration.
      */
+    responseStage =
+      "load_business_settings";
     const settingsResult = await db
       .select()
       .from(aiBusinessSettings)
@@ -229,6 +573,8 @@ export async function POST(request: Request) {
     /**
      * Receptionist is the fallback AI employee.
      */
+    responseStage =
+      "load_receptionist";
     const receptionistResult = await db
       .select({
         id: aiEmployees.id,
@@ -312,44 +658,43 @@ export async function POST(request: Request) {
       conversationId =
         crypto.randomUUID();
 
-      await db
-        .insert(conversations)
-        .values({
-          id:
-            conversationId,
-
-          businessId:
-            business.id,
-
-          integrationId:
-            integration.id,
-
-          customerName:
-            "Website Visitor",
-
-          customerPhone:
-            null,
-
-          customerEmail:
-            null,
-
-          assignedEmployeeId:
-            receptionist.id,
-
-          status:
-            "open",
-
-          createdAt:
-            now,
-
-          updatedAt:
-            now,
-        });
+      responseStage =
+        "create_conversation";
+      // Keep this insert compatible with the validated live baseline.
+      await db.run(sql`
+        INSERT INTO conversations (
+          id,
+          business_id,
+          integration_id,
+          external_conversation_id,
+          customer_name,
+          customer_phone,
+          customer_email,
+          assigned_employee_id,
+          status,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${conversationId},
+          ${business.id},
+          ${integration.id},
+          ${conversationId},
+          ${"Website Visitor"},
+          ${null},
+          ${null},
+          ${receptionist.id},
+          ${"open"},
+          ${now.getTime()},
+          ${now.getTime()}
+        )
+      `);
     }
 
     /**
      * Save the incoming visitor message first.
      */
+    responseStage =
+      "save_inbound_message";
     await db
       .insert(messages)
       .values({
@@ -392,154 +737,196 @@ export async function POST(request: Request) {
      * This allows an existing conversation to remain
      * with its current team unless the router changes it.
      */
-    const existingRoutingResult =
-      await db
-        .select({
+    let enhancedRoutingAvailable =
+      true;
+    let existingRouting:
+      | {
           department:
-            conversationRouting.department,
-
+            string | null;
           teamId:
-            conversationRouting.teamId,
-
+            string | null;
           aiEmployeeId:
-            conversationRouting.aiEmployeeId,
-
+            string | null;
           assignedUserId:
-            conversationRouting.assignedUserId,
-        })
-        .from(conversationRouting)
-        .where(
-          eq(
-            conversationRouting.conversationId,
-            conversationId,
-          ),
-        )
-        .limit(1);
+            string | null;
+        }
+      | undefined;
 
-    const existingRouting =
-      existingRoutingResult[0];
+    responseStage =
+      "load_routing";
+    try {
+      const existingRoutingResult =
+        await db
+          .select({
+            department:
+              conversationRouting.department,
+            teamId:
+              conversationRouting.teamId,
+            aiEmployeeId:
+              conversationRouting.aiEmployeeId,
+            assignedUserId:
+              conversationRouting.assignedUserId,
+          })
+          .from(conversationRouting)
+          .where(
+            eq(
+              conversationRouting.conversationId,
+              conversationId,
+            ),
+          )
+          .limit(1);
+
+      existingRouting =
+        existingRoutingResult[0];
+    } catch (routingLoadError) {
+      if (
+        classifyWebsiteChatError(
+          routingLoadError,
+        ) !== "missing_table"
+      ) {
+        throw routingLoadError;
+      }
+
+      enhancedRoutingAvailable =
+        false;
+      console.warn(
+        "Website Chat enhanced routing tables are unavailable.",
+      );
+    }
 
     /**
      * Run the central Kuba routing engine.
      */
-    const routingDecision =
-      await routeConversationToTeam({
-        businessId:
-          business.id,
+    const routingContext = {
+      businessId:
+        business.id,
+      customerId:
+        null,
+      conversationId,
+      channel:
+        "website_chat" as const,
+      message,
+      currentDepartment:
+        typeof existingRouting?.department === "string"
+          ? existingRouting.department as ConversationDepartment
+          : null,
+      currentTeamId:
+        existingRouting?.teamId ??
+        null,
+      currentAiEmployeeId:
+        existingRouting?.aiEmployeeId ??
+        null,
+      currentAssignedUserId:
+        existingRouting?.assignedUserId ??
+        null,
+    };
 
-        customerId:
-          null,
+    responseStage =
+      "route_conversation";
+    let routingDecision =
+      routeConversation(
+        routingContext,
+      );
 
-        conversationId,
+    if (enhancedRoutingAvailable) {
+      try {
+        routingDecision =
+          await routeConversationToTeam(
+            routingContext,
+          );
+      } catch (teamRoutingError) {
+        const failureType =
+          classifyWebsiteChatError(
+            teamRoutingError,
+          );
 
-        channel:
-          "website_chat",
+        if (
+          failureType !==
+            "missing_table" &&
+          failureType !==
+            "missing_column"
+        ) {
+          throw teamRoutingError;
+        }
 
-        message,
-
-        currentDepartment:
-          typeof existingRouting?.department === "string"
-            ? existingRouting.department as ConversationDepartment
-            : null,
-
-        currentTeamId:
-          existingRouting?.teamId ??
-          null,
-
-        currentAiEmployeeId:
-          existingRouting?.aiEmployeeId ??
-          null,
-
-        currentAssignedUserId:
-          existingRouting?.assignedUserId ??
-          null,
-      });
+        enhancedRoutingAvailable =
+          false;
+        console.warn(
+          "Website Chat team routing tables are unavailable.",
+        );
+      }
+    }
 
     /**
      * Persist routing state.
      */
-    if (!existingRouting) {
-      await db
-        .insert(conversationRouting)
-        .values({
-          id:
-            crypto.randomUUID(),
-
-          businessId:
-            business.id,
-
-          conversationId,
-
-          department:
-            routingDecision.department,
-
-          teamId:
-            routingDecision.teamId,
-
-          aiEmployeeId:
-            routingDecision.aiEmployeeId,
-
-          assignedUserId:
-            routingDecision.assignedUserId,
-
-          assignmentType:
-            routingDecision.assignmentType,
-
-          status:
-            routingDecision.status,
-
-          priority:
-            "normal",
-
-          confidence:
-            routingDecision.confidence,
-
-          routingReason:
-            routingDecision.reason,
-
-          createdAt:
-            now,
-
-          updatedAt:
-            now,
-        });
-    } else {
-      await db
-        .update(conversationRouting)
-        .set({
-          department:
-            routingDecision.department,
-
-          teamId:
-            routingDecision.teamId,
-
-          aiEmployeeId:
-            routingDecision.aiEmployeeId,
-
-          assignedUserId:
-            routingDecision.assignedUserId,
-
-          assignmentType:
-            routingDecision.assignmentType,
-
-          status:
-            routingDecision.status,
-
-          confidence:
-            routingDecision.confidence,
-
-          routingReason:
-            routingDecision.reason,
-
-          updatedAt:
-            new Date(),
-        })
-        .where(
-          eq(
-            conversationRouting.conversationId,
+    if (enhancedRoutingAvailable) {
+      if (!existingRouting) {
+        responseStage =
+          "create_routing";
+        await db
+          .insert(conversationRouting)
+          .values({
+            id:
+              crypto.randomUUID(),
+            businessId:
+              business.id,
             conversationId,
-          ),
-        );
+            department:
+              routingDecision.department,
+            teamId:
+              routingDecision.teamId,
+            aiEmployeeId:
+              routingDecision.aiEmployeeId,
+            assignedUserId:
+              routingDecision.assignedUserId,
+            assignmentType:
+              routingDecision.assignmentType,
+            status:
+              routingDecision.status,
+            priority:
+              "normal",
+            confidence:
+              routingDecision.confidence,
+            routingReason:
+              routingDecision.reason,
+            createdAt:
+              now,
+            updatedAt:
+              now,
+          });
+      } else {
+        responseStage =
+          "update_routing";
+        await db
+          .update(conversationRouting)
+          .set({
+            department:
+              routingDecision.department,
+            teamId:
+              routingDecision.teamId,
+            aiEmployeeId:
+              routingDecision.aiEmployeeId,
+            assignedUserId:
+              routingDecision.assignedUserId,
+            assignmentType:
+              routingDecision.assignmentType,
+            status:
+              routingDecision.status,
+            confidence:
+              routingDecision.confidence,
+            routingReason:
+              routingDecision.reason,
+            updatedAt:
+              new Date(),
+          })
+          .where(
+            eq(
+              conversationRouting.conversationId,
+              conversationId,
+            ),
+          );
+      }
     }
 
     /**
@@ -559,6 +946,8 @@ export async function POST(request: Request) {
     if (
       routingDecision.aiEmployeeId
     ) {
+      responseStage =
+        "resolve_routed_employee";
       const routedEmployeeResult =
         await db
           .select({
@@ -615,6 +1004,8 @@ export async function POST(request: Request) {
     let knowledgeContext = "";
 
     try {
+      responseStage =
+        "search_knowledge";
       const knowledgeResults =
         await searchKnowledge(
           business.id,
@@ -712,6 +1103,8 @@ Answer naturally, helpfully and professionally.
     /**
      * Generate the AI response.
      */
+    responseStage =
+      "generate_response";
     const response =
       await selectedAgent.generate(
         businessContext,
@@ -734,6 +1127,8 @@ Answer naturally, helpfully and professionally.
     /**
      * Save Kuba's response.
      */
+    responseStage =
+      "save_outbound_message";
     await db
       .insert(messages)
       .values({
@@ -789,6 +1184,8 @@ Answer naturally, helpfully and professionally.
      * Keep the conversation assigned to the
      * routed AI employee.
      */
+    responseStage =
+      "update_conversation";
     await db
       .update(conversations)
       .set({
@@ -851,6 +1248,18 @@ Answer naturally, helpfully and professionally.
       {
         error:
           "Unable to respond.",
+        code:
+          "WEBSITE_CHAT_RESPONSE_FAILED",
+        stage:
+          responseStage,
+        failureType:
+          classifyWebsiteChatError(
+            error,
+          ),
+        driverCode:
+          getWebsiteChatDriverCode(
+            error,
+          ),
       },
       { status: 500 },
     );

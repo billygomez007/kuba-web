@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import {
   aiEmployees,
+  businesses,
 } from "@/db/schema";
 
 import {
@@ -14,11 +15,19 @@ import {
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
-import { getBusinessPlan, employeeLimitMessage, getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import {
+  employeeLimitMessage,
+  getPlanDefinition,
+  getBusinessEntitlements,
+  hasCapability,
+} from "@/lib/billing/entitlements";
 
 export async function POST(
   request: Request,
 ) {
+  let activationStage =
+    "authorize";
+
   try {
     const {
       user,
@@ -68,14 +77,45 @@ export async function POST(
       return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
     }
 
-    const plan = await getBusinessPlan(membership.businessId);
+    activationStage =
+      "load_plan";
+    const businessResult = await db
+      .select({
+        plan: businesses.plan,
+      })
+      .from(businesses)
+      .where(
+        eq(
+          businesses.id,
+          membership.businessId,
+        ),
+      )
+      .limit(1);
+    const business = businessResult[0];
+
+    if (!business) {
+      return NextResponse.json(
+        {
+          error:
+            "Business access denied.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const plan =
+      getPlanDefinition(business.plan);
     if (plan.employeeLimit !== null) {
+      activationStage =
+        "check_employee_limit";
       const activeEmployees = await db.select({ total: count() }).from(aiEmployees).where(and(eq(aiEmployees.businessId, membership.businessId), eq(aiEmployees.status, "active")));
       if (Number(activeEmployees[0]?.total || 0) >= plan.employeeLimit) {
         return NextResponse.json({ error: employeeLimitMessage(plan), upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
       }
     }
 
+    activationStage =
+      "parse_request";
     const body =
       await request.json();
 
@@ -115,11 +155,17 @@ export async function POST(
       return NextResponse.json({ error: `${type} AI requires Growth or higher.`, upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
     }
 
+    activationStage =
+      "check_existing_employee";
     const existingEmployee =
       await db
         .select({
           id:
             aiEmployees.id,
+          name:
+            aiEmployees.name,
+          status:
+            aiEmployees.status,
         })
         .from(aiEmployees)
         .where(
@@ -136,16 +182,66 @@ export async function POST(
         )
         .limit(1);
 
-    if (
-      existingEmployee.length >
-      0
-    ) {
+    const existing =
+      existingEmployee[0];
+
+    if (existing) {
+      if (
+        existing.status !==
+        "active"
+      ) {
+        activationStage =
+          "reactivate_employee";
+        await db
+          .update(aiEmployees)
+          .set({
+            name,
+            description:
+              description ||
+              null,
+            templateId,
+            status:
+              "active",
+            supervisorUserId:
+              user.id,
+            updatedAt:
+              new Date(),
+          })
+          .where(
+            and(
+              eq(
+                aiEmployees.id,
+                existing.id,
+              ),
+              eq(
+                aiEmployees.businessId,
+                membership.businessId,
+              ),
+            ),
+          );
+      }
+
       return NextResponse.json(
         {
-          error:
-            "This AI employee is already activated.",
+          success:
+            true,
+          activated:
+            existing.status !==
+            "active",
+          employee: {
+            id:
+              existing.id,
+            name:
+              existing.status ===
+              "active"
+                ? existing.name
+                : name,
+            type,
+            status:
+              "active",
+          },
         },
-        { status: 409 },
+        { status: 200 },
       );
     }
 
@@ -155,6 +251,8 @@ export async function POST(
     const employeeId =
       crypto.randomUUID();
 
+    activationStage =
+      "insert_employee";
     await db
       .insert(aiEmployees)
       .values({
@@ -222,6 +320,10 @@ export async function POST(
       {
         error:
           "Unable to activate the AI employee.",
+        code:
+          "AI_EMPLOYEE_ACTIVATION_FAILED",
+        stage:
+          activationStage,
       },
       { status: 500 },
     );
