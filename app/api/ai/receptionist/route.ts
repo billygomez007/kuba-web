@@ -110,10 +110,22 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Gate basic Receptionist conversation on the base customer-operations
+     * capability (included from the Starter plan), not on
+     * "customer_ops.appointments". Appointment scheduling is an additional
+     * capability, not a prerequisite for greeting a customer or answering a
+     * general question — and the appointment tools this agent can call
+     * (mastra/tools/appointment-tools.ts) already independently enforce
+     * their own, stricter "customer_ops.ai_assist" gate before reading or
+     * writing any appointment data. Gating the whole conversation on
+     * "customer_ops.appointments" blocked every Receptionist message,
+     * including a plain "hello", for any plan without that capability.
+     */
     if (
       !hasCapability(
         await getBusinessEntitlements(business.id),
-        "customer_ops.appointments",
+        "customer_ops.core",
       )
     ) {
       return NextResponse.json(
