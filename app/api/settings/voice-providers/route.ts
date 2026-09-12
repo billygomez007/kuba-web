@@ -29,7 +29,12 @@ export async function POST(request: Request) {
     const provider = typeof body.provider === "string" ? body.provider : "";
     const accountId = typeof body.accountId === "string" ? body.accountId.trim() : "";
     const secret = typeof body.secret === "string" ? body.secret : "";
-    if (!getVoiceProvider(provider) || !accountId || !secret) return NextResponse.json({ error: "Provider, account identifier, and secret are required." }, { status: 400 });
+    const providerDefinition = getVoiceProvider(provider);
+    if (!providerDefinition || !accountId || !secret) return NextResponse.json({ error: "Provider, account identifier, and secret are required." }, { status: 400 });
+    // A "planned" provider has no working call transport yet (see
+    // lib/voice/providers.ts) — saving credentials for one would show a
+    // false "active" connection that can never place or receive a call.
+    if (providerDefinition.status !== "available") return NextResponse.json({ error: `${providerDefinition.name} is not available yet — it's on the roadmap but has no working call transport.` }, { status: 400 });
     const existing = await db.select({ id: integrations.id }).from(integrations).where(and(eq(integrations.businessId, membership.businessId), eq(integrations.provider, provider), eq(integrations.metadata, "voice_provider"))).limit(1);
     const values = { status: "active", externalAccountId: accountId, credentialsEncrypted: encryptVoiceSecret(secret), metadata: "voice_provider", displayName: getVoiceProvider(provider)?.name, updatedAt: new Date() };
     const id = existing[0]?.id || crypto.randomUUID();

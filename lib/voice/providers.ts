@@ -15,12 +15,19 @@ export type VoiceProvider = {
   models: string[];
 };
 
+// `status` must reflect whether `getVoiceTransport` actually returns a
+// working transport below, not aspiration — retell/vapi/sip have no
+// adapter implementation and would silently fail at call time if a
+// business were allowed to connect one (see PRODUCTION_CONFIGURATION_
+// CHECKLIST.md and the voice audit: these were previously mislabeled
+// "available", letting a business save credentials for a provider that
+// can never place or receive a call).
 export const voiceProviders: VoiceProvider[] = [
   { id: "openai-realtime", name: "OpenAI Realtime API", status: "available", models: ["gpt-realtime"] },
   { id: "twilio", name: "Twilio", status: "available", models: ["voice-media-stream"] },
-  { id: "retell", name: "Retell AI", status: "available", models: ["retell-default"] },
-  { id: "vapi", name: "Vapi", status: "available", models: ["vapi-default"] },
-  { id: "sip", name: "SIP provider", status: "available", models: ["sip-bridge"] },
+  { id: "retell", name: "Retell AI", status: "planned", models: ["retell-default"] },
+  { id: "vapi", name: "Vapi", status: "planned", models: ["vapi-default"] },
+  { id: "sip", name: "SIP provider", status: "planned", models: ["sip-bridge"] },
 ];
 
 export type VoiceTransport = {
