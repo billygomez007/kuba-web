@@ -24,6 +24,7 @@ let aiEmployeesRouteSource;
 let appointmentToolsSource;
 let ticketToolsSource;
 let planDefinitionsSource;
+let aiAuthoritySource;
 
 test.before(async () => {
   receptionistRouteSource = await readFile("app/api/ai/receptionist/route.ts", "utf8");
@@ -31,6 +32,7 @@ test.before(async () => {
   appointmentToolsSource = await readFile("mastra/tools/appointment-tools.ts", "utf8");
   ticketToolsSource = await readFile("mastra/tools/ticket-tools.ts", "utf8");
   planDefinitionsSource = await readFile("lib/billing/plan-definitions.ts", "utf8");
+  aiAuthoritySource = await readFile("lib/ai/authority.ts", "utf8");
 });
 
 // --- 1 & 2: the actual bug is fixed, and can't silently regress ---
@@ -77,12 +79,24 @@ test("AI employee activation uses the central canActivateEmployee policy, and ev
 // --- 4: appointment-specific functionality remains protected ---
 
 test("appointment tools still independently require customer_ops.ai_assist before touching any appointment data", () => {
-  assert.match(appointmentToolsSource, /hasCapability\(entitlements, "customer_ops\.ai_assist"\)/);
-  assert.match(appointmentToolsSource, /requireAiAssist\(businessId\)/);
+  // hasCapability(entitlements, "customer_ops.ai_assist")/requireAiAssist
+  // were centralized into lib/ai/authority.ts's checkAIEmployeeAuthority +
+  // ACTION_ENTITLEMENT map — the gate is still enforced, just in one place.
+  assert.match(appointmentToolsSource, /checkAIEmployeeAuthority\(\{[^}]*action: "read_appointments"/);
+  assert.match(appointmentToolsSource, /checkAIEmployeeAuthority\(\{[^}]*action: "create_appointment"/);
+  assert.match(appointmentToolsSource, /checkAIEmployeeAuthority\(\{[^}]*action: "update_appointment"/);
+  for (const action of ["read_appointments", "create_appointment", "update_appointment"]) {
+    assert.match(aiAuthoritySource, new RegExp(`${action}:\\s*"customer_ops\\.ai_assist"`));
+  }
 });
 
 test("ticket tools (the equivalent gap in Customer Support) also independently require customer_ops.ai_assist", () => {
-  assert.match(ticketToolsSource, /hasCapability\(entitlements, "customer_ops\.ai_assist"\)/);
+  assert.match(ticketToolsSource, /checkAIEmployeeAuthority\(\{[^}]*action: "read_tickets"/);
+  assert.match(ticketToolsSource, /checkAIEmployeeAuthority\(\{[^}]*action: "create_ticket"/);
+  assert.match(ticketToolsSource, /checkAIEmployeeAuthority\(\{[^}]*action: "escalate_ticket"/);
+  for (const action of ["read_tickets", "create_ticket", "escalate_ticket"]) {
+    assert.match(aiAuthoritySource, new RegExp(`${action}:\\s*"customer_ops\\.ai_assist"`));
+  }
 });
 
 // --- 5: the gating LOGIC itself correctly allows/denies based on capability presence ---

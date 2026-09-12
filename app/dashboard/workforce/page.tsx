@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ActivateEmployeeButton from "../../components/ActivateEmployeeButton";
 import AIEmployeeAvatar from "../../components/employees/AIEmployeeAvatar";
+import StatusBadge from "../../components/ui/StatusBadge";
 import { employeeCatalog, getEmployeeAvatar, type EmployeeCatalogEntry } from "@/lib/billing/ai-workforce-catalog";
 import { canActivateEmployee, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 import { getPlanDefinition } from "@/lib/billing/plan-definitions";
@@ -315,9 +316,7 @@ export default function WorkforcePage() {
                               {generalManager.name}
                             </h3>
 
-                            <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-300">
-                              Online
-                            </span>
+                            <StatusBadge status={generalManager.status} dot />
 
                             {entitlements && !isEmployeeTypeEntitled(entitlements, generalManager.type) && (
                               <span
@@ -824,9 +823,7 @@ function ActiveEmployeeCard({
               </span>
             )}
 
-            <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-300">
-              Online
-            </span>
+            <StatusBadge status={employee.status} dot />
 
             {!entitledUnderCurrentPlan && (
               <span

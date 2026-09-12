@@ -51,14 +51,18 @@ test("public pricing page is metadata-addressable", async () => {
 });
 
 test("progressive cards use customer-friendly tier-specific presentation", async () => {
-  const source = await pricingSources();
-  assert.match(source, /Run Your Business/);
-  assert.match(source, /Automate Your Business/);
-  assert.match(source, /Operate With AI/);
-  assert.match(source, /Complete Business Operating System/);
+  const [source, presentation] = await Promise.all([
+    readFile(new URL("../app/pricing/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8"),
+  ]);
+  const combined = `${source}\n${presentation}`;
+  assert.match(combined, /Run Your Business/);
+  assert.match(combined, /Automate Your Business/);
+  assert.match(combined, /Operate With AI/);
+  assert.match(combined, /Complete Business Operating System/);
   assert.match(source, /Everything in \{planDefinitions\.find/);
-  assert.match(source, /AI-assisted Appointments & Tickets/);
-  assert.doesNotMatch(source, /Global currency|Business Profile|Business Brain.*tier/);
+  assert.match(combined, /AI-assisted Appointments & Tickets/);
+  assert.doesNotMatch(combined, /Global currency|Business Profile|Business Brain.*tier/);
 });
 
 test("requested operations and AI-assist placements follow canonical tiers", () => {

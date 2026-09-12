@@ -31,8 +31,8 @@ const BIZ_GROWTH = "biz-tier-growth";
 const BIZ_PRO = "biz-tier-pro";
 const BIZ_ENTERPRISE = "biz-tier-enterprise";
 
-function fakeRequestContext(businessId) {
-  return { get: (key) => (key === "businessId" ? businessId : undefined) };
+function fakeRequestContext(businessId, employeeId) {
+  return { get: (key) => (key === "businessId" ? businessId : key === "employeeId" ? employeeId : undefined) };
 }
 
 async function seed() {
@@ -73,6 +73,12 @@ async function seed() {
     if (plan !== "starter") {
       await db.insert(schema.subscriptions).values({ id: crypto.randomUUID(), businessId: id, provider: "stripe", providerCustomerId: `cus_tier_${plan}`, providerSubscriptionId: `sub_tier_${plan}`, providerEventId: `evt_seed_tier_${plan}`, plan, status: "active", currentPeriodStart: now, currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), cancelAtPeriodEnd: false, trialEnd: null, createdAt: now, updatedAt: now });
     }
+    // Every AI-authority check requires a real, active employee scoped to
+    // the business in RequestContext — these tier businesses exercise the
+    // entitlement gate specifically, not tenant/employee-status, so each
+    // gets one active receptionist-type employee for its tool calls to run
+    // as.
+    await db.insert(schema.aiEmployees).values({ id: `ai-tier-${plan}`, businessId: id, name: `AI Tier ${plan}`, type: "receptionist", supervisionMode: "owner_supervised", status: "active", createdAt: now, updatedAt: now });
   }
 
   return rows;
@@ -188,10 +194,10 @@ test("direct foreign appointment lookup returns nothing when scoped to the wrong
 // --- AI tool tests: tenant identity comes only from the server-pinned requestContext ---
 
 test("AI createAppointmentTool rejects a foreign customer even when businessId is real business-a", async () => {
-  await assert.rejects(() => appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-02-01T09:00:00Z", endAt: "2027-02-01T09:30:00Z", timezone: "UTC", customerId: "cust-b" }, { requestContext: fakeRequestContext(BIZ_A) }));
+  await assert.rejects(() => appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-02-01T09:00:00Z", endAt: "2027-02-01T09:30:00Z", timezone: "UTC", customerId: "cust-b" }, { requestContext: fakeRequestContext(BIZ_A, "ai-a") }));
 });
 test("AI createAppointmentTool ignores a smuggled businessId in tool input and uses only requestContext", async () => {
-  const result = await appointmentTools.createAppointmentTool.execute({ title: "Legit booking", startAt: "2027-02-02T09:00:00Z", endAt: "2027-02-02T09:30:00Z", timezone: "UTC", businessId: BIZ_B }, { requestContext: fakeRequestContext(BIZ_A) });
+  const result = await appointmentTools.createAppointmentTool.execute({ title: "Legit booking", startAt: "2027-02-02T09:00:00Z", endAt: "2027-02-02T09:30:00Z", timezone: "UTC", businessId: BIZ_B }, { requestContext: fakeRequestContext(BIZ_A, "ai-a") });
   assert.equal(result.success, true);
   const row = (await db.select().from(schema.appointments).where((await import("drizzle-orm")).eq(schema.appointments.id, result.appointmentId)))[0];
   assert.equal(row.businessId, BIZ_A, "the created appointment must belong to the requestContext business, not any businessId present in tool input");
@@ -199,20 +205,20 @@ test("AI createAppointmentTool ignores a smuggled businessId in tool input and u
 test("AI getAppointmentsTool only returns the current business's appointments", async () => {
   const now = new Date();
   await db.insert(schema.appointments).values({ id: "appt-b-only", businessId: BIZ_B, title: "Business B only", startAt: now, endAt: new Date(now.getTime() + 3600000), timezone: "UTC", status: "scheduled", appointmentType: "meeting", meetingMode: "in_person", createdBy: "user-b", createdAt: now, updatedAt: now });
-  const result = await appointmentTools.getAppointmentsTool.execute({}, { requestContext: fakeRequestContext(BIZ_A) });
+  const result = await appointmentTools.getAppointmentsTool.execute({}, { requestContext: fakeRequestContext(BIZ_A, "ai-a") });
   assert.equal(result.appointments.some((item) => item.id === "appt-b-only"), false);
 });
 test("AI updateAppointmentTool cannot modify a foreign business's appointment", async () => {
-  const result = await appointmentTools.updateAppointmentTool.execute({ appointmentId: "appt-b-only", status: "confirmed" }, { requestContext: fakeRequestContext(BIZ_A) });
+  const result = await appointmentTools.updateAppointmentTool.execute({ appointmentId: "appt-b-only", status: "confirmed" }, { requestContext: fakeRequestContext(BIZ_A, "ai-a") });
   assert.equal(result.success, false);
   assert.match(result.error, /not found/);
 });
 
 test("AI createSupportTicketTool rejects a foreign conversation", async () => {
-  await assert.rejects(() => ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue", conversationId: "conv-b" }, { requestContext: fakeRequestContext(BIZ_A) }));
+  await assert.rejects(() => ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue", conversationId: "conv-b" }, { requestContext: fakeRequestContext(BIZ_A, "ai-a") }));
 });
 test("AI createSupportTicketTool creates tickets scoped to the requestContext business only", async () => {
-  const result = await ticketTools.createSupportTicketTool.execute({ subject: "AI ticket", description: "Created by AI" }, { requestContext: fakeRequestContext(BIZ_A) });
+  const result = await ticketTools.createSupportTicketTool.execute({ subject: "AI ticket", description: "Created by AI" }, { requestContext: fakeRequestContext(BIZ_A, "ai-a") });
   assert.equal(result.success, true);
   const row = (await db.select().from(schema.tickets).where((await import("drizzle-orm")).eq(schema.tickets.id, result.ticketId)))[0];
   assert.equal(row.businessId, BIZ_A);
@@ -221,24 +227,24 @@ test("AI createSupportTicketTool creates tickets scoped to the requestContext bu
 test("AI getTicketsTool only returns the current business's tickets", async () => {
   const now = new Date();
   await db.insert(schema.tickets).values({ id: "ticket-b-only", businessId: BIZ_B, ticketReference: "SUP-BBBBBBBB", subject: "B only", description: "desc", status: "open", priority: "normal", source: "manual", openedAt: now, createdBy: "user-b", createdAt: now, updatedAt: now });
-  const result = await ticketTools.getTicketsTool.execute({}, { requestContext: fakeRequestContext(BIZ_A) });
+  const result = await ticketTools.getTicketsTool.execute({}, { requestContext: fakeRequestContext(BIZ_A, "ai-a") });
   assert.equal(result.tickets.some((item) => item.id === "ticket-b-only"), false);
 });
 test("AI requestTicketEscalationTool cannot escalate a foreign business's ticket", async () => {
-  const result = await ticketTools.requestTicketEscalationTool.execute({ ticketId: "ticket-b-only", reason: "needs a human" }, { requestContext: fakeRequestContext(BIZ_A) });
+  const result = await ticketTools.requestTicketEscalationTool.execute({ ticketId: "ticket-b-only", reason: "needs a human" }, { requestContext: fakeRequestContext(BIZ_A, "ai-a") });
   assert.equal(result.success, false);
 });
 test("AI requestTicketEscalationTool can only ever set waiting_internal — it cannot resolve, close, or reopen", async () => {
   const now = new Date();
   await db.insert(schema.tickets).values({ id: "ticket-a-escalate", businessId: BIZ_A, ticketReference: "SUP-AAAAAAAA", subject: "Escalate me", description: "desc", status: "open", priority: "normal", source: "manual", openedAt: now, createdBy: "user-a", createdAt: now, updatedAt: now });
-  const result = await ticketTools.requestTicketEscalationTool.execute({ ticketId: "ticket-a-escalate", reason: "needs a human" }, { requestContext: fakeRequestContext(BIZ_A) });
+  const result = await ticketTools.requestTicketEscalationTool.execute({ ticketId: "ticket-a-escalate", reason: "needs a human" }, { requestContext: fakeRequestContext(BIZ_A, "ai-a") });
   assert.equal(result.success, true);
   const row = (await db.select().from(schema.tickets).where((await import("drizzle-orm")).eq(schema.tickets.id, "ticket-a-escalate")))[0];
   assert.equal(row.status, "waiting_internal");
 });
 test("Customer Support AI tool module exports no resolve/close/reopen-capable ticket tool", () => {
   const exportedNames = Object.keys(ticketTools);
-  assert.deepEqual(exportedNames.sort(), ["createSupportTicketTool", "getTicketsTool", "requestTicketEscalationTool"]);
+  assert.deepEqual(exportedNames.sort(), ["createSupportTicketTool", "getTicketsTool", "performCreateSupportTicket", "performEscalateTicket", "requestTicketEscalationTool"]);
 });
 
 // --- Structural regression guards: routes and AI tools never accept a client-supplied businessId ---
@@ -418,28 +424,25 @@ test("the dashboard layout's direct-URL capability gate covers /dashboard/appoin
 // --- AI tool entitlement gate: Growth (core only) vs Pro (AI-assisted) ---
 
 test("AI createAppointmentTool is denied for a Growth-tier business (core only, no AI assist)", async () => {
-  await assert.rejects(
-    () => appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-03-01T09:00:00Z", endAt: "2027-03-01T09:30:00Z", timezone: "UTC" }, { requestContext: fakeRequestContext(BIZ_GROWTH) }),
-    /Pro plan or higher/,
-  );
+  const result = await appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-03-01T09:00:00Z", endAt: "2027-03-01T09:30:00Z", timezone: "UTC" }, { requestContext: fakeRequestContext(BIZ_GROWTH, "ai-tier-growth") });
+  assert.equal(result.success, false);
+  assert.match(result.error, /Pro plan or higher/);
 });
 test("AI createAppointmentTool succeeds for a Pro-tier business", async () => {
-  const result = await appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-03-01T09:00:00Z", endAt: "2027-03-01T09:30:00Z", timezone: "UTC" }, { requestContext: fakeRequestContext(BIZ_PRO) });
+  const result = await appointmentTools.createAppointmentTool.execute({ title: "AI booked", startAt: "2027-03-01T09:00:00Z", endAt: "2027-03-01T09:30:00Z", timezone: "UTC" }, { requestContext: fakeRequestContext(BIZ_PRO, "ai-tier-pro") });
   assert.equal(result.success, true);
 });
 test("AI createSupportTicketTool is denied for a Growth-tier business (core only, no AI assist)", async () => {
-  await assert.rejects(
-    () => ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue" }, { requestContext: fakeRequestContext(BIZ_GROWTH) }),
-    /Pro plan or higher/,
-  );
+  const result = await ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue" }, { requestContext: fakeRequestContext(BIZ_GROWTH, "ai-tier-growth") });
+  assert.equal(result.success, false);
+  assert.match(result.error, /Pro plan or higher/);
 });
 test("AI createSupportTicketTool succeeds for an Enterprise-tier business", async () => {
-  const result = await ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue" }, { requestContext: fakeRequestContext(BIZ_ENTERPRISE) });
+  const result = await ticketTools.createSupportTicketTool.execute({ subject: "Help", description: "Issue" }, { requestContext: fakeRequestContext(BIZ_ENTERPRISE, "ai-tier-enterprise") });
   assert.equal(result.success, true);
 });
 test("AI requestTicketEscalationTool is denied for a Starter-tier business", async () => {
-  await assert.rejects(
-    () => ticketTools.requestTicketEscalationTool.execute({ ticketId: "ticket-lookup-seed", reason: "x" }, { requestContext: fakeRequestContext(BIZ_STARTER) }),
-    /Pro plan or higher/,
-  );
+  const result = await ticketTools.requestTicketEscalationTool.execute({ ticketId: "ticket-lookup-seed", reason: "x" }, { requestContext: fakeRequestContext(BIZ_STARTER, "ai-tier-starter") });
+  assert.equal(result.success, false);
+  assert.match(result.error, /Pro plan or higher/);
 });

@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import crypto from "crypto";
+import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { businesses, integrations, messages } from "@/db/schema";
+import { businesses, conversations, integrations, messages } from "@/db/schema";
 import { decrypt } from "@/lib/encryption";
 
-import { ChannelAdapter } from "./types";
+import type { ChannelAdapter } from "./types";
 
 /*
  * Canonical WhatsApp channel module.
@@ -16,32 +17,145 @@ import { ChannelAdapter } from "./types";
  * should read WHATSAPP_ACCESS_TOKEN directly to send a message.
  */
 
-type WhatsAppCredentials = {
+const DEFAULT_GRAPH_API_VERSION = "v25.0";
+
+// Meta only allows unrestricted, free-form outbound messages within 24 hours
+// of the customer's most recent inbound message ("customer service window").
+// Outside that window a message template is required instead.
+const CUSTOMER_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export interface WhatsAppCredentials {
   accessToken: string;
   phoneNumberId: string;
   graphApiVersion: string;
-};
+}
+
+export interface WhatsAppIntegrationRecord {
+  id: string;
+  businessId: string;
+  externalPhoneNumberId: string | null;
+  credentialsEncrypted: string | null;
+}
 
 /**
- * Resolves the real credentials to send with, for an already-loaded
- * integration row. Prefers the business's own encrypted credentials
- * (stored when they connected their WhatsApp number via
- * app/api/integrations/whatsapp/route.ts). Falls back to the legacy global
- * env vars only when this integration has no stored credentials of its
- * own — for installations connected before per-tenant credential storage
- * existed — and only for the same phone number those env vars configure.
+ * Verify a Meta webhook POST body using the app secret. Requires the exact
+ * raw request bytes (never a re-serialized/parsed body) and compares with
+ * crypto.timingSafeEqual to avoid leaking timing information about the
+ * expected signature.
  */
-export function getWhatsAppCredentialsForIntegration(integration: {
-  credentialsEncrypted: string | null;
-  externalPhoneNumberId: string | null;
-}): WhatsAppCredentials | null {
-  const graphApiVersion =
-    process.env.WHATSAPP_GRAPH_API_VERSION || "v25.0";
+export function verifyMetaSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  appSecret: string | undefined,
+): boolean {
+  if (!appSecret || !signatureHeader) {
+    return false;
+  }
 
-  if (
-    integration.credentialsEncrypted &&
-    integration.externalPhoneNumberId
-  ) {
+  const expected =
+    "sha256=" +
+    crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
+
+  const expectedBuffer = Buffer.from(expected);
+  const receivedBuffer = Buffer.from(signatureHeader);
+
+  if (expectedBuffer.length !== receivedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+/**
+ * Resolve the SuperKuba tenant that owns a Meta WhatsApp phone number.
+ *
+ * Never trust a business ID supplied by a webhook request, query string, or
+ * environment variable — a Meta phone_number_id must belong to exactly one
+ * registered, active integration.
+ */
+export async function resolveWhatsAppIntegrationByPhoneNumberId(
+  phoneNumberId: string,
+) {
+  const result = await db
+    .select({ integration: integrations, business: businesses })
+    .from(integrations)
+    .innerJoin(businesses, eq(integrations.businessId, businesses.id))
+    .where(
+      and(
+        eq(integrations.provider, "whatsapp"),
+        eq(integrations.externalPhoneNumberId, phoneNumberId),
+        eq(integrations.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+/**
+ * Idempotency lookup for inbound webhook processing: a message id is only
+ * unique within a given integration, so a duplicate check must always be
+ * scoped by integrationId, never by externalMessageId alone.
+ */
+export async function findWhatsAppMessageByExternalId(
+  integrationId: string,
+  externalMessageId: string,
+) {
+  const result = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.integrationId, integrationId),
+        eq(messages.externalMessageId, externalMessageId),
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+/**
+ * Resolve a business's own active WhatsApp integration. Used by outbound
+ * send paths (human agent replies, AI tool-initiated sends) that only know
+ * the trusted businessId, never a Meta phone_number_id.
+ */
+export async function resolveWhatsAppIntegrationByBusinessId(
+  businessId: string,
+) {
+  const result = await db
+    .select()
+    .from(integrations)
+    .where(
+      and(
+        eq(integrations.businessId, businessId),
+        eq(integrations.provider, "whatsapp"),
+        eq(integrations.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+/**
+ * Resolve the credentials to use for a specific WhatsApp integration.
+ *
+ * Each tenant's own encrypted access token takes priority so multiple
+ * businesses can each connect their own Meta WhatsApp Business number. A
+ * shared env-var token/number is only a fallback for the single-number
+ * staging setup and must never override a tenant's own connection — and
+ * never falls back across a different phone number than the one those env
+ * vars actually configure, so a partially-connected integration can never
+ * silently send through the wrong Meta number.
+ */
+export function getWhatsAppCredentialsForIntegration(
+  integration: WhatsAppIntegrationRecord,
+): WhatsAppCredentials | null {
+  const graphApiVersion =
+    process.env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_API_VERSION;
+
+  if (integration.credentialsEncrypted && integration.externalPhoneNumberId) {
     return {
       accessToken: decrypt(integration.credentialsEncrypted),
       phoneNumberId: integration.externalPhoneNumberId,
@@ -69,6 +183,21 @@ export function getWhatsAppCredentialsForIntegration(integration: {
 }
 
 /**
+ * Whether a free-form (non-template) reply is currently permitted under
+ * Meta's customer-service-window policy.
+ */
+export function isWithinCustomerServiceWindow(
+  lastInboundMessageAt: Date | null,
+  now: Date = new Date(),
+): boolean {
+  if (!lastInboundMessageAt) {
+    return false;
+  }
+
+  return now.getTime() - lastInboundMessageAt.getTime() <= CUSTOMER_SERVICE_WINDOW_MS;
+}
+
+/**
  * The one place that actually calls the Meta Graph API to send a WhatsApp
  * text message.
  */
@@ -85,12 +214,10 @@ export async function sendWhatsAppText(
     `https://graph.facebook.com/${credentials.graphApiVersion}/${credentials.phoneNumberId}/messages`,
     {
       method: "POST",
-
       headers: {
         Authorization: `Bearer ${credentials.accessToken}`,
         "Content-Type": "application/json",
       },
-
       body: JSON.stringify({
         messaging_product: "whatsapp",
         recipient_type: "individual",
@@ -107,10 +234,7 @@ export async function sendWhatsAppText(
   const result = await response.json();
 
   if (!response.ok) {
-    console.error(
-      "WhatsApp send error:",
-      JSON.stringify(result, null, 2),
-    );
+    console.error("WhatsApp send error:", JSON.stringify(result, null, 2));
 
     return {
       success: false,
@@ -133,117 +257,115 @@ export async function sendWhatsAppText(
   };
 }
 
-/**
- * Resolves which tenant a webhook delivery belongs to, from Meta's
- * phone_number_id — the only signal ever trusted for tenant resolution on
- * inbound WhatsApp webhooks. Never resolve tenant from a payload-supplied
- * businessId or an env var.
- */
-export async function resolveWhatsAppIntegrationByPhoneNumberId(
-  phoneNumberId: string,
-) {
+async function getLastInboundMessageAt(conversationId: string) {
   const result = await db
-    .select({
-      integration: integrations,
-      business: businesses,
-    })
-    .from(integrations)
-    .innerJoin(
-      businesses,
-      eq(integrations.businessId, businesses.id),
-    )
-    .where(
-      and(
-        eq(integrations.provider, "whatsapp"),
-        eq(integrations.externalPhoneNumberId, phoneNumberId),
-        eq(integrations.status, "active"),
-      ),
-    )
-    .limit(1);
-
-  return result[0] || null;
-}
-
-/**
- * Idempotency check: has this exact Meta message id already been stored
- * for this integration? Used to drop webhook retries before they insert a
- * duplicate inbound message.
- */
-export async function findWhatsAppMessageByExternalId(
-  integrationId: string,
-  externalMessageId: string,
-) {
-  const result = await db
-    .select({ id: messages.id })
+    .select({ createdAt: messages.createdAt })
     .from(messages)
     .where(
       and(
-        eq(messages.integrationId, integrationId),
-        eq(messages.externalMessageId, externalMessageId),
+        eq(messages.conversationId, conversationId),
+        eq(messages.direction, "inbound"),
       ),
     )
+    .orderBy(desc(messages.createdAt))
     .limit(1);
 
-  return result[0] || null;
+  return result[0]?.createdAt ?? null;
 }
 
-/**
- * Convenience wrapper for callers that only have a businessId (human-
- * triggered follow-up sends, approved action-approval execution) — resolves
- * that business's own active WhatsApp integration and sends through it.
- */
-export async function sendWhatsAppToPhone({
-  businessId,
-  phone,
-  message,
-}: {
-  businessId: string;
-  phone: string;
-  message: string;
-}): Promise<{
+async function getLastInboundMessageAtForPhone(
+  businessId: string,
+  phone: string,
+) {
+  const result = await db
+    .select({ createdAt: messages.createdAt })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(
+      and(
+        eq(conversations.businessId, businessId),
+        eq(conversations.customerPhone, phone),
+        eq(messages.direction, "inbound"),
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+
+  return result[0]?.createdAt ?? null;
+}
+
+interface WhatsAppSendOutcome {
   success: boolean;
   externalMessageId?: string;
   error?: string;
-}> {
-  const integrationResult = await db
-    .select()
-    .from(integrations)
-    .where(
-      and(
-        eq(integrations.businessId, businessId),
-        eq(integrations.provider, "whatsapp"),
-        eq(integrations.status, "active"),
-      ),
-    )
-    .limit(1);
+}
 
-  const integration = integrationResult[0];
+async function performTenantScopedSend(
+  businessId: string,
+  lastInboundAt: Date | null,
+  recipient: string,
+  message: string,
+): Promise<WhatsAppSendOutcome> {
+  const integration = await resolveWhatsAppIntegrationByBusinessId(businessId);
 
   if (!integration) {
-    return {
-      success: false,
-      error: "This business does not have an active WhatsApp integration.",
-    };
+    return { success: false, error: "not_connected" };
+  }
+
+  if (!isWithinCustomerServiceWindow(lastInboundAt)) {
+    return { success: false, error: "customer_service_window_expired" };
   }
 
   const credentials = getWhatsAppCredentialsForIntegration(integration);
 
   if (!credentials) {
-    return {
-      success: false,
-      error: "WhatsApp credentials are not configured for this business.",
-    };
+    return { success: false, error: "not_configured" };
   }
 
-  return sendWhatsAppText(credentials, phone, message);
+  return sendWhatsAppText(credentials, recipient, message);
+}
+
+/**
+ * Send a WhatsApp text to a specific phone number on behalf of a business,
+ * used by AI-tool-initiated outreach (e.g. Sales messaging a lead) where
+ * only a businessId + phone number are known, not a conversation record.
+ */
+export async function sendWhatsAppToPhone(params: {
+  businessId: string;
+  phone: string;
+  message: string;
+}): Promise<WhatsAppSendOutcome> {
+  const lastInboundAt = await getLastInboundMessageAtForPhone(
+    params.businessId,
+    params.phone,
+  );
+
+  return performTenantScopedSend(
+    params.businessId,
+    lastInboundAt,
+    params.phone,
+    params.message,
+  );
 }
 
 export const whatsappAdapter: ChannelAdapter = {
   async send(payload) {
-    return sendWhatsAppToPhone({
-      businessId: payload.businessId,
-      phone: payload.recipient,
-      message: payload.message,
-    });
+    const lastInboundAt = await getLastInboundMessageAt(payload.conversationId);
+
+    const result = await performTenantScopedSend(
+      payload.businessId,
+      lastInboundAt,
+      payload.recipient,
+      payload.message,
+    );
+
+    if (!result.success) {
+      console.error("WhatsApp channel adapter send failed:", result.error);
+    }
+
+    return {
+      success: result.success,
+      externalMessageId: result.externalMessageId,
+    };
   },
 };

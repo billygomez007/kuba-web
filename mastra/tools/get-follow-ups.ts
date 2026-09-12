@@ -4,7 +4,8 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { followUps, leads } from "@/db/schema";
-import { requireBusinessId } from "./business-context";
+import { requireBusinessId, requireEmployeeId } from "./business-context";
+import { checkAIEmployeeAuthority } from "@/lib/ai/authority";
 
 export const getFollowUpsTool = createTool({
   id: "get-follow-ups",
@@ -23,6 +24,9 @@ export const getFollowUpsTool = createTool({
 
   execute: async ({ status }, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    const employeeId = requireEmployeeId(requestContext);
+    const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: "read_follow_ups" });
+    if (!decision.ok) return { followUps: [], count: 0, error: decision.message };
     const conditions = status
       ? and(
           eq(followUps.businessId, businessId),

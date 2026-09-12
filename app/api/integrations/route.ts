@@ -70,8 +70,23 @@ export async function GET() {
     return NextResponse.json({ error: "Integrations require a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
   }
 
+  // This response is returned directly to the client, so only safe,
+  // non-secret columns may be selected here — never the encrypted
+  // credential column.
   const result = await db
-    .select()
+    .select({
+      id: integrations.id,
+      businessId: integrations.businessId,
+      provider: integrations.provider,
+      status: integrations.status,
+      externalAccountId: integrations.externalAccountId,
+      externalPhoneNumberId: integrations.externalPhoneNumberId,
+      displayName: integrations.displayName,
+      metadata: integrations.metadata,
+      lastWebhookAt: integrations.lastWebhookAt,
+      createdAt: integrations.createdAt,
+      updatedAt: integrations.updatedAt,
+    })
     .from(integrations)
     .where(
       eq(

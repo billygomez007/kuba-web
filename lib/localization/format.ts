@@ -89,14 +89,16 @@ export function getBusinessDayBounds(timeZone: string, referenceDate: Date = new
 }
 
 export function getBusinessWeekBounds(timeZone: string, referenceDate: Date = new Date()): { start: Date; end: Date } {
-  const { start: todayStart } = getBusinessDayBounds(timeZone, referenceDate);
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(todayStart);
+  const localDate = localDateParts(referenceDate, timeZone);
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(referenceDate);
   const weekdayIndex = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday);
   const daysSinceMonday = weekdayIndex === 0 ? 6 : weekdayIndex - 1;
-  const mondayReference = new Date(todayStart.getTime() - daysSinceMonday * 24 * 60 * 60 * 1000);
-  const { start } = getBusinessDayBounds(timeZone, mondayReference);
-  const { end } = getBusinessDayBounds(timeZone, new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000));
-  return { start, end };
+  const monday = new Date(Date.UTC(localDate.year, localDate.month - 1, localDate.day - daysSinceMonday));
+  const followingMonday = new Date(Date.UTC(localDate.year, localDate.month - 1, localDate.day - daysSinceMonday + 7));
+  return {
+    start: localMidnightUtc(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate(), timeZone),
+    end: localMidnightUtc(followingMonday.getUTCFullYear(), followingMonday.getUTCMonth() + 1, followingMonday.getUTCDate(), timeZone),
+  };
 }
 
 export function getBusinessMonthBounds(timeZone: string, referenceDate: Date = new Date()): { start: Date; end: Date } {

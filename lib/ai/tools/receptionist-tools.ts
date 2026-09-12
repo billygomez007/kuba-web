@@ -4,7 +4,9 @@ import { eq, and } from "drizzle-orm";
 
 import { db } from "@/db";
 import { customers } from "@/db/schema";
-import { requireBusinessId } from "@/mastra/tools/business-context";
+import { requireBusinessId, requireEmployeeId } from "@/mastra/tools/business-context";
+import { checkAIEmployeeAuthority, fileActionApproval } from "@/lib/ai/authority";
+import { createAuditLog } from "@/lib/auth/audit";
 
 
 export const findCustomerTool = createTool({
@@ -24,6 +26,9 @@ export const findCustomerTool = createTool({
     phone,
   }, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    const employeeId = requireEmployeeId(requestContext);
+    const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: "read_customers" });
+    if (!decision.ok) return { success: false, error: decision.message, customer: null };
 
     if (!email && !phone) {
       throw new Error(
@@ -73,6 +78,71 @@ export const findCustomerTool = createTool({
 });
 
 
+const createCustomerInput = z.object({
+
+  name:
+    z.string(),
+
+  email:
+    z.string().optional(),
+
+  phone:
+    z.string().optional(),
+
+  source:
+    z.string().optional(),
+
+});
+
+export async function performCreateCustomer(businessId: string, employeeId: string, { name, email, phone, source = "AI Receptionist" }: z.infer<typeof createCustomerInput>) {
+  const id =
+    crypto.randomUUID();
+
+  const now =
+    new Date();
+
+
+  await db
+    .insert(customers)
+    .values({
+
+      id,
+
+      businessId,
+
+      name,
+
+      email:
+        email || null,
+
+      phone:
+        phone || null,
+
+      source,
+
+      createdAt:
+        now,
+
+      updatedAt:
+        now,
+
+    });
+
+  await createAuditLog({ businessId, userId: null, action: "ai.create_customer", resource: "customer", resourceId: id, description: `AI employee created customer "${name}".`, metadata: { employeeId, source } });
+
+  return {
+
+    success: true,
+
+    customerId:
+      id,
+
+    message:
+      "Customer created successfully.",
+
+  };
+}
+
 export const createCustomerTool = createTool({
 
   id: "create-customer",
@@ -80,76 +150,21 @@ export const createCustomerTool = createTool({
   description:
     "Create a new customer record for the business.",
 
-  inputSchema: z.object({
-
-    name:
-      z.string(),
-
-    email:
-      z.string().optional(),
-
-    phone:
-      z.string().optional(),
-
-    source:
-      z.string().optional(),
-
-  }),
+  inputSchema: createCustomerInput,
 
 
-  execute: async ({
-    name,
-    email,
-    phone,
-    source = "AI Receptionist",
-  }, { requestContext }) => {
+  execute: async (input, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
-
-    const id =
-      crypto.randomUUID();
-
-    const now =
-      new Date();
-
-
-    await db
-      .insert(customers)
-      .values({
-
-        id,
-
-        businessId,
-
-        name,
-
-        email:
-          email || null,
-
-        phone:
-          phone || null,
-
-        source,
-
-        createdAt:
-          now,
-
-        updatedAt:
-          now,
-
-      });
-
-
-    return {
-
-      success: true,
-
-      customerId:
-        id,
-
-      message:
-        "Customer created successfully.",
-
-    };
+    const employeeId = requireEmployeeId(requestContext);
+    const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: "create_customer" });
+    if (!decision.ok) {
+      if (decision.reason === "requires_approval") {
+        const approvalId = await fileActionApproval({ businessId, employeeId, action: "create_customer", payload: input });
+        return { success: true, status: "approval_required", approvalId, message: `Approval requested. Approval ID: ${approvalId}` };
+      }
+      return { success: false, error: decision.message };
+    }
+    return performCreateCustomer(businessId, employeeId, input);
   },
 
 });

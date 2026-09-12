@@ -787,6 +787,9 @@ export const integrations = sqliteTable("integrations", {
 
   metadata: text("metadata"),
 
+  // Truthful connection-health signal for the Integrations UI — the last
+  // time this integration received a verified provider webhook. Never
+  // fabricated; null simply means no webhook has arrived yet.
   lastWebhookAt: integer("last_webhook_at", {
     mode: "timestamp_ms",
   }),
@@ -1024,6 +1027,9 @@ export const messages = sqliteTable("messages", {
 
   messageType: text("message_type").notNull().default("text"),
 
+  // Provider delivery lifecycle for outbound messages (e.g. WhatsApp
+  // "sent"/"delivered"/"read"/"failed" status callbacks). Null until a
+  // provider status webhook updates it; inbound messages never set this.
   status: text("status"),
 
   statusUpdatedAt: integer("status_updated_at", {
@@ -1073,6 +1079,41 @@ export const actionApprovals = sqliteTable("action_approvals", {
   channel: text("channel").notNull(),
   recipient: text("recipient").notNull(),
   message: text("message").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+// Structured, server-enforced authority for an AI employee: one row per
+// employee, holding its autonomy level plus a per-action allow/deny/
+// approval-required map. This is authoritative — unlike
+// aiEmployeeSettings.roleInstructions (prompt text), every Mastra tool
+// checks this via lib/ai/authority.ts before executing. See
+// AI_AUTHORITY_MATRIX.md for the full action list.
+export const aiEmployeeActionPolicies = sqliteTable("ai_employee_action_policies", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  employeeId: text("employee_id").notNull().unique(),
+  autonomyLevel: text("autonomy_level").notNull().default("operator"),
+  policy: text("policy").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+// Generic pending-approval queue for AI-employee mutations that the
+// employee's action policy marks "requires_approval" (e.g. a low-autonomy
+// employee's lead/appointment/ticket writes). Conceptually separate from
+// actionApprovals (which is specifically for outbound customer messages,
+// keyed by channel/recipient/message) so that table's single existing
+// executor (app/api/action-approvals/[id]/execute) is never touched —
+// this table has its own single executor,
+// app/api/ai-action-approvals/[id]/execute.
+export const aiEmployeeActionApprovals = sqliteTable("ai_employee_action_approvals", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  employeeId: text("employee_id").notNull(),
+  action: text("action").notNull(),
+  payload: text("payload").notNull(),
   status: text("status").notNull().default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),

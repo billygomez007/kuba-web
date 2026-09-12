@@ -44,10 +44,13 @@ export function requireBusinessId(
 }
 
 /**
- * The AI employee ID a tool call executes as must come from the server-pinned
- * RequestContext set after the employee has been authenticated, tenant-scoped,
- * type-checked, and confirmed active. Never accept employeeId from model
- * tool-call arguments as authorization.
+ * Same trust model as requireBusinessId: the AI employee ID a tool's
+ * actions are attributed to and checked against must come from the
+ * server-pinned RequestContext set after the employee has been
+ * authenticated, tenant-scoped, type-checked, and confirmed active —
+ * never accepted from the model's tool-call arguments as authorization.
+ * Every route that invokes an agent must resolve and tenant-verify the
+ * acting AI employee before constructing RequestContext.
  */
 export function requireEmployeeId(
   requestContext: TrustedRequestContext,

@@ -1,8 +1,51 @@
 @import "tailwindcss";
 
+/*
+ * SuperKuba design tokens.
+ *
+ * The product is a dark-surface application end to end (marketing and
+ * dashboard both). Before this file, individual pages hardcoded 7+
+ * different "near black" hex values for what was visually the same
+ * background role, plus arbitrary opacity/radius/shadow one-offs. These
+ * tokens are the single source of truth for those roles going forward —
+ * new/migrated components should reference them (bg-surface-page,
+ * border-subtle, text-tertiary, rounded-card, shadow-elevated, etc.)
+ * instead of introducing another arbitrary value.
+ *
+ * Kept intentionally small: enough roles to remove real drift, not a
+ * token for every possible shade.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050507;
+  --foreground: #ffffff;
+
+  /* Surfaces (consolidates #050507/#060609/#07070A/#0D0D12/#08080C/#0b0b0f/#111116) */
+  --color-surface-page: #050507;
+  --color-surface-raised: #0b0b0f;
+  --color-surface-card: rgb(255 255 255 / 0.025);
+  --color-surface-card-hover: rgb(255 255 255 / 0.05);
+  --color-surface-subtle: rgb(255 255 255 / 0.04);
+
+  /* Borders */
+  --color-border-default: rgb(255 255 255 / 0.10);
+  --color-border-muted: rgb(255 255 255 / 0.06);
+  --color-border-strong: rgb(255 255 255 / 0.18);
+
+  /* Text — tertiary/muted floors are deliberately higher than the
+     text-white/20–/30 combinations the audit flagged as sub-AA at small
+     sizes; use `muted` for anything smaller than body text. */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: rgb(255 255 255 / 0.65);
+  --color-text-tertiary: rgb(255 255 255 / 0.45);
+  --color-text-muted: rgb(255 255 255 / 0.35);
+
+  /* Brand + semantic status */
+  --color-accent: #22d3ee;
+  --color-accent-secondary: #a78bfa;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #67e8f9;
 }
 
 @theme inline {
@@ -10,18 +53,65 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-kuba-sans);
   --font-mono: var(--font-kuba-mono);
+
+  --color-surface-page: var(--color-surface-page);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-card: var(--color-surface-card);
+  --color-surface-card-hover: var(--color-surface-card-hover);
+  --color-surface-subtle: var(--color-surface-subtle);
+  --color-border-default: var(--color-border-default);
+  --color-border-muted: var(--color-border-muted);
+  --color-border-strong: var(--color-border-strong);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+  --color-text-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-secondary: var(--color-accent-secondary);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
+
+  /* Typography scale — named roles instead of one-off text-[Npx] values.
+     Compact operational text has a floor at "micro" (11px); nothing
+     smaller is used, since 8–10px arbitrary sizes were the least
+     readable/lowest-contrast text in the app. */
+  --text-display: 3rem;
+  --text-display--line-height: 1.05;
+  --text-display--font-weight: 900;
+  --text-h1: 2.25rem;
+  --text-h1--line-height: 1.1;
+  --text-h1--font-weight: 900;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 1.2;
+  --text-h2--font-weight: 800;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.3;
+  --text-h3--font-weight: 700;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.3;
+  --text-label--font-weight: 700;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.4;
+
+  /* Radius roles */
+  --radius-control: 0.75rem;
+  --radius-card: 1.25rem;
+  --radius-panel: 1.5rem;
+  --radius-pill: 9999px;
+
+  /* Elevation — a small 3-step system, not per-page bespoke shadows */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-raised: 0 20px 60px -20px rgb(0 0 0 / 0.6);
+  --shadow-dialog: 0 30px 90px -20px rgb(0 0 0 / 0.75);
 }
 
 :root {
   --font-kuba-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-kuba-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {

@@ -372,10 +372,30 @@ test("direct API activation cannot bypass Coming Soon: canActivateEmployee denie
 // ---------------------------------------------------------------------------
 
 test("appointment and ticket tools remain independently gated on customer_ops.ai_assist regardless of basic-conversation entitlement — unrelated to the future Appointment AI employee type", async () => {
+  // The direct hasCapability(entitlements, "customer_ops.ai_assist") call
+  // this test used to check for was centralized into the structured AI
+  // authority system (lib/ai/authority.ts's checkAIEmployeeAuthority +
+  // ACTION_ENTITLEMENT map) — every appointment/ticket action still
+  // requires customer_ops.ai_assist, just enforced in one place instead of
+  // duplicated per tool file.
   const appointmentSource = await readFile("mastra/tools/appointment-tools.ts", "utf8");
   const ticketSource = await readFile("mastra/tools/ticket-tools.ts", "utf8");
-  assert.match(appointmentSource, /hasCapability\(entitlements, "customer_ops\.ai_assist"\)/);
-  assert.match(ticketSource, /hasCapability\(entitlements, "customer_ops\.ai_assist"\)/);
+  const authoritySource = await readFile("lib/ai/authority.ts", "utf8");
+
+  assert.match(appointmentSource, /checkAIEmployeeAuthority\(\{[^}]*action: "read_appointments"/);
+  assert.match(appointmentSource, /checkAIEmployeeAuthority\(\{[^}]*action: "create_appointment"/);
+  assert.match(appointmentSource, /checkAIEmployeeAuthority\(\{[^}]*action: "update_appointment"/);
+  assert.match(ticketSource, /checkAIEmployeeAuthority\(\{[^}]*action: "read_tickets"/);
+  assert.match(ticketSource, /checkAIEmployeeAuthority\(\{[^}]*action: "create_ticket"/);
+  assert.match(ticketSource, /checkAIEmployeeAuthority\(\{[^}]*action: "escalate_ticket"/);
+
+  for (const action of ["read_appointments", "create_appointment", "update_appointment", "read_tickets", "create_ticket", "escalate_ticket"]) {
+    assert.match(
+      authoritySource,
+      new RegExp(`${action}:\\s*"customer_ops\\.ai_assist"`),
+      `${action} must still require customer_ops.ai_assist in the central ACTION_ENTITLEMENT map`,
+    );
+  }
 });
 
 test("Outreach's approval, autonomy, and persistence-truth safety mechanisms are untouched by the fail-closed rewrite", async () => {

@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useEscapeToClose } from "../../components/useEscapeToClose";
+import Dialog from "../../components/ui/Dialog";
+import FormField from "../../components/ui/FormField";
+import Button from "../../components/ui/Button";
 
 type Lead = {
   id: string;
@@ -431,8 +433,6 @@ function CreateFollowUpModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEscapeToClose(onClose);
-
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -494,151 +494,76 @@ function CreateFollowUpModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-follow-up-modal-title"
-    >
-      <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl sm:p-8">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300/70">
-              Sales workflow
-            </p>
-
-            <h2 id="create-follow-up-modal-title" className="mt-2 text-2xl font-black">
-              Create follow-up
-            </h2>
-
-            <p className="mt-2 text-sm text-white/35">
-              Tell Kuba what needs to happen next.
-            </p>
+    <Dialog title="Create follow-up" description="Tell Kuba what needs to happen next." onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {leads.length === 0 ? (
+          <div className="rounded-control border border-warning/20 bg-warning/[0.06] px-4 py-3 text-xs leading-5 text-warning/90">
+            There are no leads yet. Go to Sales and create a lead first.
           </div>
+        ) : (
+          <FormField label="Lead" required>
+            <select
+              value={leadId}
+              onChange={(event) => setLeadId(event.target.value)}
+              className={INPUT_CLASSES}
+            >
+              <option value="">Select a lead</option>
+              {leads.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.name || lead.email || lead.phone || "Unnamed lead"}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        )}
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/40 hover:text-white"
-          >
-            ×
-          </button>
+        <FormField label="Follow-up title" required>
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Call John about his proposal"
+            className={INPUT_CLASSES}
+          />
+        </FormField>
+
+        <FormField label="Due date and time" required>
+          <input
+            type="datetime-local"
+            value={dueAt}
+            onChange={(event) => setDueAt(event.target.value)}
+            className={INPUT_CLASSES}
+          />
+        </FormField>
+
+        <FormField label="Description">
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            rows={3}
+            placeholder="What should happen during this follow-up?"
+            className={`${INPUT_CLASSES} resize-none`}
+          />
+        </FormField>
+
+        {error && (
+          <div role="alert" className="rounded-control border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-3 border-t border-border-muted pt-5">
+          <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+
+          <Button type="submit" variant="primary" disabled={loading || leads.length === 0} className="flex-1">
+            {loading ? "Creating..." : "Create follow-up"}
+          </Button>
         </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-7 space-y-5"
-        >
-          <div>
-            <label htmlFor="follow-up-lead" className="mb-2 block text-sm font-semibold text-white/70">
-              Lead
-            </label>
-
-            {leads.length === 0 ? (
-              <div className="rounded-xl border border-amber-400/10 bg-amber-400/[0.04] px-4 py-3 text-xs leading-5 text-amber-300/70">
-                There are no leads yet. Go to Sales and create a lead first.
-              </div>
-            ) : (
-              <select
-                id="follow-up-lead"
-                required
-                value={leadId}
-                onChange={(event) =>
-                  setLeadId(event.target.value)
-                }
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-cyan-400/40"
-              >
-                <option value="">Select a lead</option>
-
-                {leads.map((lead) => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.name ||
-                      lead.email ||
-                      lead.phone ||
-                      "Unnamed lead"}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="follow-up-title" className="mb-2 block text-sm font-semibold text-white/70">
-              Follow-up title
-            </label>
-
-            <input
-              id="follow-up-title"
-              required
-              value={title}
-              onChange={(event) =>
-                setTitle(event.target.value)
-              }
-              placeholder="Call John about his proposal"
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-cyan-400/40"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="follow-up-due-at" className="mb-2 block text-sm font-semibold text-white/70">
-              Due date and time
-            </label>
-
-            <input
-              id="follow-up-due-at"
-              required
-              type="datetime-local"
-              value={dueAt}
-              onChange={(event) =>
-                setDueAt(event.target.value)
-              }
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-cyan-400/40"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="follow-up-description" className="mb-2 block text-sm font-semibold text-white/70">
-              Description
-            </label>
-
-            <textarea
-              id="follow-up-description"
-              value={description}
-              onChange={(event) =>
-                setDescription(event.target.value)
-              }
-              rows={3}
-              placeholder="What should happen during this follow-up?"
-              className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-cyan-400/40"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-xl border border-red-400/10 bg-red-400/[0.06] px-4 py-3 text-sm text-red-300">
-              {error}
-            </div>
-          )}
-
-          <div className="flex gap-3 border-t border-white/[0.07] pt-5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/50 hover:text-white"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={loading || leads.length === 0}
-              className="flex-1 rounded-xl bg-white px-4 py-3 text-sm font-bold text-black disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Creating..." : "Create follow-up"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Dialog>
   );
 }
+
+const INPUT_CLASSES =
+  "w-full rounded-control border border-border-default bg-surface-subtle px-4 py-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/40";

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import SuperKubaDashboardShowcase from "../components/SuperKubaDashboardShowcase";
+import ProductShowcase from "../components/ui/ProductShowcase";
+import MarketingHeader from "../components/MarketingHeader";
+import BackNavigation from "../components/BackNavigation";
 import {
   ArrowRight,
   Headphones,
@@ -58,9 +60,12 @@ export default function AIEmployeesPage() {
   return (
 
     <main className="min-h-screen bg-[#060609] text-white">
+      <MarketingHeader />
+      <div className="mx-auto max-w-7xl px-6 pt-28 lg:px-8">
+        <BackNavigation label="Back to SuperKuba" />
+      </div>
 
-
-      <section className="px-6 pb-20 pt-32 lg:px-8">
+      <section className="px-6 pb-20 pt-12 lg:px-8">
 
         <div className="mx-auto max-w-7xl text-center">
 
@@ -103,7 +108,16 @@ export default function AIEmployeesPage() {
 
       </section>
 
-      <SuperKubaDashboardShowcase className="border-b-0" />
+      <ProductShowcase
+        id="superkuba-dashboard"
+        tone="violet"
+        eyebrow="Product experience"
+        title="See SuperKuba AI in Action"
+        description="Experience your AI workforce platform designed to help businesses manage customers, automate operations, and grow from one intelligent command center."
+        imageSrc="/images/superkuba-dashboard-mockup.png"
+        imageAlt="SuperKuba AI business command center dashboard"
+        className="border-b-0"
+      />
 
 
       <section className="px-6 pb-28 lg:px-8">

@@ -145,6 +145,13 @@ test("business day bounds are exactly 24h in a non-DST zone and correctly 23h/25
   const nyFallBack = format.getBusinessDayBounds("America/New_York", new Date("2026-11-01T15:00:00Z"));
   assert.equal((nyFallBack.end.getTime() - nyFallBack.start.getTime()) / 3600000, 25);
 });
+test("business week bounds stay Monday-to-Monday across DST transitions", () => {
+  for (const reference of [new Date("2026-03-08T15:00:00Z"), new Date("2026-11-01T15:00:00Z")]) {
+    const bounds = format.getBusinessWeekBounds("America/New_York", reference);
+    assert.equal(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(bounds.start), "Mon");
+    assert.equal(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(bounds.end), "Mon");
+  }
+});
 
 // --- 22-24: business switch / stale context ---
 test("22. switching business changes the resolved localization context", async () => {

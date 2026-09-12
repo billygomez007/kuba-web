@@ -932,6 +932,29 @@ export async function POST(request: Request) {
     }
 
     /**
+     * A human (or a team, pending human pickup) currently owns this
+     * conversation — do not generate or send an AI reply. The customer's
+     * message is already stored above for the human/team to see in the
+     * Unified Inbox. The widget (public/kuba/chat.js) only ever displays
+     * this synchronous response — it has no polling/websocket for a later
+     * human reply — so return a truthful "handled by a person" message
+     * rather than either a fabricated AI answer or the widget's generic
+     * "I couldn't respond" failure fallback.
+     */
+    if (routingDecision.assignmentType !== "ai") {
+      return NextResponse.json({
+        success: true,
+        response: "Thanks for your message — a member of our team will follow up with you shortly.",
+        conversationId,
+        aiReplySkipped: true,
+        routing: {
+          department: routingDecision.department,
+          assignmentType: routingDecision.assignmentType,
+        },
+      });
+    }
+
+    /**
      * Select the routed AI employee.
      *
      * Receptionist remains the fallback if the
@@ -1120,7 +1143,7 @@ Answer naturally, helpfully and professionally.
       await selectedAgent.generate(
         businessContext,
         {
-          requestContext: new RequestContext([["businessId", business.id]]),
+          requestContext: new RequestContext([["businessId", business.id], ["employeeId", selectedEmployeeId]]),
         },
       );
 

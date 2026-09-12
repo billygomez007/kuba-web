@@ -8,7 +8,8 @@ import {
   leads,
   followUps,
 } from "@/db/schema";
-import { requireBusinessId } from "./business-context";
+import { requireBusinessId, requireEmployeeId } from "./business-context";
+import { checkAIEmployeeAuthority } from "@/lib/ai/authority";
 
 export const salesWorkPlanTool = createTool({
   id: "sales-work-plan",
@@ -20,6 +21,9 @@ export const salesWorkPlanTool = createTool({
 
   execute: async (_input, { requestContext }) => {
     const businessId = requireBusinessId(requestContext);
+    const employeeId = requireEmployeeId(requestContext);
+    const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: "read_follow_ups" });
+    if (!decision.ok) return { success: false, message: decision.message, leads: [], followUps: [] };
     const employee = await db
       .select({
         id: aiEmployees.id,

@@ -1,5 +1,48 @@
-import { redirect } from "next/navigation";
+"use client";
 
-export default function AIPerformanceRedirect() {
-  redirect("/dashboard/intelligence/ai-workforce");
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+type Employee = { id: string; name: string; type: string; status: string; conversations: number; responseTimeMinutes: number | null; resolutionRate: number | null; leads: number; escalationRate: number; performanceScore: number | null; health: string };
+type Item = { label: string; count: number };
+type PerformanceData = { overview: { totalEmployees: number; activeEmployees: number; conversationsToday: number; tasksCompleted: number; leadsGenerated: number; escalations: number }; employees: Employee[]; health: { healthy: number; needsAttention: number; requiresImprovement: number }; improvements: { knowledgeGaps: Item[]; objections: Item[]; escalations: Item[]; automationOpportunities: string[] }; activity: Array<{ id: string; title: string; description: string | null; employeeName: string; createdAt: string }> };
+
+const departments: Record<string, string> = { receptionist: "Customer Operations", "customer-support": "Customer Operations", sales: "Revenue Operations", marketing: "Growth Operations", accountant: "Finance Operations", operations: "Business Operations", appointment: "Customer Operations", "general-manager": "Executive Operations" };
+
+export default function AIWorkforcePerformancePage() {
+  const [data, setData] = useState<PerformanceData | null>(null);
+  const [department, setDepartment] = useState("All");
+  const [sort, setSort] = useState("performance");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const response = await fetch("/api/workforce-command-center", { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Unable to load AI Workforce Performance.");
+        if (!cancelled) setData(result);
+      } catch (loadError) {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Unable to load AI Workforce Performance.");
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const employees = useMemo(() => {
+    const filtered = (data?.employees || []).filter((employee) => department === "All" || departments[employee.type] === department);
+    return [...filtered].sort((first, second) => sort === "conversations" ? second.conversations - first.conversations : (second.performanceScore || -1) - (first.performanceScore || -1));
+  }, [data, department, sort]);
+
+  if (error) return <State message={error} error />;
+  if (!data) return <State message="Loading AI Workforce Performance..." />;
+
+  return <main className="min-h-screen bg-[#050507] px-4 py-8 text-white sm:px-6 lg:px-8 lg:py-12"><div className="mx-auto max-w-[1600px]"><header><p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300/70">AI Workforce</p><h1 className="mt-3 text-4xl font-black tracking-[-0.04em]">AI Workforce Performance</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-white/40">A single operating view of workforce health, employee performance, and the improvements that matter most.</p></header><section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{[["AI employees", data.overview.totalEmployees], ["Active employees", data.overview.activeEmployees], ["Conversations today", data.overview.conversationsToday], ["Tasks completed", data.overview.tasksCompleted], ["Leads generated", data.overview.leadsGenerated], ["Escalations", data.overview.escalations]].map(([label, value]) => <Metric key={label} label={label as string} value={value as number} />)}</section><section className="mt-6 grid gap-3 sm:grid-cols-3"><Health label="Healthy" value={data.health.healthy} tone="emerald" /><Health label="Needs attention" value={data.health.needsAttention} tone="amber" /><Health label="Requires improvement" value={data.health.requiresImprovement} tone="red" /></section><section className="mt-8 rounded-3xl border border-white/10 bg-white/[0.025] p-6 sm:p-8"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300/70">Employee performance</p><h2 className="mt-2 text-2xl font-black">Every AI employee</h2></div><div className="flex gap-3"><select value={department} onChange={(event) => setDepartment(event.target.value)} className="rounded-xl border border-white/10 bg-[#111116] px-3 py-2.5 text-xs text-white/65"><option>All</option>{[...new Set(Object.values(departments))].map((item) => <option key={item}>{item}</option>)}</select><select value={sort} onChange={(event) => setSort(event.target.value)} className="rounded-xl border border-white/10 bg-[#111116] px-3 py-2.5 text-xs text-white/65"><option value="performance">Performance</option><option value="conversations">Conversations</option></select></div></div><div className="mt-6 overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead><tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-white/30"><th className="px-3 py-3">Employee</th><th className="px-3 py-3">Department</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Conversations</th><th className="px-3 py-3">Response</th><th className="px-3 py-3">Resolution</th><th className="px-3 py-3">Leads</th><th className="px-3 py-3">Escalation</th><th className="px-3 py-3">Score</th><th className="px-3 py-3">Health</th></tr></thead><tbody>{employees.length ? employees.map((employee) => <tr key={employee.id} className="border-b border-white/[0.06] text-white/65"><td className="px-3 py-4"><Link href={`/dashboard/ai-employees/${employee.id}`} className="font-bold text-white/85 hover:text-cyan-300">{employee.name}</Link><span className="block text-xs capitalize text-white/30">{employee.type.replaceAll("-", " ")}</span></td><td className="px-3 py-4 text-xs text-white/40">{departments[employee.type] || "AI Workforce"}</td><td className="px-3 py-4 text-xs text-emerald-300">{employee.status}</td><td className="px-3 py-4">{employee.conversations}</td><td className="px-3 py-4">{employee.responseTimeMinutes == null ? "Not tracked" : `${employee.responseTimeMinutes} min`}</td><td className="px-3 py-4">{employee.resolutionRate == null ? "Not tracked" : `${employee.resolutionRate}%`}</td><td className="px-3 py-4">{employee.leads}</td><td className="px-3 py-4">{employee.escalationRate}%</td><td className="px-3 py-4 font-black text-cyan-300">{employee.performanceScore == null ? "Not tracked" : employee.performanceScore}</td><td className="px-3 py-4"><span className={employee.health === "Healthy" ? "text-emerald-300" : employee.health === "Needs attention" ? "text-amber-300" : "text-red-300"}>{employee.health}</span></td></tr>) : <tr><td colSpan={10} className="px-3 py-8 text-center text-white/35">No employees match this department.</td></tr>}</tbody></table></div></section><section className="mt-8 grid gap-6 lg:grid-cols-2"><Improvement title="AI Improvement Center" items={[...data.improvements.knowledgeGaps.map((item) => `Knowledge gap: ${item.label}`), ...data.improvements.objections.map((item) => `Customer objection: ${item.label}`), ...data.improvements.escalations.map((item) => `Frequent escalation: ${item.label}`), ...data.improvements.automationOpportunities]} /><section className="rounded-3xl border border-white/10 bg-white/[0.025] p-6 sm:p-8"><p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300/70">Workforce activity</p><h2 className="mt-2 text-2xl font-black">Recent AI actions</h2><div className="mt-6 space-y-3">{data.activity.length ? data.activity.map((item) => <div key={item.id} className="rounded-2xl border border-white/[0.07] bg-black/20 p-4"><p className="text-sm font-bold text-white/75">{item.employeeName} · {item.title}</p>{item.description && <p className="mt-1 text-xs text-white/40">{item.description}</p>}<p className="mt-2 text-[10px] text-white/25">{new Date(item.createdAt).toLocaleString()}</p></div>) : <p className="text-sm text-white/35">No recent activity recorded.</p>}</div></section></section></div></main>;
 }
+
+function Metric({ label, value }: { label: string; value: number }) { return <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><p className="text-xs text-white/35">{label}</p><p className="mt-2 text-2xl font-black">{value}</p></div>; }
+function Health({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "red" }) { const styles = { emerald: "border-emerald-400/20 bg-emerald-400/[0.05] text-emerald-300", amber: "border-amber-400/20 bg-amber-400/[0.05] text-amber-300", red: "border-red-400/20 bg-red-400/[0.05] text-red-300" }; return <div className={`rounded-2xl border p-5 ${styles[tone]}`}><p className="text-xs font-bold uppercase tracking-wider">{label}</p><p className="mt-2 text-3xl font-black">{value}</p><p className="mt-1 text-xs opacity-60">AI employees</p></div>; }
+function Improvement({ title, items }: { title: string; items: string[] }) { return <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-6 sm:p-8"><p className="text-xs font-bold uppercase tracking-[0.22em] text-violet-300/70">{title}</p><h2 className="mt-2 text-2xl font-black">What needs improvement</h2><div className="mt-6 space-y-3">{items.length ? items.slice(0, 8).map((item) => <div key={item} className="rounded-2xl border border-violet-300/10 bg-violet-300/[0.04] p-4 text-sm text-white/60">{item}</div>) : <p className="text-sm text-white/35">No improvement signals detected yet.</p>}</div></section>; }
+function State({ message, error = false }: { message: string; error?: boolean }) { return <main className="flex min-h-screen items-center justify-center bg-[#050507] px-6 text-center text-sm"><p className={error ? "text-red-200" : "text-white/40"}>{message}</p></main>; }

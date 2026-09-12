@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://superkuba.com"),
   title: "SuperKuba",
-  description: "SuperKuba AI workforce platform",
+  description: "SuperKuba — an AI workforce platform for customer conversations, sales, appointments, tickets, and operations.",
   alternates: {
     canonical: "/",
   },

@@ -1,7 +1,12 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useEscapeToClose } from "../../components/useEscapeToClose";
+import Dialog from "../../components/ui/Dialog";
+import FormField from "../../components/ui/FormField";
+import Button from "../../components/ui/Button";
+import MetricCard from "../../components/ui/MetricCard";
+import LoadingState from "../../components/ui/LoadingState";
+import EmptyState from "../../components/EmptyState";
 
 type Customer = {
   id: string;
@@ -103,25 +108,21 @@ export default function CustomersPage() {
 
         {/* Stats */}
         <section className="mt-10 grid gap-4 sm:grid-cols-3">
-          <StatCard
+          <MetricCard
             label="Total customers"
-            value={String(customers.length)}
+            value={customers.length}
             description="People and businesses in your CRM"
           />
 
-          <StatCard
+          <MetricCard
             label="With email"
-            value={String(
-              customers.filter((customer) => customer.email).length,
-            )}
+            value={customers.filter((customer) => customer.email).length}
             description="Customers with an email address"
           />
 
-          <StatCard
+          <MetricCard
             label="With phone"
-            value={String(
-              customers.filter((customer) => customer.phone).length,
-            )}
+            value={customers.filter((customer) => customer.phone).length}
             description="Customers with a phone number"
           />
         </section>
@@ -152,15 +153,19 @@ export default function CustomersPage() {
 
           <div className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.025]">
             {loading ? (
-              <div className="p-12 text-center">
-                <p className="text-sm text-white/30">
-                  Loading customers...
-                </p>
-              </div>
+              <LoadingState message="Loading customers..." />
             ) : filteredCustomers.length === 0 ? (
-              <EmptyCustomers
-                hasSearch={Boolean(search.trim())}
-                onAdd={() => setShowForm(true)}
+              <EmptyState
+                icon="◎"
+                title={search.trim() ? "No customers found." : "Your customer database is empty."}
+                description={
+                  search.trim()
+                    ? "Try a different name, email address, or phone number."
+                    : "Add your first customer and start building SuperKuba's shared customer intelligence."
+                }
+                actionLabel={search.trim() ? undefined : "+ Add first customer"}
+                onAction={search.trim() ? undefined : () => setShowForm(true)}
+                compact
               />
             ) : (
               <div className="overflow-x-auto">
@@ -235,26 +240,6 @@ export default function CustomersPage() {
         />
       )}
     </main>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  description,
-}: {
-  label: string;
-  value: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
-      <p className="text-sm text-white/40">{label}</p>
-
-      <p className="mt-4 text-3xl font-black">{value}</p>
-
-      <p className="mt-1 text-xs text-white/25">{description}</p>
-    </div>
   );
 }
 
@@ -342,43 +327,6 @@ function CustomerRow({
   );
 }
 
-function EmptyCustomers({
-  hasSearch,
-  onAdd,
-}: {
-  hasSearch: boolean;
-  onAdd: () => void;
-}) {
-  return (
-    <div className="p-12 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-xl">
-        ◎
-      </div>
-
-      <h3 className="mt-5 text-lg font-bold">
-        {hasSearch
-          ? "No customers found."
-          : "Your customer database is empty."}
-      </h3>
-
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/35">
-        {hasSearch
-          ? "Try a different name, email address, or phone number."
-          : "Add your first customer and start building Kuba's shared customer intelligence."}
-      </p>
-
-      {!hasSearch && (
-        <button
-          type="button"
-          onClick={onAdd}
-          className="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-white/90"
-        >
-          + Add first customer
-        </button>
-      )}
-    </div>
-  );
-}
 
 function AddCustomerModal({
   onClose,
@@ -393,8 +341,6 @@ function AddCustomerModal({
   const [source, setSource] = useState("manual");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEscapeToClose(onClose);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -435,140 +381,70 @@ function AddCustomerModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="add-customer-modal-title"
-    >
-      <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0b0f] p-6 shadow-2xl sm:p-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300/70">
-              Customer
-            </p>
-
-            <h2 id="add-customer-modal-title" className="mt-2 text-2xl font-black">
-              Add customer
-            </h2>
-
-            <p className="mt-2 text-sm text-white/35">
-              Add a customer to your Kuba business database.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/40 transition hover:text-white"
-          >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-7 space-y-5">
-          <Field
-            label="Name"
+    <Dialog title="Add customer" description="Add a customer to your SuperKuba business database." onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <FormField label="Name">
+          <input
             value={name}
-            onChange={setName}
+            onChange={(event) => setName(event.target.value)}
             placeholder="Customer name"
             autoFocus
+            className={INPUT_CLASSES}
           />
+        </FormField>
 
-          <Field
-            label="Email"
+        <FormField label="Email">
+          <input
             type="email"
             value={email}
-            onChange={setEmail}
+            onChange={(event) => setEmail(event.target.value)}
             placeholder="customer@example.com"
+            className={INPUT_CLASSES}
           />
+        </FormField>
 
-          <Field
-            label="Phone"
+        <FormField label="Phone">
+          <input
             value={phone}
-            onChange={setPhone}
+            onChange={(event) => setPhone(event.target.value)}
             placeholder="+233..."
+            className={INPUT_CLASSES}
           />
+        </FormField>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-white/70">
-              Source
-            </label>
+        <FormField label="Source">
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+            className={INPUT_CLASSES}
+          >
+            <option value="manual">Manual</option>
+            <option value="website">Website</option>
+            <option value="referral">Referral</option>
+            <option value="sales">Sales</option>
+            <option value="other">Other</option>
+          </select>
+        </FormField>
 
-            <select
-              value={source}
-              onChange={(event) => setSource(event.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-cyan-400/40"
-            >
-              <option value="manual">Manual</option>
-              <option value="website">Website</option>
-              <option value="referral">Referral</option>
-              <option value="sales">Sales</option>
-              <option value="other">Other</option>
-            </select>
+        {error && (
+          <div role="alert" className="rounded-control border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div className="rounded-xl border border-red-400/10 bg-red-400/[0.06] px-4 py-3 text-sm text-red-300">
-              {error}
-            </div>
-          )}
+        <div className="flex gap-3 border-t border-border-muted pt-5">
+          <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
 
-          <div className="flex gap-3 border-t border-white/[0.07] pt-5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/50 transition hover:bg-white/[0.07] hover:text-white"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 rounded-xl bg-white px-4 py-3 text-sm font-bold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Adding..." : "Add customer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <Button type="submit" variant="primary" disabled={loading} className="flex-1">
+            {loading ? "Adding..." : "Add customer"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  autoFocus,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  type?: string;
-  autoFocus?: boolean;
-}) {
-  const inputId = `add-customer-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  return (
-    <div>
-      <label htmlFor={inputId} className="mb-2 block text-sm font-semibold text-white/70">
-        {label}
-      </label>
-
-      <input
-        id={inputId}
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        autoFocus={autoFocus}
-        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-400/10"
-      />
-    </div>
-  );
-}
+const INPUT_CLASSES =
+  "w-full rounded-control border border-border-default bg-surface-subtle px-4 py-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/40 focus:ring-2 focus:ring-accent/10";

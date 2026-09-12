@@ -116,18 +116,19 @@ export async function POST(request: Request) {
    * number. Two different Kuba businesses connecting the same
    * phone_number_id would make inbound webhook tenant resolution
    * ambiguous — the webhook must be able to trust that a phone_number_id
-   * belongs to exactly one business.
+   * belongs to exactly one business. Only an "active" claim blocks a new
+   * connection, consistent with lib/channels/whatsapp.ts, so a business
+   * that has disconnected can release a number for reuse.
    */
   const claimedByAnotherBusiness =
     await db
-      .select({
-        id: integrations.id,
-      })
+      .select({ id: integrations.id })
       .from(integrations)
       .where(
         and(
           eq(integrations.provider, "whatsapp"),
           eq(integrations.externalPhoneNumberId, phoneNumberId),
+          eq(integrations.status, "active"),
           ne(integrations.businessId, membership.businessId),
         ),
       )
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "This WhatsApp number is already connected to another Kuba business.",
+          "This WhatsApp phone number is already connected to another Kuba business.",
       },
       { status: 409 },
     );

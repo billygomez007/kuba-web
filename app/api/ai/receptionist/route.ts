@@ -1204,7 +1204,7 @@ ${prompt}
       await kubaReceptionistAgent.generate(
         receptionistPrompt,
         {
-          requestContext: new RequestContext([["businessId", business.id]]),
+          requestContext: new RequestContext([["businessId", business.id], ["employeeId", receptionist?.employee.id ?? ""]]),
         },
       );
 

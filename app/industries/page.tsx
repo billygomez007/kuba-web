@@ -47,7 +47,7 @@ const industries = [
   },
   {
     title: "Hospitality",
-    id: "small-businesses",
+    id: "hospitality",
     icon: Hotel,
     description:
       "Assist guests, manage reservations, and improve customer experiences.",
@@ -150,7 +150,7 @@ export default function IndustriesPage() {
               <div
                 key={industry.title}
                 id={industry.id}
-                className="rounded-3xl border border-white/10 bg-white/[0.04] p-8"
+                className="scroll-mt-28 rounded-3xl border border-white/10 bg-white/[0.04] p-8"
               >
 
                 <Icon className="h-8 w-8 text-violet-300" />
