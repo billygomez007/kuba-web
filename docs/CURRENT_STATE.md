@@ -109,22 +109,22 @@ See `OUTREACH_RESEARCH_PIPELINE_REPORT.md` for the detailed build report.
 Tenant scoping and prospect→lead promotion idempotency are solid (real
 atomic claim-then-create transaction, tested for concurrent duplicates).
 
-**Update: the Campaign Engine backend now exists** (commits `efe8b75`
-through `ac163a6`). Domain model (`outreach_campaigns`,
-`outreach_sequence_steps`, `outreach_campaign_recipients`,
-`outreach_campaign_sends`, `outreach_suppressions`), centralized campaign/
+**Update: the Campaign Engine backend is now complete end-to-end**
+(commits `efe8b75` through `8f7bcd6`). Domain model, centralized campaign/
 recipient state machines, a durable DB-backed send worker (atomic
 claim/lease, capped retry/backoff), double suppression/consent gates,
 email delivery via the existing Resend integration with a deterministic
-provider idempotency key, a signed unsubscribe endpoint, and a
-Vercel-Cron-driven processing loop are all built, tested, and wired
-together end-to-end for the email channel. **Not yet built**: campaign
-CRUD/enrollment API routes, the AI-facing enrollment/personalization tool,
-inbound reply correlation (see the new production blocker below — Resend
-supports inbound email receiving, but wiring it needs a DNS/domain
-decision this pass could not make), reuse of the existing Outreach → Sales
-handoff tool for campaign-originated replies, and the dashboard (the
-backend was deliberately built first, per explicit instruction).
+provider idempotency key, a signed unsubscribe endpoint, a
+Vercel-Cron-driven processing loop, a full CRUD/enrollment/lifecycle
+service layer with centralized editability rules, thin authenticated API
+routes (`/api/outreach/campaigns/**`), deterministic AI tools for the
+Outreach employee to prepare (not execute) campaigns, and a shared Sales
+handoff core that both autonomous-research qualification and
+campaign-reply engagement converge into. **Not yet built**: the dashboard
+UI (deliberately last, backend-first) and live inbound reply correlation
+(the deterministic destination — `lib/outreach/campaign-reply-handoff.ts`
+— exists and is tested, but nothing calls it yet; see the production
+blocker below).
 
 ### Outreach → Sales handoff — gated promotion, not live handoff
 
@@ -253,10 +253,11 @@ AUTOMATION_PROCESS_SECRET, CRON_SECRET, ENCRYPTION_KEY,
 NEXT_PUBLIC_APP_ENV, NODE_ENV
 ```
 
-## Baseline quality gate (`feature/outreach-ai-employee`, post staging
-reconciliation, commit `b1a31ff`)
+## Baseline quality gate (`feature/outreach-ai-employee`, Campaign Engine
+backend complete, commit `8f7bcd6`)
 
-- `npm test`: **955/955 passing** (up from 834 pre-reconciliation)
+- `npm test`: **1038/1038 passing** (up from 834 pre-reconciliation, 955
+  post-reconciliation)
 - `npm run lint`: **0 errors**, 60 pre-existing warnings (unused vars,
   `<img>` vs `next/image`) — none introduced by this work
 - `npx tsc --noEmit`: **clean**
@@ -291,23 +292,21 @@ reconciliation, commit `b1a31ff`)
 7. Unify the four tenant-resolution helpers, at least fixing the
    `getBusinessMembership()` cookie gap (#2 in Known Issues).
 
-`staging` and `feature/outreach-ai-employee` are reconciled as of `b1a31ff`
-(staging merged forward into this branch, not rebased). Not yet pushed.
+`staging` and `feature/outreach-ai-employee` are reconciled as of `b1a31ff`.
+`feature/outreach-ai-employee` was pushed to origin through `0892214`; the
+Campaign Engine commits since then (`704a00a` through `8f7bcd6`) have not
+been pushed yet.
 
 ## Next recommended milestones
 
-1. Outreach Campaign Engine: audiences, campaigns, sequencing, scheduling,
-   sending, pause/resume/stop, delivery tracking, replies, suppression/
-   opt-out, retries, metrics, and handoff — built as a layer on top of the
-   existing Outreach Intelligence pipeline (research → qualify → promote),
-   not a replacement for it.
-2. Durable, DB-backed job execution (Vercel Cron polling a jobs table with
-   atomic claiming/lease semantics) for campaign sends — no new queue
-   infrastructure (Redis/Kafka/Temporal) without evidence it's needed.
-3. Email-first channel rollout for campaigns; WhatsApp campaign sending
-   only once the existing webhook/delivery-status paths have stayed green
-   through the reconciliation (validated at merge time — see the
-   `tests/whatsapp-integration.test.mjs` / `whatsapp-webhook-policy.test.mjs`
-   suites).
+1. Campaign Engine dashboard (list/detail/actions) — the backend
+   (schema, state machines, worker, CRUD/enrollment/lifecycle service
+   layer, API routes, AI tools, Sales handoff convergence) is complete and
+   tested; the UI is the remaining piece to make it usable end-to-end.
+2. Decide and configure inbound email receiving (Resend supports it) so
+   `lib/outreach/campaign-reply-handoff.ts` — already built and tested —
+   can actually be triggered by a real reply.
+3. Per-business verified sending identity for campaign email (today: one
+   platform-wide `EMAIL_FROM`).
 4. Independently audit Sales AI's conversation/CRM sync depth (not covered
    in this pass) before calling it production-ready.
