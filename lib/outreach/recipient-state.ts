@@ -31,8 +31,10 @@ export const recipientTransitions: Record<RecipientStatus, RecipientStatus[]> = 
   pending: ["ready", "suppressed", "opted_out", "stopped"],
   // Passed eligibility checks; eligible for the next step to be scheduled.
   ready: ["scheduled", "suppressed", "opted_out", "stopped"],
-  // A send job exists for the current step and is due.
-  scheduled: ["in_progress", "suppressed", "opted_out", "stopped"],
+  // A send job exists for the current step and is due. "replied" is
+  // reachable here too — a reply about a previous step can arrive while
+  // the next step is already scheduled.
+  scheduled: ["in_progress", "suppressed", "opted_out", "stopped", "replied"],
   // A worker has claimed the current step's send. A transient failure
   // returns the recipient to "scheduled" so the retry is picked up the same
   // way any other due send is (see lib/outreach/send-worker.ts's retry
@@ -48,7 +50,9 @@ export const recipientTransitions: Record<RecipientStatus, RecipientStatus[]> = 
   interested: ["handed_off", "completed", "stopped"],
   // Promoted through the existing Outreach -> Sales handoff.
   handed_off: ["completed", "stopped"],
-  completed: [],
+  // Not fully terminal — a reply can still arrive after the sequence has
+  // finished, and must still be able to trigger a handoff.
+  completed: ["replied"],
   suppressed: [],
   opted_out: [],
   failed: ["stopped"],

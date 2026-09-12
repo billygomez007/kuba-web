@@ -1,12 +1,10 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   aiEmployees,
-  leads,
-  outreachContacts,
   outreachProspects,
   outreachResearchEvidence,
 } from "@/db/schema";
@@ -14,7 +12,7 @@ import {
   requireBusinessId,
   requireEmployeeId,
 } from "./business-context";
-import { createAuditLog } from "@/lib/auth/audit";
+import { promoteProspectToSales } from "@/lib/outreach/sales-handoff";
 
 export const promoteOutreachProspectToSalesTool = createTool({
   id: "promote-outreach-prospect-to-sales",
@@ -47,25 +45,26 @@ export const promoteOutreachProspectToSalesTool = createTool({
     const businessId = requireBusinessId(requestContext);
     const employeeId = requireEmployeeId(requestContext);
 
+    /*
+     * These preconditions are specific to AUTONOMOUS, AI-initiated
+     * promotion. They are deliberately NOT part of the shared handoff core
+     * (lib/outreach/sales-handoff.ts) — a campaign-reply-triggered handoff
+     * (lib/outreach/campaign-reply-handoff.ts) is a different trigger with
+     * direct engagement evidence of its own, and is not forced through an
+     * ICP-score rule that exists for the passive research-qualification
+     * path.
+     */
     const prospect = (
       await db
         .select({
           id: outreachProspects.id,
           companyName: outreachProspects.companyName,
-          website: outreachProspects.website,
-          industry: outreachProspects.industry,
-          country: outreachProspects.country,
-          city: outreachProspects.city,
-          description: outreachProspects.description,
           employeeId: outreachProspects.employeeId,
           researchStatus: outreachProspects.researchStatus,
-          qualificationStatus:
-            outreachProspects.qualificationStatus,
+          qualificationStatus: outreachProspects.qualificationStatus,
           icpFitScore: outreachProspects.icpFitScore,
-          qualificationReason:
-            outreachProspects.qualificationReason,
-          promotedLeadId:
-            outreachProspects.promotedLeadId,
+          qualificationReason: outreachProspects.qualificationReason,
+          promotedLeadId: outreachProspects.promotedLeadId,
         })
         .from(outreachProspects)
         .where(
@@ -80,51 +79,31 @@ export const promoteOutreachProspectToSalesTool = createTool({
     if (!prospect) {
       return {
         success: false,
-        error:
-          "Outreach prospect not found for the current business.",
+        error: "Outreach prospect not found for the current business.",
       };
     }
 
     if (prospect.employeeId !== employeeId) {
       return {
         success: false,
-        error:
-          "This prospect does not belong to the active Outreach employee.",
+        error: "This prospect does not belong to the active Outreach employee.",
       };
     }
 
     if (prospect.promotedLeadId) {
-      const existingLead = (
-        await db
-          .select({
-            id: leads.id,
-            name: leads.name,
-            email: leads.email,
-            phone: leads.phone,
-            source: leads.source,
-            stage: leads.stage,
-            assignedEmployeeId:
-              leads.assignedEmployeeId,
-          })
-          .from(leads)
-          .where(
-            and(
-              eq(leads.id, prospect.promotedLeadId),
-              eq(leads.businessId, businessId),
-            ),
-          )
-          .limit(1)
-      )[0];
-
-      return {
-        success: true,
-        created: false,
-        deduplicated: true,
-        alreadyPromoted: true,
-        lead: existingLead || {
-          id: prospect.promotedLeadId,
-        },
-      };
+      // Delegate to the shared core purely to return the existing lead
+      // consistently with every other code path — this call is a no-op
+      // read since promotedLeadId is already set.
+      const result = await promoteProspectToSales({
+        businessId,
+        prospectId,
+        employeeId,
+        reason: { type: "autonomous_research_qualification", icpFitScore: prospect.icpFitScore ?? 0, qualificationReason: prospect.qualificationReason },
+        recommendedNextAction,
+      });
+      return result.success
+        ? { success: true, created: false, deduplicated: true, alreadyPromoted: true, lead: result.lead }
+        : result;
     }
 
     /*
@@ -141,16 +120,9 @@ export const promoteOutreachProspectToSalesTool = createTool({
      */
     const outreachEmployee = (
       await db
-        .select({
-          supervisionMode: aiEmployees.supervisionMode,
-        })
+        .select({ supervisionMode: aiEmployees.supervisionMode })
         .from(aiEmployees)
-        .where(
-          and(
-            eq(aiEmployees.id, employeeId),
-            eq(aiEmployees.businessId, businessId),
-          ),
-        )
+        .where(and(eq(aiEmployees.id, employeeId), eq(aiEmployees.businessId, businessId)))
         .limit(1)
     )[0];
 
@@ -163,389 +135,63 @@ export const promoteOutreachProspectToSalesTool = createTool({
       };
     }
 
-    if (
-      prospect.qualificationStatus !== "qualified"
-    ) {
+    if (prospect.qualificationStatus !== "qualified") {
       return {
         success: false,
-        error:
-          `Only qualified prospects can be promoted to Sales. Current status: ${prospect.qualificationStatus}.`,
+        error: `Only qualified prospects can be promoted to Sales. Current status: ${prospect.qualificationStatus}.`,
       };
     }
 
-    if (
-      prospect.icpFitScore === null ||
-      prospect.icpFitScore < 70
-    ) {
+    if (prospect.icpFitScore === null || prospect.icpFitScore < 70) {
       return {
         success: false,
-        error:
-          "Sales promotion requires an ICP fit score of at least 70.",
+        error: "Sales promotion requires an ICP fit score of at least 70.",
       };
     }
 
     if (prospect.researchStatus !== "researched") {
       return {
         success: false,
-        error:
-          "Sales promotion requires completed prospect research.",
+        error: "Sales promotion requires completed prospect research.",
       };
     }
 
-    const evidence = await db
-      .select({
-        claim: outreachResearchEvidence.claim,
-        classification:
-          outreachResearchEvidence.classification,
-        sourceUrl:
-          outreachResearchEvidence.sourceUrl,
-        sourceTier:
-          outreachResearchEvidence.sourceTier,
-        buyingSignalType:
-          outreachResearchEvidence.buyingSignalType,
-        buyingSignalStrength:
-          outreachResearchEvidence.buyingSignalStrength,
-      })
-      .from(outreachResearchEvidence)
-      .where(
-        and(
-          eq(
-            outreachResearchEvidence.businessId,
-            businessId,
-          ),
-          eq(
-            outreachResearchEvidence.prospectId,
-            prospectId,
-          ),
-          eq(
-            outreachResearchEvidence.employeeId,
-            employeeId,
-          ),
-        ),
-      );
-
-    if (evidence.length === 0) {
-      return {
-        success: false,
-        error:
-          "Sales promotion requires saved Outreach research evidence.",
-      };
-    }
-
-    const contacts = await db
-      .select({
-        name: outreachContacts.name,
-        jobTitle: outreachContacts.jobTitle,
-        email: outreachContacts.email,
-        phone: outreachContacts.phone,
-        contactPageUrl:
-          outreachContacts.contactPageUrl,
-        contactType:
-          outreachContacts.contactType,
-        verificationStatus:
-          outreachContacts.verificationStatus,
-        doNotContact:
-          outreachContacts.doNotContact,
-      })
-      .from(outreachContacts)
-      .where(
-        and(
-          eq(outreachContacts.businessId, businessId),
-          eq(outreachContacts.prospectId, prospectId),
-        ),
-      );
-
-    const usableContacts = contacts.filter(
-      (contact) => !contact.doNotContact,
-    );
-
-    const primaryContact =
-      usableContacts.find(
-        (contact) =>
-          contact.verificationStatus ===
-            "verified_public" &&
-          (contact.email || contact.phone),
-      ) ||
-      usableContacts.find(
-        (contact) =>
-          contact.verificationStatus ===
-          "verified_public",
-      ) ||
-      usableContacts[0];
-
-    const salesEmployee = (
+    const evidenceCount = (
       await db
-        .select({
-          id: aiEmployees.id,
-          name: aiEmployees.name,
-        })
-        .from(aiEmployees)
+        .select({ id: outreachResearchEvidence.id })
+        .from(outreachResearchEvidence)
         .where(
           and(
-            eq(aiEmployees.businessId, businessId),
-            eq(aiEmployees.type, "sales"),
-            eq(aiEmployees.status, "active"),
+            eq(outreachResearchEvidence.businessId, businessId),
+            eq(outreachResearchEvidence.prospectId, prospectId),
+            eq(outreachResearchEvidence.employeeId, employeeId),
           ),
         )
-        .limit(1)
-    )[0];
+    ).length;
 
-    const evidenceSummary = evidence
-      .slice(0, 10)
-      .map((item, index) => {
-        const source =
-          item.sourceUrl
-            ? ` Source: ${item.sourceUrl}`
-            : "";
-
-        const signal =
-          item.buyingSignalType
-            ? ` Buying signal: ${item.buyingSignalType}${
-                item.buyingSignalStrength
-                  ? ` (${item.buyingSignalStrength})`
-                  : ""
-              }.`
-            : "";
-
-        return `${index + 1}. [${item.classification}] ${item.claim}.${source}${signal}`;
-      })
-      .join("\n");
-
-    const notes = [
-      "OUTREACH TO SALES HANDOFF",
-      "",
-      `Company: ${prospect.companyName}`,
-      `Website: ${prospect.website || "Unknown"}`,
-      `Industry: ${prospect.industry || "Unknown"}`,
-      `Location: ${
-        [prospect.city, prospect.country]
-          .filter(Boolean)
-          .join(", ") || "Unknown"
-      }`,
-      "",
-      `ICP fit score: ${prospect.icpFitScore}/100`,
-      `Qualification: ${prospect.qualificationReason || "No reason recorded"}`,
-      "",
-      "Research evidence:",
-      evidenceSummary || "No evidence summary available.",
-      "",
-      "Public contact:",
-      primaryContact
-        ? [
-            primaryContact.name
-              ? `Name: ${primaryContact.name}`
-              : null,
-            primaryContact.jobTitle
-              ? `Role: ${primaryContact.jobTitle}`
-              : null,
-            primaryContact.email
-              ? `Email: ${primaryContact.email}`
-              : null,
-            primaryContact.phone
-              ? `Phone: ${primaryContact.phone}`
-              : null,
-            primaryContact.contactPageUrl
-              ? `Contact page: ${primaryContact.contactPageUrl}`
-              : null,
-          ]
-            .filter(Boolean)
-            .join("\n")
-        : "No usable public contact saved.",
-      "",
-      `Recommended next action: ${recommendedNextAction.trim()}`,
-    ].join("\n");
-
-    const now = new Date();
-    const leadId = crypto.randomUUID();
-
-    const promotionResult = await db.transaction(async (tx) => {
-      const claimedProspect = (
-        await tx
-          .update(outreachProspects)
-          .set({
-            promotedLeadId: leadId,
-            promotedAt: now,
-            updatedAt: now,
-          })
-          .where(
-            and(
-              eq(outreachProspects.id, prospectId),
-              eq(outreachProspects.businessId, businessId),
-              eq(outreachProspects.employeeId, employeeId),
-              isNull(outreachProspects.promotedLeadId),
-            ),
-          )
-          .returning({
-            id: outreachProspects.id,
-          })
-      )[0];
-
-      if (!claimedProspect) {
-        const alreadyPromoted = (
-          await tx
-            .select({
-              promotedLeadId: outreachProspects.promotedLeadId,
-            })
-            .from(outreachProspects)
-            .where(
-              and(
-                eq(outreachProspects.id, prospectId),
-                eq(outreachProspects.businessId, businessId),
-                eq(outreachProspects.employeeId, employeeId),
-              ),
-            )
-            .limit(1)
-        )[0];
-
-        return {
-          created: false as const,
-          existingLeadId:
-            alreadyPromoted?.promotedLeadId || null,
-          lead: null,
-        };
-      }
-
-      const createdLead = (
-        await tx
-          .insert(leads)
-          .values({
-            id: leadId,
-            businessId,
-
-            customerId: null,
-
-            name: prospect.companyName,
-            email: primaryContact?.email || null,
-            phone: primaryContact?.phone || null,
-
-            service: null,
-            destination: null,
-            intent: "outreach_qualified_prospect",
-            notes,
-
-            studyLevel: null,
-            program: null,
-            university: null,
-            preferredIntake: null,
-            budget: null,
-
-            source: "kuba_outreach",
-            stage: "new",
-
-            estimatedValue: null,
-            currency: "GHS",
-
-            dealStatus: "open",
-            closedAt: null,
-
-            assignedEmployeeId:
-              salesEmployee?.id || null,
-
-            createdAt: now,
-            updatedAt: now,
-          })
-          .returning({
-            id: leads.id,
-            name: leads.name,
-            email: leads.email,
-            phone: leads.phone,
-            source: leads.source,
-            stage: leads.stage,
-            assignedEmployeeId:
-              leads.assignedEmployeeId,
-          })
-      )[0];
-
-      if (!createdLead) {
-        throw new Error(
-          "Failed to create Sales lead during Outreach promotion.",
-        );
-      }
-
+    if (evidenceCount === 0) {
       return {
-        created: true as const,
-        existingLeadId: null,
-        lead: createdLead,
-      };
-    });
-
-    if (!promotionResult.created) {
-      const existingLead = promotionResult.existingLeadId
-        ? (
-            await db
-              .select({
-                id: leads.id,
-                name: leads.name,
-                email: leads.email,
-                phone: leads.phone,
-                source: leads.source,
-                stage: leads.stage,
-                assignedEmployeeId:
-                  leads.assignedEmployeeId,
-              })
-              .from(leads)
-              .where(
-                and(
-                  eq(leads.id, promotionResult.existingLeadId),
-                  eq(leads.businessId, businessId),
-                ),
-              )
-              .limit(1)
-          )[0]
-        : null;
-
-      return {
-        success: true,
-        created: false,
-        deduplicated: true,
-        alreadyPromoted: true,
-        lead:
-          existingLead ||
-          (promotionResult.existingLeadId
-            ? { id: promotionResult.existingLeadId }
-            : null),
+        success: false,
+        error: "Sales promotion requires saved Outreach research evidence.",
       };
     }
 
-    const createdLead = promotionResult.lead;
-
-    await createAuditLog({
+    const result = await promoteProspectToSales({
       businessId,
-      userId: null,
-      action:
-        "ai.outreach.prospect.promoted_to_sales",
-      resource: "outreach_prospect",
-      resourceId: prospectId,
-      description:
-        `Kuba Outreach promoted "${prospect.companyName}" to Sales.`,
-      metadata: {
-        employeeId,
-        salesLeadId: leadId,
-        assignedSalesEmployeeId:
-          salesEmployee?.id || null,
+      prospectId,
+      employeeId,
+      reason: {
+        type: "autonomous_research_qualification",
         icpFitScore: prospect.icpFitScore,
-        evidenceCount: evidence.length,
-        usableContactCount:
-          usableContacts.length,
+        qualificationReason: prospect.qualificationReason,
       },
+      recommendedNextAction,
     });
 
-    return {
-      success: true,
-      created: true,
-      deduplicated: false,
-      alreadyPromoted: false,
-      lead: createdLead,
-      handoff: {
-        prospectId,
-        companyName: prospect.companyName,
-        icpFitScore: prospect.icpFitScore,
-        assignedSalesEmployee:
-          salesEmployee || null,
-        evidenceCount: evidence.length,
-        usableContactCount:
-          usableContacts.length,
-      },
-    };
+    if (!result.success) return result;
+
+    return result.deduplicated
+      ? { success: true, created: false, deduplicated: true, alreadyPromoted: true, lead: result.lead }
+      : { success: true, created: true, deduplicated: false, alreadyPromoted: false, lead: result.lead };
   },
 });

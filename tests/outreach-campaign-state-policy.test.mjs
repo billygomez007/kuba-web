@@ -64,10 +64,14 @@ test("a recipient can be suppressed or opted out directly from pending, without 
   assert.doesNotThrow(() => assertRecipientTransition("pending", "opted_out"));
 });
 
-test("terminal recipient states have no outgoing transitions", () => {
-  for (const terminal of ["completed", "suppressed", "opted_out", "stopped"]) {
+test("suppressed/opted_out/stopped recipient states have no outgoing transitions", () => {
+  for (const terminal of ["suppressed", "opted_out", "stopped"]) {
     assert.deepEqual(recipientTransitions[terminal], []);
   }
+});
+
+test("completed is not fully terminal — a reply can still arrive after the sequence finishes and must be able to trigger a handoff", () => {
+  assert.deepEqual(recipientTransitions.completed, ["replied"]);
 });
 
 test("a sent step can loop back for the next step or complete if it was the last one", () => {
