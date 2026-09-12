@@ -3012,6 +3012,21 @@ export const outreachContacts = sqliteTable(
       mode: "timestamp_ms",
     }),
 
+    // Outreach eligibility is not implied by simply having a discovered
+    // contact record. These fields let the campaign engine express real
+    // consent state without building a full legal-compliance platform now;
+    // "unknown" is the honest default for a contact discovered via public
+    // research, not an assumed yes.
+    consentStatus: text("consent_status")
+      .notNull()
+      .default("unknown"),
+
+    consentSource: text("consent_source"),
+
+    consentCapturedAt: integer("consent_captured_at", {
+      mode: "timestamp_ms",
+    }),
+
     createdAt: integer("created_at", {
       mode: "timestamp_ms",
     }).notNull(),
@@ -3041,6 +3056,278 @@ export const outreachContacts = sqliteTable(
       table.businessId,
       table.doNotContact,
       table.updatedAt,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Outreach Campaign Engine
+//
+// Layers on top of the Outreach Intelligence tables above (outreach_prospects
+// / outreach_contacts / outreach_research_evidence), which are unchanged.
+// A campaign sends to outreach_contacts (a reachable delivery identity —
+// email, phone, WhatsApp) rather than to a prospect directly; a prospect can
+// have multiple contacts, and outreach_campaign_recipients keeps a nullable
+// reference back to the prospect so research/qualification/Sales context
+// stays connected. Sequences are campaign-scoped for v1 — no reusable
+// sequence-template infrastructure until real usage proves the need.
+// ---------------------------------------------------------------------------
+
+export const outreachCampaigns = sqliteTable(
+  "outreach_campaigns",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+    employeeId: text("employee_id").notNull(),
+
+    name: text("name").notNull(),
+    description: text("description"),
+
+    // Extensible for whatsapp later (see AI_AUTHORITY/CURRENT_STATE notes on
+    // WhatsApp campaigns being blocked on Meta template/consent/policy work).
+    channel: text("channel").notNull().default("email"),
+
+    // draft | scheduled | running | paused | completed | stopped | failed.
+    // Transitions are centralized in lib/outreach/campaign-state.ts — never
+    // mutate this column directly from a route.
+    status: text("status").notNull().default("draft"),
+
+    // Campaign launch is the v1 approval event (see launchedBy/launchedAt) —
+    // no separate workflow-approval model yet.
+    launchedBy: text("launched_by"),
+    launchedAt: integer("launched_at", { mode: "timestamp_ms" }),
+
+    scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }),
+    pausedAt: integer("paused_at", { mode: "timestamp_ms" }),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    stoppedAt: integer("stopped_at", { mode: "timestamp_ms" }),
+    failedAt: integer("failed_at", { mode: "timestamp_ms" }),
+    failureReason: text("failure_reason"),
+
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("outreach_campaigns_business_status_idx").on(
+      table.businessId,
+      table.status,
+      table.updatedAt,
+    ),
+
+    index("outreach_campaigns_business_employee_idx").on(
+      table.businessId,
+      table.employeeId,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const outreachSequenceSteps = sqliteTable(
+  "outreach_sequence_steps",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+
+    stepNumber: integer("step_number").notNull(),
+
+    // Hours after enrollment (step 1) or after the previous step's send
+    // (step 2+) before this step becomes due.
+    delayHours: integer("delay_hours").notNull().default(0),
+
+    subjectTemplate: text("subject_template"),
+    bodyTemplate: text("body_template").notNull(),
+
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("outreach_sequence_steps_campaign_step_unique").on(
+      table.campaignId,
+      table.stepNumber,
+    ),
+
+    index("outreach_sequence_steps_business_campaign_idx").on(
+      table.businessId,
+      table.campaignId,
+    ),
+  ],
+);
+
+export const outreachCampaignRecipients = sqliteTable(
+  "outreach_campaign_recipients",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    contactId: text("contact_id").notNull(),
+
+    // Nullable reference back to the researched prospect — kept for Sales/
+    // research context, never required for delivery itself.
+    prospectId: text("prospect_id"),
+
+    // Snapshot of the contact at enrollment time, not a live join. Preserves
+    // auditability/reproducibility if the underlying contact row changes or
+    // is later suppressed/edited (see outreach_contacts). Deliberately not a
+    // full copy of the contact record — only what's needed to explain what
+    // was actually targeted.
+    destinationChannel: text("destination_channel").notNull(),
+    destinationIdentity: text("destination_identity").notNull(),
+    displayName: text("display_name"),
+    personalizationContextVersion: text("personalization_context_version"),
+
+    // pending | ready | scheduled | in_progress | sent | replied |
+    // interested | handed_off | completed | suppressed | opted_out | failed
+    // | stopped. Not every recipient passes through every state. Transitions
+    // are centralized in lib/outreach/recipient-state.ts.
+    status: text("status").notNull().default("pending"),
+
+    currentStepNumber: integer("current_step_number"),
+    nextSendAt: integer("next_send_at", { mode: "timestamp_ms" }),
+
+    enrolledAt: integer("enrolled_at", { mode: "timestamp_ms" }).notNull(),
+    lastSentAt: integer("last_sent_at", { mode: "timestamp_ms" }),
+    lastReplyAt: integer("last_reply_at", { mode: "timestamp_ms" }),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+
+    suppressedAt: integer("suppressed_at", { mode: "timestamp_ms" }),
+    suppressionReason: text("suppression_reason"),
+    optedOutAt: integer("opted_out_at", { mode: "timestamp_ms" }),
+
+    // Extends the existing Outreach -> Sales handoff for campaign-originated
+    // prospects (see mastra/tools/promote-outreach-prospect-to-sales.ts).
+    handedOffAt: integer("handed_off_at", { mode: "timestamp_ms" }),
+    handoffLeadId: text("handoff_lead_id"),
+
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    // No double-enrollment of the same contact into the same campaign.
+    uniqueIndex("outreach_campaign_recipients_campaign_contact_unique").on(
+      table.campaignId,
+      table.contactId,
+    ),
+
+    index("outreach_campaign_recipients_business_campaign_idx").on(
+      table.businessId,
+      table.campaignId,
+      table.status,
+    ),
+
+    // The shape the cron worker scans to find due sends.
+    index("outreach_campaign_recipients_next_send_idx").on(
+      table.status,
+      table.nextSendAt,
+    ),
+  ],
+);
+
+export const outreachCampaignSends = sqliteTable(
+  "outreach_campaign_sends",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    recipientId: text("recipient_id").notNull(),
+    sequenceStepId: text("sequence_step_id").notNull(),
+
+    // scheduled | claimed | sending | sent | delivered | opened | replied |
+    // bounced | failed | cancelled | dead_letter.
+    status: text("status").notNull().default("scheduled"),
+
+    scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }).notNull(),
+
+    // Lease/claim fields — a worker atomically claims a row via a
+    // compare-and-swap UPDATE (status = 'scheduled' -> 'claimed'), and a
+    // lease that outlives its expiry without reaching a terminal state can
+    // be reclaimed by a later run. See lib/outreach/send-worker.ts.
+    claimedAt: integer("claimed_at", { mode: "timestamp_ms" }),
+    claimedBy: text("claimed_by"),
+    leaseExpiresAt: integer("lease_expires_at", { mode: "timestamp_ms" }),
+
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastAttemptAt: integer("last_attempt_at", { mode: "timestamp_ms" }),
+    nextAttemptAt: integer("next_attempt_at", { mode: "timestamp_ms" }),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+
+    // Stable machine code (e.g. "rate_limited", "invalid_recipient",
+    // "suppressed", "provider_rejected", "timeout") plus a short
+    // human-readable reason. Deliberately never a stack trace or full
+    // provider payload.
+    failureCode: text("failure_code"),
+    failureReason: text("failure_reason"),
+
+    // Provider's message id, for delivery-status webhook correlation and
+    // idempotency — same pattern as messages.externalMessageId.
+    externalMessageId: text("external_message_id"),
+
+    // What was actually sent, plus enough trace metadata to reconstruct how
+    // it was produced (template + personalization inputs + which AI
+    // generation/agent run, if any) without storing hidden chain-of-thought.
+    renderedSubject: text("rendered_subject"),
+    renderedBody: text("rendered_body"),
+    personalizationMetadata: text("personalization_metadata"),
+
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    // The idempotency guarantee: exactly one send row can ever exist for a
+    // given recipient's given sequence step, enforced at the database level
+    // — not merely an application-level check.
+    uniqueIndex("outreach_campaign_sends_recipient_step_unique").on(
+      table.recipientId,
+      table.sequenceStepId,
+    ),
+
+    // The shape the cron worker's claim query scans.
+    index("outreach_campaign_sends_status_scheduled_idx").on(
+      table.status,
+      table.scheduledAt,
+    ),
+
+    index("outreach_campaign_sends_business_campaign_idx").on(
+      table.businessId,
+      table.campaignId,
+    ),
+
+    index("outreach_campaign_sends_external_message_idx").on(
+      table.externalMessageId,
+    ),
+  ],
+);
+
+export const outreachSuppressions = sqliteTable(
+  "outreach_suppressions",
+  {
+    id: text("id").primaryKey(),
+
+    businessId: text("business_id").notNull(),
+
+    // "email" | "phone". Values are normalized before storage (safe email
+    // normalization; E.164 for phone) so a lookup at send time is a single
+    // exact-match query, never a fuzzy/case-insensitive scan.
+    channel: text("channel").notNull(),
+    normalizedIdentity: text("normalized_identity").notNull(),
+
+    // "unsubscribed" | "bounced" | "complained" | "manual" | "invalid".
+    reason: text("reason").notNull(),
+    sourceCampaignId: text("source_campaign_id"),
+
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    // Business-scoped, never a cross-tenant global list.
+    uniqueIndex("outreach_suppressions_business_channel_identity_unique").on(
+      table.businessId,
+      table.channel,
+      table.normalizedIdentity,
     ),
   ],
 );
