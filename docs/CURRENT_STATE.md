@@ -242,47 +242,50 @@ AUTOMATION_PROCESS_SECRET, CRON_SECRET, ENCRYPTION_KEY,
 NEXT_PUBLIC_APP_ENV, NODE_ENV
 ```
 
-## Baseline quality gate (this audit, `feature/outreach-ai-employee`, with
-the uncommitted working tree in place)
+## Baseline quality gate (`feature/outreach-ai-employee`, post staging
+reconciliation, commit `b1a31ff`)
 
-- `npm test`: **834/834 passing** (44 test files)
-- `npm run lint`: **0 errors**, 65 pre-existing warnings (unused vars,
-  `<img>` vs `next/image`) — none introduced by this audit
-- `npm run build`: **clean** (Next.js 16, webpack build; TypeScript checking
-  is not disabled in `next.config.ts`, so this is a real typecheck pass too)
+- `npm test`: **955/955 passing** (up from 834 pre-reconciliation)
+- `npm run lint`: **0 errors**, 60 pre-existing warnings (unused vars,
+  `<img>` vs `next/image`) — none introduced by this work
+- `npx tsc --noEmit`: **clean**
+- `npm run build`: **clean** (Next.js 16, webpack build)
 
 ## Production blockers (in rough priority order)
 
-1. Confirm whether the `0038` migration baseline (and `0039`–`0041`) are
-   actually applied to the production Turso database — cannot be verified
-   from a local checkout; needs an operator with production DB access.
-2. Reconcile `staging` and `feature/outreach-ai-employee` before either
-   goes further — they've diverged with distinct, non-overlapping commits.
-3. Decide whether "Outreach Campaigns" (bulk send, scheduling, tracking) is
-   near-term scope or a later phase — the product brief describes it as
-   core; the repo has none of it today. This is a scoping decision, not an
-   engineering one.
-4. WhatsApp Embedded Signup/OAuth for self-serve business onboarding (today:
-   manual token paste only).
-5. Voice: durable session state for OpenAI Realtime calls across serverless
-   instances, before relying on it for real concurrent traffic.
-6. No `.env.example` — onboarding a new environment currently relies on
+1. **BLOCKED** — Production Turso schema/migration state must be verified
+   read-only before the next production database deployment. Do not assume
+   `0038`–`0042` are applied to production merely because they exist
+   locally; do not reset, replay migrations against, or otherwise touch
+   production until an operator confirms real Turso access.
+2. Decide whether WhatsApp Embedded Signup/OAuth for self-serve onboarding
+   (today: manual token paste only) ships before or alongside the Outreach
+   Campaign Engine.
+3. Voice: durable session state for OpenAI Realtime calls across serverless
+   instances, before relying on it for real concurrent traffic — explicitly
+   deprioritized until the campaign foundation is stable.
+4. No `.env.example` — onboarding a new environment currently relies on
    grepping the codebase.
-7. Unify the four tenant-resolution helpers, at least fixing the
+5. Unify the four tenant-resolution helpers, at least fixing the
    `getBusinessMembership()` cookie gap (#2 in Known Issues).
+
+`staging` and `feature/outreach-ai-employee` are reconciled as of `b1a31ff`
+(staging merged forward into this branch, not rebased). Not yet pushed.
 
 ## Next recommended milestones
 
-1. Commit/finish the in-flight AI-workforce catalog/policy + entitlement UI
-   work already sitting uncommitted in this worktree (830+ tests already
-   pass with it in place) rather than letting it linger uncommitted.
-2. Get an explicit answer on production blocker #1 and #3 above before
-   investing further engineering time in Outreach.
-3. If campaigns are in scope: design the send-loop (Cron-polling a
-   `campaign_sends`-style table is the natural minimal-infrastructure
-   choice given no queue system exists) with idempotency, retry, and rate
-   limiting from the start, and an explicit send tool the Outreach agent
-   can call (or a deterministic non-agent send path it triggers) — not an
-   LLM fabricating delivery state.
+1. Outreach Campaign Engine: audiences, campaigns, sequencing, scheduling,
+   sending, pause/resume/stop, delivery tracking, replies, suppression/
+   opt-out, retries, metrics, and handoff — built as a layer on top of the
+   existing Outreach Intelligence pipeline (research → qualify → promote),
+   not a replacement for it.
+2. Durable, DB-backed job execution (Vercel Cron polling a jobs table with
+   atomic claiming/lease semantics) for campaign sends — no new queue
+   infrastructure (Redis/Kafka/Temporal) without evidence it's needed.
+3. Email-first channel rollout for campaigns; WhatsApp campaign sending
+   only once the existing webhook/delivery-status paths have stayed green
+   through the reconciliation (validated at merge time — see the
+   `tests/whatsapp-integration.test.mjs` / `whatsapp-webhook-policy.test.mjs`
+   suites).
 4. Independently audit Sales AI's conversation/CRM sync depth (not covered
    in this pass) before calling it production-ready.
