@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getCatalogEntry } from "@/lib/billing/ai-workforce-catalog";
 
 type Employee = {
   id: string;
@@ -50,24 +51,6 @@ type Workspace = {
   } | null;
 };
 
-const categories: Record<string, string> = {
-  receptionist: "Customer Operations",
-  sales: "Revenue Operations",
-  "customer-support": "Customer Operations",
-  "general-manager": "Executive Operations",
-  accountant: "Finance Operations",
-  finance: "Finance Operations",
-  marketing: "Growth Operations",
-  operations: "Business Operations",
-  appointment: "Customer Operations",
-};
-
-const capabilities: Record<string, string[]> = {
-  receptionist: ["Answer customer questions", "Capture customer details", "Book appointments", "Transfer conversations"],
-  sales: ["Qualify leads", "Follow up with customers", "Update sales pipeline", "Surface revenue opportunities"],
-  "customer-support": ["Answer support questions", "Resolve common issues", "Track customer context", "Escalate complex requests"],
-  "general-manager": ["Monitor business operations", "Coordinate AI employees", "Identify bottlenecks", "Recommend next actions"],
-};
 
 export default function AIEmployeeWorkspacePage() {
   const params = useParams<{ id: string }>();
@@ -97,7 +80,7 @@ export default function AIEmployeeWorkspacePage() {
   if (error || !workspace) return <WorkspaceState message={error || "AI employee not found."} error />;
 
   const { employee, metrics, activities, knowledge, salesInsights } = workspace;
-  const employeeCapabilities = capabilities[employee.type] || ["Complete assigned business tasks", "Work across connected channels", "Maintain customer context", "Escalate when needed"];
+  const employeeCapabilities = getCatalogEntry(employee.type)?.capabilities || ["Complete assigned business tasks", "Work across connected channels", "Maintain customer context", "Escalate when needed"];
 
   return (
     <main className="min-h-screen bg-[#07070A] px-4 py-7 text-white sm:px-6 lg:px-8 lg:py-10">
@@ -110,7 +93,7 @@ export default function AIEmployeeWorkspacePage() {
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.1] text-2xl text-cyan-300">✦</div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3"><h1 className="text-3xl font-black tracking-[-0.04em] sm:text-4xl">{employee.name}</h1><Status status={employee.status} /></div>
-                <p className="mt-2 text-sm font-bold uppercase tracking-[0.18em] text-cyan-300/65">{categories[employee.type] || "AI Workforce"}</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.18em] text-cyan-300/65">{getCatalogEntry(employee.type)?.category || "AI Workforce"}</p>
                 <p className="mt-3 text-sm text-white/40">Assigned to your business · {employee.supervisor || "Owner supervised"}</p>
               </div>
             </div>

@@ -18,75 +18,14 @@ import CustomerSupportWorkspace from "../../../components/employees/CustomerSupp
 import GeneralManagerWorkspace from "../../../components/employees/GeneralManagerWorkspace";
 import OutreachWorkspace from "../../../components/employees/OutreachWorkspace";
 import AIEmployeeHeader from "../../../components/employees/AIEmployeeHeader";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 
 type Props = {
   params: Promise<{
     id: string;
   }>;
 };
-
-
-function getEmployeeAvatar(type: string) {
-  const avatars: Record<string, string> = {
-    receptionist: "/avatars/receptionist.png",
-    sales: "/avatars/sales.png",
-    "customer-support": "/avatars/customer-support.png",
-    accountant: "/avatars/accountant.png",
-    finance: "/avatars/finance.png",
-    marketing: "/avatars/marketing.png",
-    hr: "/avatars/hr.png",
-    operations: "/avatars/operations.png",
-    appointment: "/avatars/appointment.png",
-  };
-
-  return avatars[type] || "/avatars/receptionist.png";
-}
-
-
-function getEmployeeCategory(type: string) {
-  const categories: Record<string, string> = {
-    receptionist: "Customer Experience",
-    sales: "Revenue",
-    "customer-support": "Customer Experience",
-    accountant: "Finance",
-    finance: "Finance",
-    marketing: "Growth",
-    hr: "People",
-    operations: "Operations",
-    appointment: "Operations",
-  };
-
-  return categories[type] || "AI Workforce";
-}
-
-
-function getEmployeeSpecialization(type: string) {
-  const specializations: Record<string, string> = {
-    receptionist:
-      "Handles customers, inquiries, bookings, and lead capture.",
-    sales:
-      "Manages leads, follow-ups, and sales intelligence.",
-    "customer-support":
-      "Answers customer questions and resolves support requests.",
-    accountant:
-      "Handles finance workflows and reports.",
-    finance:
-      "Supports financial planning and business analysis.",
-    marketing:
-      "Creates campaigns, content, and customer engagement strategies.",
-    hr:
-      "Supports recruitment and people operations.",
-    operations:
-      "Manages business processes and workflows.",
-    appointment:
-      "Schedules appointments and manages bookings.",
-  };
-
-  return (
-    specializations[type] ||
-    "Helping your business get work done."
-  );
-}
 
 export default async function EmployeeWorkspace({
   params,
@@ -207,6 +146,7 @@ export default async function EmployeeWorkspace({
           type={employee.type}
           status={employee.status}
           description={employee.description}
+          notEntitledUnderCurrentPlan={!isEmployeeTypeEntitled(await getBusinessEntitlements(business.businessId), employee.type)}
         />
 
 

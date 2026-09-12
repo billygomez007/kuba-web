@@ -3,18 +3,26 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+// Basic conversation on each of these routes is gated by permission (RBAC)
+// plus the centralized AI-workforce type-availability policy
+// (lib/billing/ai-workforce-policy.ts's isEmployeeTypeEntitled), not by a
+// standalone capability string. Using the same function activation uses is
+// what guarantees these routes can never disagree with whether the
+// employee was legitimately allowed to be activated in the first place —
+// see tests/receptionist-entitlement-policy.test.mjs and
+// tests/ai-workforce-policy-model.test.mjs for the fuller policy coverage.
 const routes = {
-  "app/api/ai/receptionist/route.ts": ["PERMISSIONS.RECEPTION_AI", "customer_ops.appointments"],
-  "app/api/ai/sales/route.ts": ["PERMISSIONS.SALES_AI", "customer_ops.leads"],
-  "app/api/ai/customer-support/route.ts": ["PERMISSIONS.MESSAGING_MANAGE", "customer_ops.tickets"],
+  "app/api/ai/receptionist/route.ts": ["PERMISSIONS.RECEPTION_AI", "receptionist"],
+  "app/api/ai/sales/route.ts": ["PERMISSIONS.SALES_AI", "sales"],
+  "app/api/ai/customer-support/route.ts": ["PERMISSIONS.MESSAGING_MANAGE", "customer-support"],
 };
 
 for (const [file, gates] of Object.entries(routes)) {
-  test(`${file} gates agent execution by permission and capability`, async () => {
+  test(`${file} gates agent execution by permission and employee-type entitlement`, async () => {
     const source = await readFile(file, "utf8");
     assert.match(source, new RegExp(gates[0].replace(".", "\\.")));
-    assert.match(source, new RegExp(gates[1].replace(".", "\\.")));
-    assert.match(source, /hasCapability/);
+    assert.match(source, /isEmployeeTypeEntitled/);
+    assert.match(source, new RegExp(`isEmployeeTypeEntitled\\(\\s*await getBusinessEntitlements\\([^)]*\\),\\s*"${gates[1]}"`));
     assert.match(source, /hasPermission/);
   });
 }

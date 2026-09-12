@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { upsertBusinessLocalization } from "@/lib/localization/business";
 import { isSupportedCountry, isSupportedCurrency, isValidTimezone, SUPPORTED_COUNTRIES } from "@/lib/localization/registry";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 
 const onboardingIndustries = new Set([
   "Travel",
@@ -92,9 +93,17 @@ export async function GET() {
       .from(aiEmployees)
       .where(eq(aiEmployees.businessId, business.id));
 
+    // Resolved (subscription/trial-aware) entitlements, exposed read-only so
+    // the workforce catalog UI can render accurate lock/upgrade states.
+    // This is presentation data only — every activation and runtime route
+    // re-resolves and re-checks entitlements itself; nothing trusts this
+    // value as authorization.
+    const entitlements = await getBusinessEntitlements(business.id);
+
     return NextResponse.json({
       business,
       employees,
+      entitlements,
       businesses: result.map((row) => ({ ...row.business, role: row.role, branchId: row.branchId })),
       selectedBusinessId: selected?.business.id || null,
       onboardingStatus:

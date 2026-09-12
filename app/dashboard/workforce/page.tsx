@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ActivateEmployeeButton from "../../components/ActivateEmployeeButton";
 import AIEmployeeAvatar from "../../components/employees/AIEmployeeAvatar";
+import { employeeCatalog, getEmployeeAvatar, type EmployeeCatalogEntry } from "@/lib/billing/ai-workforce-catalog";
+import { canActivateEmployee, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
+import { getPlanDefinition } from "@/lib/billing/plan-definitions";
+import type { BusinessEntitlements } from "@/lib/billing/entitlements";
 
 type Employee = {
   id: string;
@@ -13,117 +17,9 @@ type Employee = {
   status: string;
 };
 
-type EmployeeDefinition = {
-  templateId: string;
-  type: string;
-  name: string;
-  category: string;
-  description: string;
-  icon: string;
-};
+type EmployeeDefinition = EmployeeCatalogEntry;
 
-const employeeLibrary: EmployeeDefinition[] = [
-  {
-    name: "Kuba General Manager",
-    type: "general-manager",
-    category: "Executive",
-    description:
-      "Oversees business operations, coordinates AI employees, monitors performance, identifies bottlenecks, and helps business owners make better decisions.",
-    icon: "◈",
-    templateId: "general-manager",
-  },
-
-  {
-    templateId: "kuba-sales",
-    type: "sales",
-    name: "Kuba Sales",
-    category: "Revenue",
-    icon: "↗",
-    description:
-      "Find prospects, qualify leads, follow up with customers, and help move opportunities toward revenue.",
-  },
-  {
-    templateId: "kuba-receptionist",
-    type: "receptionist",
-    name: "Kuba Receptionist",
-    category: "Customer Operations",
-    icon: "✦",
-    description:
-      "Welcome customers, answer questions, capture information, and route customer requests.",
-  },
-  {
-    templateId: "kuba-accountant",
-    type: "accountant",
-    name: "Kuba Accountant",
-    category: "Finance",
-    icon: "◎",
-    description:
-      "Support bookkeeping, financial records, reporting, and accounting workflows.",
-  },
-  {
-    templateId: "kuba-appointment",
-    type: "appointment",
-    name: "Kuba Appointment",
-    category: "Operations",
-    icon: "◈",
-    description:
-      "Schedule appointments, manage availability, send reminders, and handle bookings.",
-  },
-  {
-    templateId: "kuba-marketing",
-    type: "marketing",
-    name: "Kuba Marketing",
-    category: "Marketing",
-    icon: "✺",
-    description:
-      "Plan campaigns, create content, engage customers, and support marketing workflows.",
-  },
-  {
-    templateId: "kuba-outreach",
-    type: "outreach",
-    name: "Kuba Outreach",
-    category: "Revenue",
-    icon: "⌁",
-    description:
-      "Find and research prospects, identify buying signals, prepare personalized outreach, and hand qualified opportunities to Sales.",
-  },
-  {
-    templateId: "kuba-customer-support",
-    type: "customer-support",
-    name: "Kuba Customer Support",
-    category: "Customer Experience",
-    icon: "◌",
-    description:
-      "Handle customer questions, resolve common issues, and support customers across their journey.",
-  },
-  {
-    templateId: "kuba-hr",
-    type: "hr",
-    name: "Kuba HR",
-    category: "People",
-    icon: "◉",
-    description:
-      "Support recruitment, employee information, HR workflows, and people operations.",
-  },
-  {
-    templateId: "kuba-operations",
-    type: "operations",
-    name: "Kuba Operations",
-    category: "Operations",
-    icon: "⌁",
-    description:
-      "Coordinate business processes, monitor operational workflows, and help keep work moving.",
-  },
-  {
-    templateId: "kuba-finance",
-    type: "finance",
-    name: "Kuba Finance",
-    category: "Finance",
-    icon: "◍",
-    description:
-      "Support financial planning, analysis, budgets, and business finance workflows.",
-  },
-];
+const employeeLibrary: EmployeeDefinition[] = employeeCatalog;
 
 export default function WorkforcePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -141,6 +37,9 @@ export default function WorkforcePage() {
   const [activities, setActivities] =
     useState<ActivityItem[]>([]);
 
+  const [entitlements, setEntitlements] =
+    useState<BusinessEntitlements | null>(null);
+
   async function loadEmployees() {
     try {
       const response = await fetch("/api/businesses", {
@@ -153,6 +52,7 @@ export default function WorkforcePage() {
 
       const data = await response.json();
       setEmployees(data.employees ?? []);
+      setEntitlements(data.entitlements ?? null);
     } catch (error) {
       console.error(error);
     } finally {
@@ -213,6 +113,15 @@ export default function WorkforcePage() {
     );
   }, [search]);
 
+  const readyToActivateCount = useMemo(() => {
+    if (!entitlements) return 0;
+    return availableEmployees.filter(
+      (employee) =>
+        employee.implementation === "available" &&
+        canActivateEmployee(entitlements, employee.type, activeEmployees.length).allowed,
+    ).length;
+  }, [availableEmployees, entitlements, activeEmployees.length]);
+
   return (
     <main className="min-h-screen bg-[#050507] text-white">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -238,6 +147,17 @@ export default function WorkforcePage() {
               sales, customer service, finance, marketing, operations, and
               more.
             </p>
+
+            {entitlements && (
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-wider text-white/50">
+                <span className="text-cyan-300">{entitlements.planName}</span>
+                <span className="text-white/20">·</span>
+                <WorkforceUsage
+                  active={activeEmployees.length}
+                  limit={entitlements.limits.max_ai_employees}
+                />
+              </div>
+            )}
           </div>
 
           <Link
@@ -355,6 +275,9 @@ export default function WorkforcePage() {
                           type={generalManagerDefinition.type}
                           description={generalManagerDefinition.description}
                           templateId={generalManagerDefinition.templateId}
+                          entitlements={entitlements}
+                          activeEmployeeCount={activeEmployees.length}
+                          implementation={generalManagerDefinition.implementation}
                         />
 
                       </div>
@@ -395,6 +318,15 @@ export default function WorkforcePage() {
                             <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-300">
                               Online
                             </span>
+
+                            {entitlements && !isEmployeeTypeEntitled(entitlements, generalManager.type) && (
+                              <span
+                                className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300"
+                                title="This employee type isn't included in your current plan. It keeps working, but you'll need to upgrade to activate another one like it."
+                              >
+                                Not in current plan
+                              </span>
+                            )}
 
                           </div>
 
@@ -573,6 +505,9 @@ export default function WorkforcePage() {
                         key={employee.id}
                         employee={employee}
                         definition={definition}
+                        entitledUnderCurrentPlan={
+                          !entitlements || isEmployeeTypeEntitled(entitlements, employee.type)
+                        }
                       />
                     );
 
@@ -721,6 +656,8 @@ export default function WorkforcePage() {
                   key={employee.type}
                   employee={employee}
                   active={false}
+                  entitlements={entitlements}
+                  activeEmployeeCount={activeEmployees.length}
                 />
 
               ))}
@@ -746,16 +683,20 @@ export default function WorkforcePage() {
 
           <WorkforceStat
             label="Available roles"
-            value={String(
-              Math.max(employeeLibrary.length - activeTypes.size, 0),
-            )}
-            description="Roles ready to activate"
+            value={String(readyToActivateCount)}
+            description="Roles you're entitled to activate now"
           />
 
           <WorkforceStat
             label="Workforce capacity"
-            value={`${activeEmployees.length}/${employeeLibrary.length}`}
-            description="Current employees in your library"
+            value={
+              !entitlements
+                ? "..."
+                : entitlements.limits.max_ai_employees === null
+                  ? `${activeEmployees.length} · Unlimited`
+                  : `${activeEmployees.length}/${entitlements.limits.max_ai_employees}`
+            }
+            description={`AI employee slots on ${entitlements?.planName || "your plan"}`}
           />
         </section>
 
@@ -825,21 +766,8 @@ function WorkforceStat({
   );
 }
 
-function getEmployeeAvatar(type: string) {
-  const avatars: Record<string, string> = {
-    receptionist: "/avatars/receptionist.png",
-    sales: "/avatars/sales.png",
-    "customer-support": "/avatars/customer-support.png",
-    accountant: "/avatars/accountant.png",
-    finance: "/avatars/finance.png",
-    marketing: "/avatars/marketing.png",
-    hr: "/avatars/hr.png",
-    operations: "/avatars/operations.png",
-    appointment: "/avatars/appointment.png",
-    "general-manager": "/brand/kuba-general-manager-avatar.png",
-  };
-
-  return avatars[type] || "/avatars/receptionist.png";
+function WorkforceUsage({ active, limit }: { active: number; limit: number | null }) {
+  return <span className="text-white/70">{limit === null ? `${active} active · Unlimited` : `${active} / ${limit} AI employees`}</span>;
 }
 
 
@@ -847,10 +775,12 @@ function ActiveEmployeeCard({
   employee,
   definition,
   executive = false,
+  entitledUnderCurrentPlan = true,
 }: {
   employee: Employee;
   definition?: EmployeeDefinition;
   executive?: boolean;
+  entitledUnderCurrentPlan?: boolean;
 }) {
   const avatar = getEmployeeAvatar(employee.type);
 
@@ -897,6 +827,15 @@ function ActiveEmployeeCard({
             <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-300">
               Online
             </span>
+
+            {!entitledUnderCurrentPlan && (
+              <span
+                className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300"
+                title="This employee type isn't included in your current plan. It keeps working, but you'll need to upgrade to activate another one like it."
+              >
+                Not in current plan
+              </span>
+            )}
 
           </div>
 
@@ -981,10 +920,25 @@ function ActiveEmployeeCard({
 function EmployeeLibraryCard({
   employee,
   active,
+  entitlements,
+  activeEmployeeCount = 0,
 }: {
   employee: EmployeeDefinition;
   active: boolean;
+  entitlements?: BusinessEntitlements | null;
+  activeEmployeeCount?: number;
 }) {
+  const comingSoon = employee.implementation === "coming-soon";
+  const decision =
+    !comingSoon && entitlements
+      ? canActivateEmployee(entitlements, employee.type, activeEmployeeCount)
+      : null;
+  const locked = decision !== null && !decision.allowed && decision.code !== "ENTERPRISE_CONFIGURATION_REQUIRED";
+  const requiredPlanName =
+    locked && decision && "requiredPlan" in decision && decision.requiredPlan
+      ? getPlanDefinition(decision.requiredPlan).name
+      : null;
+
   return (
     <div className="rounded-3xl border border-white/10 bg-white/[0.025] p-5 transition hover:border-cyan-400/25 hover:bg-white/[0.04]">
 
@@ -995,9 +949,19 @@ function EmployeeLibraryCard({
           {employee.category}
         </span>
 
-        <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/25">
-          AI Employee
-        </span>
+        {comingSoon ? (
+          <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/30">
+            Coming Soon
+          </span>
+        ) : requiredPlanName ? (
+          <span className="rounded-full border border-violet-300/20 bg-violet-300/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-violet-200">
+            {requiredPlanName}
+          </span>
+        ) : (
+          <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/25">
+            AI Employee
+          </span>
+        )}
 
       </div>
 
@@ -1057,6 +1021,9 @@ function EmployeeLibraryCard({
           type={employee.type}
           description={employee.description}
           templateId={employee.templateId}
+          entitlements={entitlements}
+          activeEmployeeCount={activeEmployeeCount}
+          implementation={employee.implementation}
         />
 
       )}

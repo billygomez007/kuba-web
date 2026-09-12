@@ -7,7 +7,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 
 import {
   businesses,
@@ -79,16 +80,25 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Basic Support conversation is gated by the same type-availability
+     * policy used at activation (Growth plan or higher), not by
+     * "customer_ops.tickets". Ticket-management specifically is an
+     * additional capability, not a prerequisite for a customer describing
+     * their issue — mastra/tools/ticket-tools.ts already independently
+     * enforces its own, stricter "customer_ops.ai_assist" gate before
+     * creating or modifying any ticket.
+     */
     if (
-      !hasCapability(
+      !isEmployeeTypeEntitled(
         await getBusinessEntitlements(business.id),
-        "customer_ops.tickets",
+        "customer-support",
       )
     ) {
       return NextResponse.json(
         {
           error: "Kuba Customer Support requires a higher plan.",
-          code: "FEATURE_NOT_ENTITLED",
+          code: "EMPLOYEE_TYPE_NOT_ENTITLED",
           upgradeRequired: true,
         },
         { status: 403 },

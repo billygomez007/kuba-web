@@ -6,6 +6,8 @@ import { RequestContext } from "@mastra/core/request-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 
 import {
   businesses,
@@ -104,6 +106,31 @@ export async function POST(
       );
     }
 
+
+    /*
+     * General Manager is a Pro/Enterprise-tier employee under the approved
+     * AI Workforce plan model — this route previously had no plan gate at
+     * all, letting any plan chat with an already-active General Manager
+     * regardless of what that business is currently entitled to. Uses the
+     * same type-availability policy as activation
+     * (lib/billing/ai-workforce-policy.ts), so this can never disagree with
+     * whether the employee was legitimately allowed to be activated.
+     */
+    if (
+      !isEmployeeTypeEntitled(
+        await getBusinessEntitlements(business.id),
+        "general-manager",
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error: "Kuba General Manager requires the Pro plan or higher.",
+          code: "EMPLOYEE_TYPE_NOT_ENTITLED",
+          upgradeRequired: true,
+        },
+        { status: 403 },
+      );
+    }
 
     const employeeResult =
       await db

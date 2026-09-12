@@ -54,7 +54,11 @@ export async function getBusinessEntitlements(businessId: string): Promise<Busin
     if (override.overrideType === "limit") {
       const value = Number(override.value);
       if (!Number.isFinite(value)) continue;
-      if (override.feature === "employeeLimit") limits.max_ai_employees = limits.max_ai_employees === null ? null : Math.max(limits.max_ai_employees, value);
+      // An explicit employeeLimit override is an authoritative,
+      // admin-configured Enterprise agreement value — it must be able to
+      // set a specific finite limit even when the plan's own default is
+      // null (unlimited), which a "raise the floor" Math.max can never do.
+      if (override.feature === "employeeLimit") limits.max_ai_employees = value;
       if (override.feature === "automationLimit") limits.max_automations = limits.max_automations === null ? null : Math.max(limits.max_automations, value);
       if (override.feature === "voiceMinutes") limits.includedVoiceMinutes = Math.max(limits.includedVoiceMinutes, value);
       if (override.feature in limits) limits[override.feature as keyof EntitlementLimits] = value;

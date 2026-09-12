@@ -3,81 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import BackNavigation from "../../components/BackNavigation";
+import { employeeCatalog } from "@/lib/billing/ai-workforce-catalog";
 
-const employees = [
-  {
-    name: "Kuba Receptionist",
-    type: "receptionist",
-    category: "Customer Experience",
-    avatar: "/avatars/receptionist.png",
-    recommended: true,
-    description: "Handles customers, inquiries, bookings, and lead capture.",
-  },
-  {
-    name: "Kuba Sales",
-    type: "sales",
-    category: "Revenue",
-    avatar: "/avatars/sales.png",
-    recommended: true,
-    description: "Manages leads, follow-ups, and sales intelligence.",
-  },
-  {
-    name: "Kuba Customer Support",
-    type: "customer-support",
-    category: "Customer Experience",
-    avatar: "/avatars/customer-support.png",
-    recommended: false,
-    description: "Answers customer questions and resolves support requests.",
-  },
-  {
-    name: "Kuba Accountant",
-    type: "accountant",
-    category: "Finance",
-    avatar: "/avatars/accountant.png",
-    recommended: false,
-    description: "Handles finance workflows and reports.",
-  },
-  {
-    name: "Kuba Finance",
-    type: "finance",
-    category: "Finance",
-    avatar: "/avatars/finance.png",
-    recommended: false,
-    description: "Supports financial planning and business analysis.",
-  },
-  {
-    name: "Kuba Marketing",
-    type: "marketing",
-    category: "Growth",
-    avatar: "/avatars/marketing.png",
-    recommended: false,
-    description: "Creates campaigns, content, and customer engagement strategies.",
-  },
-  {
-    name: "Kuba HR",
-    type: "hr",
-    category: "People",
-    avatar: "/avatars/hr.png",
-    recommended: false,
-    description: "Supports recruitment and people operations.",
-  },
-  {
-    name: "Kuba Operations",
-    type: "operations",
-    category: "Operations",
-    avatar: "/avatars/operations.png",
-    recommended: false,
-    description: "Manages business processes and workflows.",
-  },
-  {
-    name: "Kuba Appointment",
-    type: "appointment",
-    category: "Operations",
-    avatar: "/avatars/appointment.png",
-    recommended: false,
-    description: "Schedules appointments and manages bookings.",
-  },
-];
+// Sourced from the shared catalog instead of a private copy (this page's
+// own list used to drift from the other AI-employee pickers elsewhere in
+// the app). Only types with a real, working chat runtime are offered —
+// see lib/billing/ai-workforce-catalog.ts for the full list and why each
+// type not shown here is still "coming soon".
+const employees = employeeCatalog
+  .filter((entry) => entry.implementation === "available")
+  .map((entry) => ({
+    name: entry.name,
+    type: entry.type,
+    category: entry.category,
+    avatar: entry.avatar,
+    recommended: entry.type === "receptionist" || entry.type === "sales",
+    description: entry.description,
+  }));
 
 export default function AITrainingPage() {
   const router = useRouter();

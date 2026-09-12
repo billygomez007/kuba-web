@@ -7,7 +7,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 import {
   businesses,
   aiBusinessSettings,
@@ -111,27 +112,27 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Gate basic Receptionist conversation on the base customer-operations
-     * capability (included from the Starter plan), not on
-     * "customer_ops.appointments". Appointment scheduling is an additional
-     * capability, not a prerequisite for greeting a customer or answering a
-     * general question — and the appointment tools this agent can call
-     * (mastra/tools/appointment-tools.ts) already independently enforce
-     * their own, stricter "customer_ops.ai_assist" gate before reading or
-     * writing any appointment data. Gating the whole conversation on
-     * "customer_ops.appointments" blocked every Receptionist message,
-     * including a plain "hello", for any plan without that capability.
+     * Gate basic Receptionist conversation on the same AI-workforce-policy
+     * type check used at activation (lib/billing/ai-workforce-policy.ts),
+     * not a standalone capability string. Appointment scheduling is an
+     * additional capability, not a prerequisite for greeting a customer or
+     * answering a general question — the appointment tools this agent can
+     * call (mastra/tools/appointment-tools.ts) already independently
+     * enforce their own, stricter "customer_ops.ai_assist" gate before
+     * reading or writing any appointment data. Using the identical function
+     * activation uses guarantees this route can never disagree with
+     * whether the employee was legitimately allowed to be activated.
      */
     if (
-      !hasCapability(
+      !isEmployeeTypeEntitled(
         await getBusinessEntitlements(business.id),
-        "customer_ops.core",
+        "receptionist",
       )
     ) {
       return NextResponse.json(
         {
           error: "The AI Receptionist requires a higher plan.",
-          code: "FEATURE_NOT_ENTITLED",
+          code: "EMPLOYEE_TYPE_NOT_ENTITLED",
           upgradeRequired: true,
         },
         { status: 403 },

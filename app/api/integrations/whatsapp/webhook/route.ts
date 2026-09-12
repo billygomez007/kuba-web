@@ -25,6 +25,8 @@ import {
   resolveWhatsAppIntegrationByPhoneNumberId,
   sendWhatsAppText,
 } from "@/lib/channels/whatsapp";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeImplementationAvailable, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -633,6 +635,11 @@ ${customerMessage}
     let selectedEmployeeId =
       receptionist.id;
 
+    const workforceEntitlements =
+      await getBusinessEntitlements(
+        businessId,
+      );
+
     if (
       routingDecision.aiEmployeeId
     ) {
@@ -668,7 +675,11 @@ ${customerMessage}
       const routedEmployee =
         routedEmployeeResult[0];
 
-      if (routedEmployee) {
+      if (
+        routedEmployee &&
+        isEmployeeTypeEntitled(workforceEntitlements, routedEmployee.type) &&
+        isEmployeeImplementationAvailable(routedEmployee.type)
+      ) {
         selectedEmployeeId =
           routedEmployee.id;
 

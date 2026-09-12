@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { employeeCatalog } from "@/lib/billing/ai-workforce-catalog";
+import { canActivateEmployee } from "@/lib/billing/ai-workforce-policy";
+import { getPlanDefinition } from "@/lib/billing/plan-definitions";
+import type { BusinessEntitlements } from "@/lib/billing/entitlements";
 
 type Role = {
   type: string;
@@ -11,15 +15,14 @@ type Role = {
   capabilities: string[];
 };
 
-const roles: Role[] = [
-  { type: "receptionist", name: "Receptionist", description: "Welcome customers, answer enquiries, and route requests.", capabilities: ["Answer enquiries", "Capture leads", "Schedule appointments", "Escalate conversations"] },
-  { type: "sales", name: "Sales Representative", description: "Qualify opportunities and keep revenue moving.", capabilities: ["Qualify leads", "Follow up customers", "Update pipeline", "Surface opportunities"] },
-  { type: "customer-support", name: "Customer Support", description: "Resolve customer questions and service issues.", capabilities: ["Answer support questions", "Resolve common issues", "Track customer context", "Escalate complex requests"] },
-  { type: "marketing", name: "Marketing Assistant", description: "Support campaigns, content, and customer engagement.", capabilities: ["Plan campaigns", "Create content", "Engage customers", "Track opportunities"] },
-  { type: "operations", name: "Executive Assistant", description: "Coordinate business operations and important next actions.", capabilities: ["Organize work", "Monitor operations", "Coordinate teams", "Surface priorities"] },
-  { type: "accountant", name: "Accountant", description: "Support finance workflows, records, and reporting.", capabilities: ["Organize records", "Support reporting", "Track finance tasks", "Escalate exceptions"] },
-  { type: "custom", name: "Custom Employee", description: "Design an AI employee around a specific business workflow.", capabilities: ["Define responsibilities", "Choose a communication style", "Connect business context", "Set approval expectations"] },
-];
+// Only roles with a real, working chat runtime today are offered here —
+// showing a "coming soon" type as a buildable role would let someone build
+// and activate an employee with nothing to talk to. See
+// lib/billing/ai-workforce-catalog.ts for the full catalog and why each
+// type is classified the way it is.
+const roles: Role[] = employeeCatalog
+  .filter((entry) => entry.implementation === "available")
+  .map((entry) => ({ type: entry.type, name: entry.roleName, description: entry.description, capabilities: entry.capabilities }));
 
 const knowledgeOptions = ["Business profile", "FAQs", "Products and services", "Pricing", "Documents", "Policies"];
 const approvalOptions = ["Discounts", "Refunds", "External messages", "Customer data changes"];
@@ -38,7 +41,43 @@ export default function CreateAIEmployeePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [entitlements, setEntitlements] = useState<BusinessEntitlements | null>(null);
+  const [activeEmployeeCount, setActiveEmployeeCount] = useState(0);
+  const [entitlementsLoaded, setEntitlementsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEntitlements() {
+      try {
+        const response = await fetch("/api/businesses", { cache: "no-store" });
+        const data = await response.json();
+        if (cancelled) return;
+        setEntitlements(data.entitlements ?? null);
+        const active = Array.isArray(data.employees) ? data.employees.filter((employee: { status: string }) => employee.status?.toLowerCase() === "active").length : 0;
+        setActiveEmployeeCount(active);
+      } catch {
+        // Leave entitlements null — the role picker below treats that as
+        // "unknown" and disables selection rather than assuming access.
+      } finally {
+        if (!cancelled) setEntitlementsLoaded(true);
+      }
+    }
+    void loadEntitlements();
+    return () => { cancelled = true; };
+  }, []);
+
+  const roleDecisions = useMemo(() => {
+    const decisions = new Map<string, ReturnType<typeof canActivateEmployee>>();
+    if (!entitlements) return decisions;
+    for (const candidate of roles) {
+      decisions.set(candidate.type, canActivateEmployee(entitlements, candidate.type, activeEmployeeCount));
+    }
+    return decisions;
+  }, [entitlements, activeEmployeeCount]);
+
   function chooseRole(selectedRole: Role) {
+    const decision = roleDecisions.get(selectedRole.type);
+    if (decision && !decision.allowed) return; // locked roles aren't selectable — no dead-end submission
     setRole(selectedRole);
     setName(`Kuba ${selectedRole.name}`);
     setDescription(selectedRole.description);
@@ -86,13 +125,13 @@ export default function CreateAIEmployeePage() {
           <nav className="flex gap-2 overflow-x-auto lg:block lg:space-y-2">{["Select role", "Identity", "Business Brain", "Capabilities", "Approval settings", "Activation"].map((label, index) => <button key={label} type="button" onClick={() => setStep(index + 1)} className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm lg:w-full ${step === index + 1 ? "bg-cyan-300/[0.1] text-cyan-200" : "text-white/35 hover:bg-white/[0.04]"}`}><span className="flex h-7 w-7 items-center justify-center rounded-lg border border-current text-xs">{index + 1}</span>{label}</button>)}</nav>
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-5 sm:p-8">
-            {step === 1 && <><StepHeading eyebrow="Step 1 of 6" title="Choose a role" description="Start with a proven role and its recommended capabilities." /><div className="grid gap-3 md:grid-cols-2">{roles.map((item) => <button key={item.type} type="button" onClick={() => chooseRole(item)} className={`rounded-2xl border p-5 text-left transition ${role.type === item.type ? "border-cyan-300/40 bg-cyan-300/[0.08]" : "border-white/10 bg-black/20 hover:border-white/20"}`}><div className="flex items-start justify-between gap-3"><h2 className="font-bold">{item.name}</h2>{role.type === item.type && <span className="text-cyan-300">✓</span>}</div><p className="mt-2 text-sm leading-6 text-white/40">{item.description}</p><p className="mt-4 text-xs text-cyan-200/60">{item.capabilities.slice(0, 2).join(" · ")}</p></button>)}</div></>}
+            {step === 1 && <><StepHeading eyebrow="Step 1 of 6" title="Choose a role" description="Start with a proven role and its recommended capabilities." /><div className="grid gap-3 md:grid-cols-2">{roles.map((item) => { const decision = roleDecisions.get(item.type); const locked = entitlementsLoaded && decision && !decision.allowed; const requiredPlan = locked && decision && !decision.allowed && "requiredPlan" in decision ? decision.requiredPlan : undefined; return <button key={item.type} type="button" onClick={() => chooseRole(item)} disabled={locked} aria-disabled={locked} title={locked ? decision?.message : undefined} className={`rounded-2xl border p-5 text-left transition ${locked ? "cursor-not-allowed border-white/5 bg-black/10 opacity-50" : role.type === item.type ? "border-cyan-300/40 bg-cyan-300/[0.08]" : "border-white/10 bg-black/20 hover:border-white/20"}`}><div className="flex items-start justify-between gap-3"><h2 className="font-bold">{item.name}</h2>{locked ? <span className="rounded-full border border-violet-300/20 bg-violet-300/[0.08] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-200">{requiredPlan ? `Upgrade to ${getPlanDefinition(requiredPlan).name}` : "Locked"}</span> : role.type === item.type && <span className="text-cyan-300">✓</span>}</div><p className="mt-2 text-sm leading-6 text-white/40">{item.description}</p><p className="mt-4 text-xs text-cyan-200/60">{item.capabilities.slice(0, 2).join(" · ")}</p></button>; })}</div></>}
             {step === 2 && <><StepHeading eyebrow="Step 2 of 6" title="Define the identity" description="Give your employee a clear role inside the business." /><div className="grid gap-5 md:grid-cols-2"><Field label="Employee name" value={name} onChange={setName} /><Field label="Department" value={department} onChange={setDepartment} /><Field label="Personality and tone" value={personality} onChange={setPersonality} /><Field label="Role" value={role.name} onChange={() => undefined} disabled /><label className="md:col-span-2"><span className="text-sm font-semibold text-white/70">Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 outline-none focus:border-cyan-300/40" /></label></div></>}
             {step === 3 && <><StepHeading eyebrow="Step 3 of 6" title="Connect the Business Brain" description="Choose the knowledge areas this employee should use. Existing shared knowledge remains the source of truth." /><ChoiceList values={knowledgeOptions} selected={knowledge} onToggle={(value) => toggleValue(value, knowledge, setKnowledge)} /></>}
             {step === 4 && <><StepHeading eyebrow="Step 4 of 6" title="Select capabilities" description="Tune the work this employee is prepared to handle." /><ChoiceList values={role.capabilities} selected={capabilities} onToggle={(value) => toggleValue(value, capabilities, setCapabilities)} /></>}
             {step === 5 && <><StepHeading eyebrow="Step 5 of 6" title="Set approval expectations" description="These preferences prepare the future approval workflow without changing execution rules today." /><ChoiceList values={approvalOptions} selected={approvals} onToggle={(value) => toggleValue(value, approvals, setApprovals)} /></>}
             {step === 6 && <><StepHeading eyebrow="Step 6 of 6" title="Ready to activate" description="Review the employee identity and activate its workspace." /><div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-5"><p className="text-xs uppercase tracking-wider text-cyan-200/60">Employee preview</p><h2 className="mt-2 text-2xl font-black">{name || "Unnamed employee"}</h2><p className="mt-1 text-sm text-white/45">{role.name} · {department}</p><p className="mt-4 text-sm leading-6 text-white/60">{description}</p></div>{error && <p className="mt-5 rounded-xl border border-red-400/20 bg-red-400/[0.05] p-4 text-sm text-red-200">{error}</p>}</>}
-            <div className="mt-8 flex flex-col-reverse justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row"><button type="button" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || loading} className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-white/55 disabled:opacity-30">Back</button>{step < 6 ? <button type="button" onClick={() => setStep((current) => Math.min(6, current + 1))} className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black">Continue</button> : <button type="button" onClick={() => void activate()} disabled={loading || !name.trim()} className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-black disabled:opacity-50">{loading ? "Activating..." : "Create and activate employee"}</button>}</div>
+            <div className="mt-8 flex flex-col-reverse justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row"><button type="button" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || loading} className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-white/55 disabled:opacity-30">Back</button>{step < 6 ? <button type="button" onClick={() => setStep((current) => Math.min(6, current + 1))} className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black">Continue</button> : <button type="button" onClick={() => void activate()} disabled={loading || !name.trim() || roleDecisions.get(role.type)?.allowed === false} className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-bold text-black disabled:opacity-50">{loading ? "Activating..." : "Create and activate employee"}</button>}</div>
           </section>
         </div>
       </div>

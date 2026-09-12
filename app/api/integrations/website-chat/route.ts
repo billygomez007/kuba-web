@@ -22,6 +22,8 @@ import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { runAutomationTrigger } from "@/lib/automations/engine";
 import { createAuditLog } from "@/lib/auth/audit";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeImplementationAvailable, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 
 
 function classifyWebsiteChatError(
@@ -943,6 +945,11 @@ export async function POST(request: Request) {
         receptionist.type,
       );
 
+    const workforceEntitlements =
+      await getBusinessEntitlements(
+        business.id,
+      );
+
     if (
       routingDecision.aiEmployeeId
     ) {
@@ -984,7 +991,11 @@ export async function POST(request: Request) {
       const routedEmployee =
         routedEmployeeResult[0];
 
-      if (routedEmployee) {
+      if (
+        routedEmployee &&
+        isEmployeeTypeEntitled(workforceEntitlements, routedEmployee.type) &&
+        isEmployeeImplementationAvailable(routedEmployee.type)
+      ) {
         selectedEmployeeId =
           routedEmployee.id;
 

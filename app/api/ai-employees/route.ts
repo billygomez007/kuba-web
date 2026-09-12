@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import {
   aiEmployees,
-  businesses,
 } from "@/db/schema";
 
 import {
@@ -16,11 +15,11 @@ import {
   PERMISSIONS,
 } from "@/lib/auth/permissions";
 import {
-  employeeLimitMessage,
-  getPlanDefinition,
   getBusinessEntitlements,
-  hasCapability,
 } from "@/lib/billing/entitlements";
+import {
+  canActivateEmployee,
+} from "@/lib/billing/ai-workforce-policy";
 
 export async function POST(
   request: Request,
@@ -73,47 +72,6 @@ export async function POST(
       );
     }
 
-    if (!hasCapability(await getBusinessEntitlements(membership.businessId), "ai_workforce.core")) {
-      return NextResponse.json({ error: "AI Workforce requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "starter" }, { status: 403 });
-    }
-
-    activationStage =
-      "load_plan";
-    const businessResult = await db
-      .select({
-        plan: businesses.plan,
-      })
-      .from(businesses)
-      .where(
-        eq(
-          businesses.id,
-          membership.businessId,
-        ),
-      )
-      .limit(1);
-    const business = businessResult[0];
-
-    if (!business) {
-      return NextResponse.json(
-        {
-          error:
-            "Business access denied.",
-        },
-        { status: 403 },
-      );
-    }
-
-    const plan =
-      getPlanDefinition(business.plan);
-    if (plan.employeeLimit !== null) {
-      activationStage =
-        "check_employee_limit";
-      const activeEmployees = await db.select({ total: count() }).from(aiEmployees).where(and(eq(aiEmployees.businessId, membership.businessId), eq(aiEmployees.status, "active")));
-      if (Number(activeEmployees[0]?.total || 0) >= plan.employeeLimit) {
-        return NextResponse.json({ error: employeeLimitMessage(plan), upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
-      }
-    }
-
     activationStage =
       "parse_request";
     const body =
@@ -151,8 +109,48 @@ export async function POST(
       );
     }
 
-    if (plan.id === "starter" && !["receptionist", "appointment", "customer-support"].includes(type)) {
-      return NextResponse.json({ error: `${type} AI requires Growth or higher.`, upgradeRequired: true, requiredPlan: "growth" }, { status: 403 });
+    /*
+     * Server-side entitlement policy is authoritative here — the client's
+     * `type` is only ever used to look up what THIS business is entitled to
+     * do, never trusted as authorization by itself. canActivateEmployee
+     * checks both independent dimensions (employee count AND employee type)
+     * using the same subscription/trial-aware entitlements resolution the
+     * rest of the app relies on, and is the same function the runtime chat
+     * routes use — so activation and runtime entitlement can never disagree.
+     */
+    activationStage =
+      "check_entitlement";
+    const entitlements =
+      await getBusinessEntitlements(membership.businessId);
+    const activeEmployees = await db
+      .select({ total: count() })
+      .from(aiEmployees)
+      .where(
+        and(
+          eq(aiEmployees.businessId, membership.businessId),
+          eq(aiEmployees.status, "active"),
+        ),
+      );
+    const activationDecision = canActivateEmployee(
+      entitlements,
+      type,
+      Number(activeEmployees[0]?.total || 0),
+    );
+
+    if (!activationDecision.allowed) {
+      return NextResponse.json(
+        {
+          error: activationDecision.message,
+          code: activationDecision.code,
+          // A genuine plan-upgrade path (a specific requiredPlan, or more
+          // workforce capacity from EMPLOYEE_LIMIT_REACHED) sets this.
+          // EMPLOYEE_NOT_AVAILABLE and ENTERPRISE_CONFIGURATION_REQUIRED
+          // are never solved by upgrading, so both must resolve to false.
+          upgradeRequired: Boolean(activationDecision.requiredPlan) || activationDecision.code === "EMPLOYEE_LIMIT_REACHED",
+          ...(activationDecision.requiredPlan ? { requiredPlan: activationDecision.requiredPlan } : {}),
+        },
+        { status: 403 },
+      );
     }
 
     activationStage =

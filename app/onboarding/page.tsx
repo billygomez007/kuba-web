@@ -8,14 +8,19 @@ import { COUNTRY_ORDER, CURRENCY_ORDER, SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIE
 import { formatDate } from "@/lib/localization/format";
 import { planDefinitions, planOrder, type PlanId } from "@/lib/billing/plan-definitions";
 import { cardFeatures, limitCopy, pricingCopy } from "@/lib/billing/pricing-presentation";
+import { employeeCatalog } from "@/lib/billing/ai-workforce-catalog";
+import { canActivateEmployee } from "@/lib/billing/ai-workforce-policy";
+import type { BusinessEntitlements } from "@/lib/billing/entitlements";
 
 type Role = { type: string; name: string; description: string };
-const roles: Role[] = [
-  { type: "receptionist", name: "AI Receptionist", description: "Customer enquiries, appointments, and phone calls." },
-  { type: "sales", name: "AI Sales Assistant", description: "Lead qualification and sales follow-up." },
-  { type: "customer-support", name: "AI Customer Support", description: "Customer issues, troubleshooting, and escalation." },
-  { type: "general-manager", name: "AI Executive Assistant", description: "Internal productivity and operational priorities." },
-];
+// The same 4 starter-friendly roles this step has always offered, sourced
+// from the shared catalog instead of a private copy so the name/description
+// can't drift from what the rest of the app calls the same type.
+const FIRST_EMPLOYEE_TYPES = ["receptionist", "sales", "customer-support", "general-manager"];
+const roles: Role[] = employeeCatalog
+  .filter((entry) => FIRST_EMPLOYEE_TYPES.includes(entry.type))
+  .sort((a, b) => FIRST_EMPLOYEE_TYPES.indexOf(a.type) - FIRST_EMPLOYEE_TYPES.indexOf(b.type))
+  .map((entry) => ({ type: entry.type, name: entry.name.replace("Kuba ", "AI "), description: entry.description }));
 const steps = ["Welcome", "Business information", "Choose your plan", "Setup choice", "First AI employee", "Business training", "Channels", "Voice setup", "Automations", "Test employee", "Ready to deploy"];
 const SELF_SERVE_PLANS: PlanId[] = ["starter", "growth", "pro"];
 const TRIAL_DAYS = 14;
@@ -42,6 +47,12 @@ function OnboardingPageInner() {
   // SUGGESTION only — never applied automatically. See applyDetectedTimezone.
   const [detectedTimezone] = useState(() => { try { const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone; return browserZone && isValidTimezone(browserZone) ? browserZone : ""; } catch { return ""; } });
   const [location, setLocation] = useState(""); const [website, setWebsite] = useState(""); const [description, setDescription] = useState(""); const [products, setProducts] = useState(""); const [customers, setCustomers] = useState(""); const [role, setRole] = useState(roles[0]); const [employeeId, setEmployeeId] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  // Real, server-resolved entitlements for the business just created in
+  // step 2 — never the client's `selectedPlan` UI state, which only
+  // reflects a completed trial/checkout if the user actually finished one.
+  // A user who clicks "Continue without payment" still has Starter
+  // entitlements regardless of what plan they were looking at in step 3.
+  const [entitlements, setEntitlements] = useState<BusinessEntitlements | null>(null);
 
   const [selectedPlan, setSelectedPlan] = useState<PlanId>(isSelfServePlan(initialPlan) ? initialPlan : "growth");
   const [trialLoading, setTrialLoading] = useState(false);
@@ -63,9 +74,10 @@ function OnboardingPageInner() {
   }
 
   async function createBusiness() { const response = await fetch("/api/businesses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessName, website, industry, countryCode, currencyCode, timezone, businessSize: "Solo", goals: ["Automate customer support"], location }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to save business profile."); }
+  async function loadEntitlements() { try { const response = await fetch("/api/businesses", { cache: "no-store" }); const data = await response.json(); if (response.ok) setEntitlements(data.entitlements ?? null); } catch { /* role picker treats null as "unknown" and disables selection */ } }
   async function saveBrain() { const form = new FormData(); form.set("businessDescription", `${description}${location ? ` Location: ${location}.` : ""}`); form.set("productsAndServices", products); form.set("targetCustomers", customers); form.set("frequentlyAskedQuestions", ""); form.set("aiInstructions", ""); form.set("tone", "professional"); const response = await fetch("/api/businesses/ai-settings", { method: "POST", body: form, redirect: "manual" }); if (!response.ok && response.status !== 307) throw new Error("Unable to save Business Brain."); }
   async function createEmployee() { const response = await fetch("/api/ai-employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Kuba ${role.name.replace("AI ", "")}`, type: role.type, description: role.description, templateId: role.type }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to create AI employee."); if (data.employee?.id) { setEmployeeId(data.employee.id); const settings = new FormData(); settings.set("employeeId", data.employee.id); settings.set("responsibilities", role.description); settings.set("communicationStyle", "Professional and helpful"); settings.set("roleInstructions", "Use Business Brain and approved tools. Escalate when human support is needed."); await fetch("/api/ai-employees/settings", { method: "POST", body: settings }); } }
-  async function next() { setError(""); if (step === 2 && !businessName.trim()) { setError("Business name is required."); return; } const actionDate = new Date(); setLoading(true); try { if (step === 2) { await createBusiness(); setFirstChargeDate(computeFirstChargeDate(timezone, actionDate)); } if (step === 6) await saveBrain(); if (step === 5) await createEmployee(); if (step === 4) { setStep(5); setLoading(false); return; } setStep((current) => Math.min(steps.length, current + 1)); } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "Unable to continue setup."); } finally { setLoading(false); } }
+  async function next() { setError(""); if (step === 2 && !businessName.trim()) { setError("Business name is required."); return; } const actionDate = new Date(); setLoading(true); try { if (step === 2) { await createBusiness(); setFirstChargeDate(computeFirstChargeDate(timezone, actionDate)); await loadEntitlements(); } if (step === 6) await saveBrain(); if (step === 5) await createEmployee(); if (step === 4) { setStep(5); setLoading(false); return; } setStep((current) => Math.min(steps.length, current + 1)); } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "Unable to continue setup."); } finally { setLoading(false); } }
   function skip() { router.push("/dashboard"); }
   async function deploy() { if (!employeeId) { setError("Create an AI employee before deploying."); return; } setLoading(true); const response = await fetch("/api/workforce/deployment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId }) }); const data = await response.json(); if (!response.ok) setError(data.error || "Complete the readiness steps before deploying."); else router.push("/dashboard"); setLoading(false); }
 
@@ -256,17 +268,30 @@ function OnboardingPageInner() {
               <p className="text-white/70">Select your first AI employee role.</p>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {roles.map((candidate) => (
-                  <button
-                    key={candidate.type}
-                    type="button"
-                    onClick={() => setRole(candidate)}
-                    className={`rounded-xl border p-4 text-left ${role.type === candidate.type ? "border-cyan-300 bg-cyan-300/10" : "border-white/15 bg-black/20"}`}
-                  >
-                    <p className="font-semibold">{candidate.name}</p>
-                    <p className="mt-1 text-sm text-white/60">{candidate.description}</p>
-                  </button>
-                ))}
+                {roles.map((candidate) => {
+                  const decision = entitlements ? canActivateEmployee(entitlements, candidate.type, 0) : null;
+                  const locked = decision !== null && !decision.allowed;
+                  return (
+                    <button
+                      key={candidate.type}
+                      type="button"
+                      onClick={() => { if (!locked) setRole(candidate); }}
+                      disabled={locked}
+                      title={locked ? decision?.message : undefined}
+                      className={`rounded-xl border p-4 text-left ${locked ? "cursor-not-allowed border-white/5 bg-black/10 opacity-50" : role.type === candidate.type ? "border-cyan-300 bg-cyan-300/10" : "border-white/15 bg-black/20"}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold">{candidate.name}</p>
+                        {locked && (
+                          <span className="rounded-full border border-violet-300/30 bg-violet-300/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-200">
+                            Upgrade required
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-white/60">{candidate.description}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -9,6 +9,7 @@ import { getCurrentMembership } from "@/lib/auth/tenant";
 import { aiBusinessSettings, aiEmployeeActivities, aiEmployees, conversations, messages } from "@/db/schema";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { isEmployeeImplementationAvailable, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
@@ -28,7 +29,8 @@ export async function GET() {
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.simulator")) {
+    const entitlements = await getBusinessEntitlements(business.businessId);
+    if (!hasCapability(entitlements, "ai_workforce.simulator")) {
       return NextResponse.json({ error: "Simulator requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
     }
 
@@ -47,7 +49,8 @@ export async function POST(request: Request) {
     const business = await getCurrentMembership();
     if (!business) return NextResponse.json({ error: "Business not found." }, { status: 404 });
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-    if (!hasCapability(await getBusinessEntitlements(business.businessId), "ai_workforce.simulator")) {
+    const entitlements = await getBusinessEntitlements(business.businessId);
+    if (!hasCapability(entitlements, "ai_workforce.simulator")) {
       return NextResponse.json({ error: "Simulator requires a higher plan.", code: "FEATURE_NOT_ENTITLED", upgradeRequired: true, requiredPlan: "pro" }, { status: 403 });
     }
 
@@ -63,6 +66,12 @@ export async function POST(request: Request) {
     const employees = await db.select({ id: aiEmployees.id, name: aiEmployees.name, type: aiEmployees.type, status: aiEmployees.status }).from(aiEmployees).where(eq(aiEmployees.businessId, business.businessId));
     const selectedEmployees = employeeIds.map((id: string) => employees.find((employee: typeof employees[number]) => employee.id === id)).filter((employee: typeof employees[number] | undefined): employee is typeof employees[number] => Boolean(employee && employee.status === "active"));
     if (selectedEmployees.length !== employeeIds.length) return NextResponse.json({ error: "One or more selected AI employees are not active in this business." }, { status: 404 });
+    if (selectedEmployees.some((employee: typeof employees[number]) => !isEmployeeTypeEntitled(entitlements, employee.type))) {
+      return NextResponse.json({ error: "One or more selected AI employee types are not included in this plan.", code: "EMPLOYEE_TYPE_NOT_ENTITLED" }, { status: 403 });
+    }
+    if (selectedEmployees.some((employee: typeof employees[number]) => !isEmployeeImplementationAvailable(employee.type))) {
+      return NextResponse.json({ error: "One or more selected AI employees do not have a production-ready runtime.", code: "EMPLOYEE_NOT_AVAILABLE" }, { status: 409 });
+    }
 
     const settings = await db.select({ businessDescription: aiBusinessSettings.businessDescription, productsAndServices: aiBusinessSettings.productsAndServices, frequentlyAskedQuestions: aiBusinessSettings.frequentlyAskedQuestions, aiInstructions: aiBusinessSettings.aiInstructions }).from(aiBusinessSettings).where(eq(aiBusinessSettings.businessId, business.businessId)).limit(1);
     const knowledge = settings[0];

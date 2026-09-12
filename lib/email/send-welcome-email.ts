@@ -1,4 +1,4 @@
-import { resend } from "./resend";
+import { getResend } from "./resend";
 import { welcomeEmailTemplate } from "./templates";
 
 export async function sendWelcomeEmail(
@@ -7,7 +7,7 @@ export async function sendWelcomeEmail(
 ) {
   const emailTemplate = welcomeEmailTemplate({ name });
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: process.env.EMAIL_FROM!,
     to: email,
     replyTo: process.env.EMAIL_REPLY_TO!,

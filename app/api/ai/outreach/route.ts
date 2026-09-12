@@ -6,6 +6,8 @@ import { RequestContext } from "@mastra/core/request-context";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import {
   businesses,
@@ -147,6 +149,33 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "No business is associated with your account." },
         { status: 404 },
+      );
+    }
+
+    /*
+     * Outreach is a Pro/Enterprise-tier employee under the approved AI
+     * Workforce plan model — it previously had no plan gate at all on this
+     * route, letting any plan use it regardless of what they were entitled
+     * to activate. Uses the same type-availability policy as activation
+     * (lib/billing/ai-workforce-policy.ts), so this can never disagree with
+     * whether the employee was legitimately allowed to be activated. This
+     * only gates basic research/chat availability — it does not touch
+     * Outreach's existing approval, autonomy, external-action, or research
+     * safety controls, which remain fully enforced downstream regardless.
+     */
+    if (
+      !isEmployeeTypeEntitled(
+        await getBusinessEntitlements(business.id),
+        "outreach",
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error: "Kuba Outreach requires the Pro plan or higher.",
+          code: "EMPLOYEE_TYPE_NOT_ENTITLED",
+          upgradeRequired: true,
+        },
+        { status: 403 },
       );
     }
 

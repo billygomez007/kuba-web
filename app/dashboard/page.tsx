@@ -18,6 +18,8 @@ import ExecutiveIntelligencePanels from "../components/command-center/ExecutiveI
 import ExecutiveOperationsOverview from "../components/command-center/ExecutiveOperationsOverview";
 import AIWorkforceOverview from "../components/dashboard/AIWorkforceOverview";
 import SetupChecklist from "../components/dashboard/SetupChecklist";
+import { employeeCatalog } from "@/lib/billing/ai-workforce-catalog";
+import type { BusinessEntitlements } from "@/lib/billing/entitlements";
 
 type Business = {
   id: string;
@@ -36,48 +38,13 @@ type Employee = {
   status: string;
 };
 
-const employeeLibrary = [
-  {
-    type: "sales",
-    icon: "↗",
-    title: "Kuba Sales",
-    description:
-      "Find prospects, qualify leads, follow up with customers, and help move opportunities toward revenue.",
-    category: "Revenue",
-  },
-  {
-    type: "receptionist",
-    icon: "✦",
-    title: "Kuba Receptionist",
-    description:
-      "Welcome customers, answer common questions, capture information, and route requests.",
-    category: "Customer Operations",
-  },
-  {
-    type: "accountant",
-    icon: "◎",
-    title: "Kuba Accountant",
-    description:
-      "Help manage bookkeeping, financial records, reports, and accounting workflows.",
-    category: "Finance",
-  },
-  {
-    type: "appointment",
-    icon: "◈",
-    title: "Kuba Appointment",
-    description:
-      "Schedule appointments, manage availability, send reminders, and handle bookings.",
-    category: "Operations",
-  },
-  {
-    type: "marketing",
-    icon: "✺",
-    title: "Kuba Marketing",
-    description:
-      "Plan campaigns, create content, engage customers, and support marketing workflows.",
-    category: "Marketing",
-  },
-];
+// Sourced from the shared catalog (lib/billing/ai-workforce-catalog.ts)
+// instead of a private copy. Only real, working employee types are
+// previewed here — the full catalog, including locked and coming-soon
+// types, lives at /dashboard/ai-employees.
+const employeeLibrary = employeeCatalog
+  .filter((entry) => entry.implementation === "available" && entry.type !== "general-manager")
+  .map((entry) => ({ type: entry.type, icon: entry.icon, title: entry.name, description: entry.description, category: entry.category }));
 
 export default function DashboardPage() {
   const [business, setBusiness] = useState<Business | null>(null);
@@ -86,6 +53,7 @@ export default function DashboardPage() {
   const [userTimezone, setUserTimezone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [entitlements, setEntitlements] = useState<BusinessEntitlements | null>(null);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -115,6 +83,7 @@ export default function DashboardPage() {
 
         setBusiness(data.business ?? data);
         setEmployees(data.employees ?? []);
+        setEntitlements(data.entitlements ?? null);
         setBusinessTimezone(data.profile?.timezone ?? null);
         setUserTimezone(data.userTimezone ?? null);
         setLoadFailed(false);
@@ -308,6 +277,8 @@ export default function DashboardPage() {
                         name={employee.title}
                         type={employee.type}
                         description={employee.description}
+                        entitlements={entitlements}
+                        activeEmployeeCount={employees.filter((item) => item.status?.toLowerCase() === "active").length}
                       />
                     )}
                   </EmployeeCard>

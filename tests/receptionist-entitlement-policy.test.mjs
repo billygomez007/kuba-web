@@ -6,12 +6,15 @@
 // capability — including a business that had just activated the Receptionist
 // employee, since activation only requires the Starter-included
 // "ai_workforce.core" — got a clean 403 FEATURE_NOT_ENTITLED for every
-// message, including a plain "hello". The fix gates basic conversation on
-// "customer_ops.core" (Starter-included) instead. Actual appointment
-// scheduling remains independently protected: mastra/tools/appointment-tools.ts
+// message, including a plain "hello". The fix (since folded into the
+// broader central AI Workforce plan policy, lib/billing/ai-workforce-policy.ts)
+// gates basic conversation on the same type-availability check activation
+// uses (isEmployeeTypeEntitled(entitlements, "receptionist")), which
+// resolves true from the Starter plan onward. Actual appointment scheduling
+// remains independently protected: mastra/tools/appointment-tools.ts
 // already enforces its own, stricter "customer_ops.ai_assist" (Pro-tier) gate
-// before reading or writing any appointment row, regardless of what the route
-// itself checks.
+// before reading or writing any appointment row, regardless of what this
+// route checks.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -35,23 +38,27 @@ test.before(async () => {
 test("the Receptionist chat route no longer gates basic conversation on customer_ops.appointments", () => {
   assert.doesNotMatch(
     receptionistRouteSource,
-    /hasCapability\(\s*await getBusinessEntitlements\(business\.id\),\s*"customer_ops\.appointments"/,
+    /"customer_ops\.appointments"/,
   );
 });
 
-test("the Receptionist chat route gates basic conversation on customer_ops.core instead", () => {
+test("the Receptionist chat route gates basic conversation via the central employee-type policy instead", () => {
   assert.match(
     receptionistRouteSource,
-    /hasCapability\(\s*await getBusinessEntitlements\(business\.id\),\s*"customer_ops\.core"/,
+    /isEmployeeTypeEntitled\(\s*await getBusinessEntitlements\(business\.id\),\s*"receptionist"/,
   );
 });
 
 // --- 3: activation and runtime entitlement are now consistent ---
 
-test("AI employee activation requires ai_workforce.core, and every plan that includes it also includes customer_ops.core", () => {
+test("AI employee activation uses the central canActivateEmployee policy, and every plan that includes ai_workforce.core also includes customer_ops.core", () => {
   assert.match(
     aiEmployeesRouteSource,
-    /hasCapability\(await getBusinessEntitlements\(membership\.businessId\), "ai_workforce\.core"\)/,
+    /canActivateEmployee\(\s*entitlements,\s*type,/,
+  );
+  assert.match(
+    aiEmployeesRouteSource,
+    /getBusinessEntitlements\(membership\.businessId\)/,
   );
 
   // Structural guard against this exact bug class recurring: whatever

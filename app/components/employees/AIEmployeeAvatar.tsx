@@ -1,22 +1,12 @@
 "use client";
 
+import { getEmployeeAvatar } from "@/lib/billing/ai-workforce-catalog";
+
 type Props = {
   type: string;
   name: string;
   size?: "sm" | "md" | "lg";
   showStatus?: boolean;
-};
-
-const avatars: Record<string, string> = {
-  receptionist: "/avatars/receptionist.png",
-  sales: "/avatars/sales.png",
-  "customer-support": "/avatars/customer-support.png",
-  accountant: "/avatars/accountant.png",
-  finance: "/avatars/finance.png",
-  marketing: "/avatars/marketing.png",
-  hr: "/avatars/hr.png",
-  operations: "/avatars/operations.png",
-  appointment: "/avatars/appointment.png",
 };
 
 const sizes = {
@@ -31,8 +21,7 @@ export default function AIEmployeeAvatar({
   size = "md",
   showStatus = true,
 }: Props) {
-  const avatar =
-    avatars[type] || "/avatars/receptionist.png";
+  const avatar = getEmployeeAvatar(type);
 
   return (
     <div className="relative kuba-avatar-float">

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { resend } from "@/lib/email/resend";
+import { getResend } from "@/lib/email/resend";
 import { contactSalesEmailTemplate } from "@/lib/email/templates";
 import { rateLimit } from "@/lib/api/rate-limit";
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     const template = contactSalesEmailTemplate({ name, email, company, message });
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: process.env.EMAIL_FROM,
       to: salesInbox,
       replyTo: email,

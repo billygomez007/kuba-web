@@ -63,7 +63,7 @@ test("the homepage now renders the shared MarketingFooter instead of an inline d
 test("/api/contact-sales is a real, rate-limited endpoint that validates input and only sends when configured", async () => {
   const source = await readFile("app/api/contact-sales/route.ts", "utf8");
   assert.match(source, /rateLimit\(/);
-  assert.match(source, /resend\.emails\.send/);
+  assert.match(source, /getResend\(\)\.emails\.send/);
   assert.match(source, /CONFIGURATION_REQUIRED/);
   assert.match(source, /EMAIL_PATTERN\.test\(email\)/);
 });

@@ -1,34 +1,14 @@
 "use client";
 
+import { getCatalogEntry, getEmployeeAvatar } from "@/lib/billing/ai-workforce-catalog";
+
 type Props = {
   name: string;
   type: string;
   status: string;
   description?: string | null;
-};
-
-const avatars: Record<string, string> = {
-  receptionist: "/avatars/receptionist.png",
-  sales: "/avatars/sales.png",
-  "customer-support": "/avatars/customer-support.png",
-  accountant: "/avatars/accountant.png",
-  finance: "/avatars/finance.png",
-  marketing: "/avatars/marketing.png",
-  hr: "/avatars/hr.png",
-  operations: "/avatars/operations.png",
-  appointment: "/avatars/appointment.png",
-};
-
-const categories: Record<string, string> = {
-  receptionist: "Customer Experience",
-  sales: "Revenue",
-  "customer-support": "Customer Experience",
-  accountant: "Finance",
-  finance: "Finance",
-  marketing: "Growth",
-  hr: "People",
-  operations: "Operations",
-  appointment: "Operations",
+  /** True if this employee's type isn't included in the business's current plan. */
+  notEntitledUnderCurrentPlan?: boolean;
 };
 
 export default function AIEmployeeHeader({
@@ -36,12 +16,10 @@ export default function AIEmployeeHeader({
   type,
   status,
   description,
+  notEntitledUnderCurrentPlan = false,
 }: Props) {
-  const avatar =
-    avatars[type] || "/avatars/receptionist.png";
-
-  const category =
-    categories[type] || "AI Workforce";
+  const avatar = getEmployeeAvatar(type);
+  const category = getCatalogEntry(type)?.category || "AI Workforce";
 
   return (
     <section className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-8 shadow-2xl backdrop-blur-xl">
@@ -78,6 +56,15 @@ export default function AIEmployeeHeader({
             <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
               {status}
             </span>
+
+            {notEntitledUnderCurrentPlan && (
+              <span
+                className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300"
+                title="This employee type isn't included in your current plan. It keeps working, but you'll need to upgrade to activate another one like it."
+              >
+                Not in current plan
+              </span>
+            )}
 
           </div>
 

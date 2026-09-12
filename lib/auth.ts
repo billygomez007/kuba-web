@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db";
-import { resend } from "@/lib/email/resend";
+import { getResend } from "@/lib/email/resend";
 import {
   emailChangeConfirmationTemplate,
   verificationEmailTemplate,
@@ -77,7 +77,7 @@ export const auth = betterAuth({
         actionUrl: url,
       });
 
-      await resend.emails.send({
+      await getResend().emails.send({
         from: process.env.EMAIL_FROM!,
         to: user.email,
         subject: template.subject,
@@ -98,7 +98,7 @@ export const auth = betterAuth({
           actionUrl: url,
         });
 
-        await resend.emails.send({
+        await getResend().emails.send({
           from: process.env.EMAIL_FROM!,
           to: user.email,
           subject: template.subject,

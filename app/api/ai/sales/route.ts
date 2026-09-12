@@ -7,7 +7,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
-import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { businesses, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
@@ -64,16 +65,25 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Basic Sales conversation is gated by the same type-availability
+     * policy used at activation (Growth plan or higher) — not by
+     * "customer_ops.leads", which is included from Starter and would let a
+     * Starter business talk to a Sales employee it should never have been
+     * able to activate in the first place. Higher-value sales automation
+     * features, if any exist, should keep their own separate, narrower
+     * capability gates independent of this basic-conversation check.
+     */
     if (
-      !hasCapability(
+      !isEmployeeTypeEntitled(
         await getBusinessEntitlements(business.id),
-        "customer_ops.leads",
+        "sales",
       )
     ) {
       return NextResponse.json(
         {
           error: "Kuba Sales requires a higher plan.",
-          code: "FEATURE_NOT_ENTITLED",
+          code: "EMPLOYEE_TYPE_NOT_ENTITLED",
           upgradeRequired: true,
         },
         { status: 403 },
