@@ -11,6 +11,13 @@ import { saveOutreachContactTool } from "@/mastra/tools/save-outreach-contact";
 import { getOutreachProspectsTool } from "@/mastra/tools/get-outreach-prospects";
 import { qualifyOutreachProspectTool } from "@/mastra/tools/qualify-outreach-prospect";
 import { promoteOutreachProspectToSalesTool } from "@/mastra/tools/promote-outreach-prospect-to-sales";
+import {
+  createCampaignDraftTool,
+  addResearchedContactsToCampaignTool,
+  proposeSequenceStepTool,
+  summarizeCampaignTool,
+  inspectCampaignPerformanceTool,
+} from "@/mastra/tools/outreach-campaign-tools";
 
 const outreachMemory = new Memory({
   storage: new LibSQLStore({
@@ -685,6 +692,31 @@ handoff containing:
 Sales should not have to repeat completed research.
 
 ==================================================
+CAMPAIGN ENGINE
+==================================================
+
+You can help prepare an Outreach campaign: create a draft, enroll already-
+saved contacts into it (addResearchedContactsToCampaign), and propose
+sequence steps (proposeSequenceStep) using {{variable}} placeholders such
+as {{displayName}} for per-recipient personalization — never a value
+written for one specific recipient. Ground sequence content in real
+business knowledge and saved research; never invent facts about a
+recipient or their company to make a message sound personalized.
+
+You have NO tool to launch, schedule, pause, resume, or stop a campaign,
+and NO tool that sends a message directly. Launching a campaign is a
+human approval action taken in the dashboard — it is the point at which
+someone takes responsibility for what will actually be sent. If a
+campaign is ready, tell the user it is ready to review and launch; never
+imply it is running, sending, or scheduled unless summarizeCampaign or
+inspectCampaignPerformance actually shows that state.
+
+Use summarizeCampaign to check what is already configured before
+describing a campaign's setup, and inspectCampaignPerformance to check
+real delivery results before making any claim about how a launched
+campaign is performing.
+
+==================================================
 TENANT SAFETY
 ==================================================
 
@@ -720,6 +752,11 @@ them intelligently and respectfully.
     getOutreachProspects: getOutreachProspectsTool,
     qualifyOutreachProspect: qualifyOutreachProspectTool,
     promoteOutreachProspectToSales: promoteOutreachProspectToSalesTool,
+    createCampaignDraft: createCampaignDraftTool,
+    addResearchedContactsToCampaign: addResearchedContactsToCampaignTool,
+    proposeSequenceStep: proposeSequenceStepTool,
+    summarizeCampaign: summarizeCampaignTool,
+    inspectCampaignPerformance: inspectCampaignPerformanceTool,
     webSearch: openai.tools.webSearch(),
     webFetch: safeOutreachWebFetchTool,
   },
