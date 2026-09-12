@@ -14,6 +14,9 @@ import {
   leads,
 } from "@/db/schema";
 import { isValidTimezone as isValidIanaTimezone } from "@/lib/localization/registry";
+import { assertTransition } from "@/lib/state-transitions";
+
+export { assertTransition };
 
 export const APPOINTMENT_STATUSES = ["scheduled", "confirmed", "completed", "cancelled", "no_show"] as const;
 export const TICKET_STATUSES = ["open", "in_progress", "waiting_customer", "waiting_internal", "resolved", "closed"] as const;
@@ -102,10 +105,6 @@ export const ticketTransitions: Record<TicketStatus, TicketStatus[]> = {
   resolved: ["open", "closed"],
   closed: ["open"],
 };
-
-export function assertTransition<T extends string>(transitions: Record<T, T[]>, current: T, next: T) {
-  if (!transitions[current]?.includes(next)) throw new Error(`Cannot change status from ${current} to ${next}.`);
-}
 
 export function ticketReference() {
   return `SUP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
