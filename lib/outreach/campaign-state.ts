@@ -20,10 +20,14 @@ export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
 /**
  * Only the transitions explicitly approved for v1. "failed" is reachable
- * only from "running" (a fatal system-level error partway through
- * execution) — this is the one transition not given as an explicit example
- * and is inferred only because "failed" would otherwise be an unreachable
- * terminal state; confirm before relying on it for anything user-facing.
+ * only from "running" — confirmed campaign-level-only: a campaign may
+ * enter "failed" only when campaign-level execution cannot safely
+ * continue (corrupted/inconsistent campaign configuration, missing
+ * required sending configuration, an irrecoverable orchestration failure,
+ * an invariant violation). A single recipient's or send's failure is a
+ * recipient/send-level outcome and must NEVER, by itself, transition the
+ * campaign to "failed" — see lib/outreach/recipient-state.ts and
+ * lib/outreach/send-worker.ts, which handle those independently.
  */
 export const campaignTransitions: Record<CampaignStatus, CampaignStatus[]> = {
   draft: ["scheduled", "running"],

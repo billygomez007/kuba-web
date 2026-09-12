@@ -33,8 +33,13 @@ export const recipientTransitions: Record<RecipientStatus, RecipientStatus[]> = 
   ready: ["scheduled", "suppressed", "opted_out", "stopped"],
   // A send job exists for the current step and is due.
   scheduled: ["in_progress", "suppressed", "opted_out", "stopped"],
-  // A worker has claimed the current step's send.
-  in_progress: ["sent", "failed", "stopped"],
+  // A worker has claimed the current step's send. A transient failure
+  // returns the recipient to "scheduled" so the retry is picked up the same
+  // way any other due send is (see lib/outreach/send-worker.ts's retry
+  // scheduling). "suppressed"/"opted_out" are reachable here too — the
+  // double suppression/consent gate (sections 29-30) runs after the
+  // recipient has already moved to "in_progress".
+  in_progress: ["sent", "scheduled", "suppressed", "opted_out", "failed", "stopped"],
   // Current step delivered; loops back for the next step, or completes if
   // that was the last step in the sequence.
   sent: ["ready", "replied", "completed", "suppressed", "opted_out", "stopped"],
