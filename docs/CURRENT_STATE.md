@@ -109,11 +109,22 @@ See `OUTREACH_RESEARCH_PIPELINE_REPORT.md` for the detailed build report.
 Tenant scoping and prospect→lead promotion idempotency are solid (real
 atomic claim-then-create transaction, tested for concurrent duplicates).
 
-**Building an actual outreach campaign engine (contact lists, scheduled
-sends, delivery tracking, pause/resume) is new feature work, not a bug
-fix** — it needs a queue/scheduling decision (Vercel Cron polling a
-`campaign_sends` table is the natural fit given there's no queue
-infrastructure today) and should be scoped as its own effort.
+**Update: the Campaign Engine backend now exists** (commits `efe8b75`
+through `ac163a6`). Domain model (`outreach_campaigns`,
+`outreach_sequence_steps`, `outreach_campaign_recipients`,
+`outreach_campaign_sends`, `outreach_suppressions`), centralized campaign/
+recipient state machines, a durable DB-backed send worker (atomic
+claim/lease, capped retry/backoff), double suppression/consent gates,
+email delivery via the existing Resend integration with a deterministic
+provider idempotency key, a signed unsubscribe endpoint, and a
+Vercel-Cron-driven processing loop are all built, tested, and wired
+together end-to-end for the email channel. **Not yet built**: campaign
+CRUD/enrollment API routes, the AI-facing enrollment/personalization tool,
+inbound reply correlation (see the new production blocker below — Resend
+supports inbound email receiving, but wiring it needs a DNS/domain
+decision this pass could not make), reuse of the existing Outreach → Sales
+handoff tool for campaign-originated replies, and the dashboard (the
+backend was deliberately built first, per explicit instruction).
 
 ### Outreach → Sales handoff — gated promotion, not live handoff
 
@@ -258,15 +269,26 @@ reconciliation, commit `b1a31ff`)
    `0038`–`0042` are applied to production merely because they exist
    locally; do not reset, replay migrations against, or otherwise touch
    production until an operator confirms real Turso access.
-2. Decide whether WhatsApp Embedded Signup/OAuth for self-serve onboarding
+2. Campaign reply correlation needs a decision on inbound email receiving.
+   Resend (already the platform's email provider) supports inbound email
+   receiving (a "Receiving" DNS record + webhook events), which would
+   avoid a second external provider — but configuring a receiving
+   domain/subdomain is a real DNS/production change outside what this pass
+   can do autonomously. Until decided and configured, campaign replies
+   cannot be correlated back to a send/recipient/prospect and the existing
+   Outreach → Sales handoff tool cannot be triggered from a campaign reply.
+3. Every campaign email currently sends from one platform-wide `EMAIL_FROM`
+   address — no per-business verified sending identity yet (see
+   `lib/outreach/email-channel.ts`).
+4. Decide whether WhatsApp Embedded Signup/OAuth for self-serve onboarding
    (today: manual token paste only) ships before or alongside the Outreach
    Campaign Engine.
-3. Voice: durable session state for OpenAI Realtime calls across serverless
+5. Voice: durable session state for OpenAI Realtime calls across serverless
    instances, before relying on it for real concurrent traffic — explicitly
    deprioritized until the campaign foundation is stable.
-4. No `.env.example` — onboarding a new environment currently relies on
+6. No `.env.example` — onboarding a new environment currently relies on
    grepping the codebase.
-5. Unify the four tenant-resolution helpers, at least fixing the
+7. Unify the four tenant-resolution helpers, at least fixing the
    `getBusinessMembership()` cookie gap (#2 in Known Issues).
 
 `staging` and `feature/outreach-ai-employee` are reconciled as of `b1a31ff`
