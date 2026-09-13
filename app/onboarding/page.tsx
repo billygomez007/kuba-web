@@ -76,7 +76,42 @@ function OnboardingPageInner() {
 
   async function createBusiness() { const response = await fetch("/api/businesses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessName, website, industry, countryCode, currencyCode, timezone, businessSize: "Solo", goals: ["Automate customer support"], location }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to save business profile."); }
   async function loadEntitlements() { try { const response = await fetch("/api/businesses", { cache: "no-store" }); const data = await response.json(); if (response.ok) setEntitlements(data.entitlements ?? null); } catch { /* role picker treats null as "unknown" and disables selection */ } }
-  async function saveBrain() { const form = new FormData(); form.set("businessDescription", `${description}${location ? ` Location: ${location}.` : ""}`); form.set("productsAndServices", products); form.set("targetCustomers", customers); form.set("frequentlyAskedQuestions", ""); form.set("aiInstructions", ""); form.set("tone", "professional"); const response = await fetch("/api/businesses/ai-settings", { method: "POST", body: form, redirect: "manual" }); if (!response.ok && response.status !== 307) throw new Error("Unable to save Business Brain."); }
+  async function saveBrain() {
+    const form = new FormData();
+    form.set("businessDescription", `${description}${location ? ` Location: ${location}.` : ""}`);
+    form.set("productsAndServices", products);
+    form.set("targetCustomers", customers);
+    // This step has no UI for FAQs or AI instructions, so those fields are
+    // deliberately left out of the form rather than sent as "" — the route
+    // treats an omitted field as "leave unchanged," not "clear it," so this
+    // step can't wipe out AI instructions an earlier step (goals-derived) or
+    // a later settings-page edit already saved for this business.
+    form.set("tone", "professional");
+    const response = await fetch("/api/businesses/ai-settings", { method: "POST", body: form, redirect: "manual" });
+    // /api/businesses/ai-settings redirects to /dashboard/settings/ai on a
+    // successful save — correct for its OTHER caller, a real <form
+    // action="..." method="POST">, but this call comes from a SPA fetch()
+    // that must never navigate away mid-onboarding, hence redirect:
+    // "manual". A browser reports a followed-but-not-taken redirect as an
+    // OPAQUE response — type "opaqueredirect", status 0 — never the real
+    // redirect status the server actually sent. A numeric-status check
+    // (the previous code) can therefore never match a real success: fetch
+    // never exposes the real status in manual mode, so every successful
+    // save was misreported as "Unable to save Business Brain." A genuinely-readable
+    // (non-opaque) response only occurs for a real failure — auth,
+    // permission, or an unexpected server error all return actual JSON
+    // bodies — so that's the only case worth trying to read a specific
+    // message from.
+    if (response.type === "opaqueredirect" || response.ok) return;
+    let message = "Unable to save Business Brain.";
+    try {
+      const data = await response.json();
+      if (data?.error) message = data.error;
+    } catch {
+      // Keep the generic message — never expose a raw parse failure.
+    }
+    throw new Error(message);
+  }
   async function createEmployee() { const response = await fetch("/api/ai-employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Kuba ${role.name.replace("AI ", "")}`, type: role.type, description: role.description, templateId: role.type }) }); const data = await response.json(); if (!response.ok && response.status !== 409) throw new Error(data.error || "Unable to create AI employee."); if (data.employee?.id) { setEmployeeId(data.employee.id); const settings = new FormData(); settings.set("employeeId", data.employee.id); settings.set("responsibilities", role.description); settings.set("communicationStyle", "Professional and helpful"); settings.set("roleInstructions", "Use Business Brain and approved tools. Escalate when human support is needed."); await fetch("/api/ai-employees/settings", { method: "POST", body: settings }); } }
   async function next() { setError(""); if (step === 2 && !businessName.trim()) { setError("Business name is required."); return; } const actionDate = new Date(); setLoading(true); try { if (step === 2) { await createBusiness(); setFirstChargeDate(computeFirstChargeDate(timezone, actionDate)); await loadEntitlements(); } if (step === 6) await saveBrain(); if (step === 5) await createEmployee(); if (step === 4) { setStep(5); setLoading(false); return; } setStep((current) => Math.min(steps.length, current + 1)); } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "Unable to continue setup."); } finally { setLoading(false); } }
   function skip() { router.push("/dashboard"); }

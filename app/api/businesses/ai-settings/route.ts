@@ -35,25 +35,23 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
 
-    const businessDescription = String(
-      formData.get("businessDescription") || "",
-    ).trim();
+    // A field the caller never submitted (not in formData at all) means
+    // "leave this alone" — distinct from a field submitted as an empty
+    // string, which means the user intentionally cleared it. This matters
+    // because two different forms share this one route: the full AI
+    // settings page always submits every field (so "" there really is a
+    // clear), while onboarding's Business training step only collects
+    // businessDescription/productsAndServices/targetCustomers and has no UI
+    // for aiInstructions or FAQs — it must not blank out content an earlier
+    // onboarding step (or a later settings-page edit) already saved there.
+    const readField = (key: string): string | undefined =>
+      formData.has(key) ? String(formData.get(key) || "").trim() : undefined;
 
-    const productsAndServices = String(
-      formData.get("productsAndServices") || "",
-    ).trim();
-
-    const targetCustomers = String(
-      formData.get("targetCustomers") || "",
-    ).trim();
-
-    const frequentlyAskedQuestions = String(
-      formData.get("frequentlyAskedQuestions") || "",
-    ).trim();
-
-    const aiInstructions = String(
-      formData.get("aiInstructions") || "",
-    ).trim();
+    const businessDescription = readField("businessDescription");
+    const productsAndServices = readField("productsAndServices");
+    const targetCustomers = readField("targetCustomers");
+    const frequentlyAskedQuestions = readField("frequentlyAskedQuestions");
+    const aiInstructions = readField("aiInstructions");
 
     const tone = String(
       formData.get("tone") || "professional",
@@ -86,22 +84,19 @@ export async function POST(request: Request) {
     const now = new Date();
 
     if (existing.length > 0) {
+      const updateValues: Record<string, unknown> = {
+        tone: safeTone,
+        updatedAt: now,
+      };
+      if (businessDescription !== undefined) updateValues.businessDescription = businessDescription || null;
+      if (productsAndServices !== undefined) updateValues.productsAndServices = productsAndServices || null;
+      if (targetCustomers !== undefined) updateValues.targetCustomers = targetCustomers || null;
+      if (frequentlyAskedQuestions !== undefined) updateValues.frequentlyAskedQuestions = frequentlyAskedQuestions || null;
+      if (aiInstructions !== undefined) updateValues.aiInstructions = aiInstructions || null;
+
       await db
         .update(aiBusinessSettings)
-        .set({
-          businessDescription:
-            businessDescription || null,
-          productsAndServices:
-            productsAndServices || null,
-          targetCustomers:
-            targetCustomers || null,
-          frequentlyAskedQuestions:
-            frequentlyAskedQuestions || null,
-          aiInstructions:
-            aiInstructions || null,
-          tone: safeTone,
-          updatedAt: now,
-        })
+        .set(updateValues)
         .where(
           eq(
             aiBusinessSettings.id,
