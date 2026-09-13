@@ -1,0 +1,49 @@
+name: Campaign send worker (5-minute tick)
+
+# Vercel's Hobby plan only permits cron jobs that run once per day, so
+# vercel.json's own entry for this endpoint is a once-daily safety-net
+# fallback only (see vercel.json). This workflow is the primary, frequent
+# trigger for the Outreach Campaign Engine's send worker in production.
+#
+# The endpoint this calls (app/api/outreach/campaigns/cron/process-sends)
+# is authenticated with CRON_SECRET (Bearer header, same convention as
+# every other cron endpoint in this repo), bounded (claims a fixed batch
+# and returns), and safe under concurrent/duplicate invocation (atomic
+# compare-and-swap claim per send row) — so overlapping ticks from this
+# schedule, a manual run, and the vercel.json fallback can never double-
+# process the same send.
+#
+# NOTE: GitHub only evaluates scheduled workflows on the repository's
+# default branch, so this has no effect until merged there. Requires two
+# values configured in this repo's Settings -> Secrets and variables ->
+# Actions before it will run successfully:
+#   - Secret   CRON_SECRET       — must match the CRON_SECRET env var set
+#                                   on the Vercel production deployment.
+#   - Variable PRODUCTION_APP_URL — the production origin, e.g.
+#                                   https://app.example.com (no trailing
+#                                   slash, no secrets in the value).
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  trigger-send-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the campaign send-worker cron endpoint
+        run: |
+          if [ -z "${{ vars.PRODUCTION_APP_URL }}" ]; then
+            echo "PRODUCTION_APP_URL repository variable is not set; skipping." >&2
+            exit 1
+          fi
+          status=$(curl -sS -o /tmp/response.json -w "%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_APP_URL }}/api/outreach/campaigns/cron/process-sends")
+          echo "HTTP status: $status"
+          cat /tmp/response.json
+          if [ "$status" -ge 300 ]; then
+            exit 1
+          fi

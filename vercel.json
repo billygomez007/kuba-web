@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/outreach/campaigns/cron/process-sends",
-      "schedule": "*/5 * * * *"
+      "schedule": "50 4 * * *"
     }
   ]
 }
