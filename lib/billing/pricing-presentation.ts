@@ -5,16 +5,19 @@
  * presentation metadata only (labels, copy, tier grouping); the actual
  * entitlement matrix stays solely in lib/billing/plan-definitions.ts.
  *
- * Prices are placeholders ("$XX") until real commercial pricing is approved
- * — never invent a number here.
+ * Prices are current approved WORKING commercial configuration (2026-09),
+ * not a placeholder value — they may still change, but they are real
+ * numbers to show customers today. Do not duplicate these numbers
+ * elsewhere; every surface (pricing page, billing settings, plan-comparison
+ * dialog) should import pricingCopy rather than hand-writing its own price.
  */
 import { defaultLimitsForPlan, planDefinitions, planOrder, type Capability, type PlanId } from "./plan-definitions";
 
 export const pricingCopy: Record<PlanId, { price: string; billingLabel: string; tagline: string; positioning: string; cta: string; recommended?: boolean }> = {
-  starter: { price: "$XX", billingLabel: "/ month", tagline: "Run Your Business", positioning: "For entrepreneurs and small businesses that need the essential tools to manage customers and everyday work.", cta: "Start 14-Day Free Trial" },
-  growth: { price: "$XX", billingLabel: "/ month", tagline: "Automate Your Business", positioning: "For growing businesses that need automation and stronger customer operations.", cta: "Start 14-Day Free Trial" },
-  pro: { price: "$XX", billingLabel: "/ month", tagline: "Operate With AI", positioning: "For businesses running more of their operations through SuperKuba.", cta: "Start 14-Day Free Trial", recommended: true },
-  enterprise: { price: "Custom", billingLabel: "pricing", tagline: "Complete Business Operating System", positioning: "For organizations needing the complete operating system, governance, multi-business capability, advanced control, and enterprise support.", cta: "Contact Sales" },
+  starter: { price: "GHS 699", billingLabel: "/ month", tagline: "Your first AI employee", positioning: "For entrepreneurs and small businesses that need the essential tools to manage customers and everyday work.", cta: "Start 14-Day Free Trial" },
+  growth: { price: "GHS 1,999", billingLabel: "/ month", tagline: "Your AI customer and sales team", positioning: "For growing businesses that need automation and stronger customer operations.", cta: "Start 14-Day Free Trial" },
+  pro: { price: "GHS 4,999", billingLabel: "/ month", tagline: "Your complete AI workforce", positioning: "For businesses running more of their operations through SuperKuba.", cta: "Start 14-Day Free Trial", recommended: true },
+  enterprise: { price: "Custom", billingLabel: "pricing", tagline: "Your AI operating infrastructure", positioning: "For organizations needing the complete operating system, governance, multi-business capability, advanced control, and enterprise support.", cta: "Contact Sales" },
 };
 
 const cardPresentation: Partial<Record<Capability, { label: string; tier: PlanId }>> = {
@@ -23,13 +26,13 @@ const cardPresentation: Partial<Record<Capability, { label: string; tier: PlanId
   "customer_ops.inbox": { label: "Unified Inbox", tier: "starter" },
   "integrations.communication": { label: "Website Live Chat", tier: "starter" },
   "customer_ops.customers": { label: "Customer Management", tier: "starter" },
-  "customer_ops.leads": { label: "Lead Management", tier: "starter" },
+  "customer_ops.conversations": { label: "Conversation Management", tier: "starter" },
+  "customer_ops.appointments": { label: "Appointments", tier: "starter" },
   "business_ops.tasks": { label: "Tasks", tier: "starter" },
   "admin.team_staff": { label: "Team Access", tier: "starter" },
   "intelligence.basic": { label: "Basic Reporting", tier: "starter" },
+  "customer_ops.leads": { label: "Lead Management", tier: "growth" },
   "ai_workforce.builder": { label: "AI Employee Builder", tier: "growth" },
-  "customer_ops.conversations": { label: "Conversation Management", tier: "growth" },
-  "customer_ops.appointments": { label: "Appointments", tier: "growth" },
   "customer_ops.tickets": { label: "Support Tickets", tier: "growth" },
   "business_ops.core": { label: "Business Operations", tier: "growth" },
   "business_ops.automations": { label: "Automations", tier: "growth" },
