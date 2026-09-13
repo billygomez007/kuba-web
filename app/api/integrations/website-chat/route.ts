@@ -22,6 +22,14 @@ import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { runAutomationTrigger } from "@/lib/automations/engine";
 import { createAuditLog } from "@/lib/auth/audit";
+import { isWebsiteChatOriginAllowed } from "@/lib/integrations/website-chat-origin";
+
+function websiteChatUnavailableResponse() {
+  return NextResponse.json(
+    { error: "Website chat is unavailable." },
+    { status: 403 },
+  );
+}
 
 
 function classifyWebsiteChatError(
@@ -197,6 +205,7 @@ export async function GET() {
         id: integrations.id,
         publicKey: integrations.publicKey,
         status: integrations.status,
+        allowedOrigins: integrations.allowedOrigins,
       })
       .from(integrations)
       .where(
@@ -286,6 +295,7 @@ export async function PUT() {
         id: integrations.id,
         publicKey: integrations.publicKey,
         status: integrations.status,
+        allowedOrigins: integrations.allowedOrigins,
       })
       .from(integrations)
       .where(
@@ -372,6 +382,7 @@ export async function PUT() {
         id: integrations.id,
         publicKey: integrations.publicKey,
         status: integrations.status,
+        allowedOrigins: integrations.allowedOrigins,
       })
       .from(integrations)
       .where(
@@ -531,17 +542,21 @@ export async function POST(request: Request) {
     const record = integrationResult[0];
 
     if (!record) {
-      return NextResponse.json(
-        {
-          error:
-            "Website integration not found.",
-        },
-        { status: 404 },
-      );
+      // Keep unknown keys indistinguishable from an origin policy denial.
+      return websiteChatUnavailableResponse();
     }
 
     const integration = record.integration;
     const business = record.business;
+
+    if (
+      !isWebsiteChatOriginAllowed(
+        integration.allowedOrigins,
+        request.headers.get("origin"),
+      )
+    ) {
+      return websiteChatUnavailableResponse();
+    }
 
     if (business.status !== "active") {
       return NextResponse.json(

@@ -697,6 +697,9 @@ export const integrations = sqliteTable("integrations", {
 
   publicKey: text("public_key").unique(),
 
+  /** JSON array of exact browser origins allowed to use website chat. */
+  allowedOrigins: text("allowed_origins"),
+
 
   externalPhoneNumberId: text("external_phone_number_id"),
 
