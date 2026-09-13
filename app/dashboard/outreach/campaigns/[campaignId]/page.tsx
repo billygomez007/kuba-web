@@ -77,6 +77,8 @@ type Recipient = {
   suppressionReason: string | null;
   handoffLeadId: string | null;
   handedOffAt: string | null;
+  handoffReasonLabel: string | null;
+  handoffAssignedEmployeeName: string | null;
   enrolledAt: string;
 };
 
@@ -711,6 +713,11 @@ function RecipientsSection({
         )}
       </div>
 
+      <p className="mt-2 text-xs text-text-muted">
+        Automatic reply detection isn&apos;t active yet — it requires inbound email receiving to be configured for this
+        workspace. Replies and Sales hand-offs from this campaign won&apos;t appear here until that&apos;s set up.
+      </p>
+
       {allRecipients.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
           {RECIPIENT_FILTERS.map((option) => (
@@ -802,6 +809,21 @@ function RecipientTable({
                 />
                 {recipient.suppressionReason && (
                   <p className="mt-1 text-[10px] text-text-muted">{recipient.suppressionReason.replace(/_/g, " ")}</p>
+                )}
+                {recipient.status === "handed_off" && (
+                  <p className="mt-1 text-[10px] text-text-muted">
+                    {formatDateTime(recipient.handedOffAt)}
+                    {recipient.handoffReasonLabel ? ` · ${recipient.handoffReasonLabel}` : ""}
+                    {recipient.handoffAssignedEmployeeName ? ` · to ${recipient.handoffAssignedEmployeeName}` : ""}
+                    {recipient.handoffLeadId ? (
+                      <>
+                        {" · "}
+                        <Link href="/dashboard/sales" className="text-accent hover:underline">
+                          View in Sales
+                        </Link>
+                      </>
+                    ) : null}
+                  </p>
                 )}
               </td>
               <td className="px-3 py-3 text-text-tertiary">{recipient.currentStepNumber ?? "—"}</td>
