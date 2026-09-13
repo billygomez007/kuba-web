@@ -24,6 +24,11 @@ import { runAutomationTrigger } from "@/lib/automations/engine";
 import { createAuditLog } from "@/lib/auth/audit";
 import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 import { isEmployeeImplementationAvailable, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
+import {
+  type WebsiteChatMetadata,
+  parseWebsiteChatMetadata,
+  normalizeDomain,
+} from "@/lib/integrations/website-chat-config";
 
 
 function classifyWebsiteChatError(
@@ -199,6 +204,7 @@ export async function GET() {
         id: integrations.id,
         publicKey: integrations.publicKey,
         status: integrations.status,
+        metadata: integrations.metadata,
       })
       .from(integrations)
       .where(
@@ -216,17 +222,45 @@ export async function GET() {
       .limit(1);
 
     const integration = result[0];
+    const metadata = parseWebsiteChatMetadata(
+      integration?.metadata,
+    );
 
-    if (!integration) {
-      return NextResponse.json({
-        success: true,
-        integration: null,
-      });
-    }
+    const businessResult = await db
+      .select({ id: businesses.id, name: businesses.name })
+      .from(businesses)
+      .where(eq(businesses.id, membership.businessId))
+      .limit(1);
+
+    // Same real readiness check the public POST handler enforces at
+    // message-send time — surfaced here proactively so the setup page can
+    // show an honest "not ready" state instead of letting the business
+    // believe the widget will work once installed.
+    const receptionistResult = await db
+      .select({ id: aiEmployees.id })
+      .from(aiEmployees)
+      .where(
+        and(
+          eq(aiEmployees.businessId, membership.businessId),
+          eq(aiEmployees.type, "receptionist"),
+          eq(aiEmployees.status, "active"),
+        ),
+      )
+      .limit(1);
 
     return NextResponse.json({
       success: true,
-      integration,
+      business: businessResult[0] || null,
+      aiEmployeeReady: receptionistResult.length > 0,
+      integration: integration
+        ? {
+            id: integration.id,
+            publicKey: integration.publicKey,
+            status: integration.status,
+            domain: metadata.domain || null,
+            welcomeMessage: metadata.welcomeMessage || null,
+          }
+        : null,
     });
   } catch (error) {
     console.error(
@@ -288,6 +322,7 @@ export async function PUT() {
         id: integrations.id,
         publicKey: integrations.publicKey,
         status: integrations.status,
+        metadata: integrations.metadata,
       })
       .from(integrations)
       .where(
@@ -310,10 +345,17 @@ export async function PUT() {
       existing?.status === "active" &&
       existing.publicKey
     ) {
+      const existingMetadata = parseWebsiteChatMetadata(existing.metadata);
       return NextResponse.json({
         success: true,
         activated: false,
-        integration: existing,
+        integration: {
+          id: existing.id,
+          publicKey: existing.publicKey,
+          status: existing.status,
+          domain: existingMetadata.domain || null,
+          welcomeMessage: existingMetadata.welcomeMessage || null,
+        },
       });
     }
 
@@ -374,6 +416,7 @@ export async function PUT() {
         id: integrations.id,
         publicKey: integrations.publicKey,
         status: integrations.status,
+        metadata: integrations.metadata,
       })
       .from(integrations)
       .where(
@@ -403,6 +446,15 @@ export async function PUT() {
       );
     }
 
+    const activatedMetadata = parseWebsiteChatMetadata(activatedIntegration.metadata);
+    const activatedIntegrationView = {
+      id: activatedIntegration.id,
+      publicKey: activatedIntegration.publicKey,
+      status: activatedIntegration.status,
+      domain: activatedMetadata.domain || null,
+      welcomeMessage: activatedMetadata.welcomeMessage || null,
+    };
+
     const created =
       !existing &&
       activatedIntegration.publicKey ===
@@ -412,7 +464,7 @@ export async function PUT() {
       return NextResponse.json({
         success: true,
         activated: false,
-        integration: activatedIntegration,
+        integration: activatedIntegrationView,
       });
     }
 
@@ -436,7 +488,7 @@ export async function PUT() {
     return NextResponse.json({
       success: true,
       activated: true,
-      integration: activatedIntegration,
+      integration: activatedIntegrationView,
     });
   } catch (error) {
     console.error(
@@ -454,7 +506,236 @@ export async function PUT() {
   }
 }
 
+// Saves the allowed website domain and/or welcome message. Config can be
+// saved before first activation (a business setting up in advance), in
+// which case this creates the integration row itself in "inactive" status
+// with no publicKey yet — PUT is still what actually activates it.
+export async function PATCH(request: Request) {
+  try {
+    const { headers } = await import("next/headers");
+    const { auth } = await import("@/lib/auth");
+    const {
+      hasPermission,
+      PERMISSIONS,
+    } = await import("@/lib/auth/permissions");
+    const { getCurrentMembership } = await import("@/lib/auth/tenant");
+    const {
+      unauthorizedResponse,
+      forbiddenResponse,
+    } = await import("@/lib/auth/security");
+
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return unauthorizedResponse();
+    }
+
+    const membership = await getCurrentMembership();
+
+    if (!membership) {
+      return forbiddenResponse();
+    }
+
+    if (
+      !hasPermission(
+        membership.role,
+        membership.permissions,
+        PERMISSIONS.INTEGRATIONS_MANAGE,
+      )
+    ) {
+      return forbiddenResponse();
+    }
+
+    const body = await request.json().catch(() => ({}));
+
+    if (
+      !("domain" in body) &&
+      !("welcomeMessage" in body)
+    ) {
+      return NextResponse.json(
+        { error: "Nothing to update." },
+        { status: 400 },
+      );
+    }
+
+    let normalizedDomain: string | null | undefined;
+    if ("domain" in body) {
+      const rawDomain = String(body.domain || "").trim();
+      if (!rawDomain) {
+        normalizedDomain = null;
+      } else {
+        normalizedDomain = normalizeDomain(rawDomain);
+        if (!normalizedDomain) {
+          return NextResponse.json(
+            { error: "Enter a valid website domain, e.g. example.com." },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
+    let nextWelcomeMessage: string | null | undefined;
+    if ("welcomeMessage" in body) {
+      const rawWelcome = String(body.welcomeMessage || "").trim();
+      if (rawWelcome.length > 300) {
+        return NextResponse.json(
+          { error: "Welcome message must be 300 characters or fewer." },
+          { status: 400 },
+        );
+      }
+      nextWelcomeMessage = rawWelcome || null;
+    }
+
+    const existingResult = await db
+      .select({
+        id: integrations.id,
+        metadata: integrations.metadata,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.businessId, membership.businessId),
+          eq(integrations.provider, "website_chat"),
+        ),
+      )
+      .limit(1);
+
+    const existing = existingResult[0];
+    const integrationId = existing?.id || `website_chat:${membership.businessId}`;
+    const currentMetadata = parseWebsiteChatMetadata(existing?.metadata);
+
+    const nextMetadata: WebsiteChatMetadata = { ...currentMetadata };
+    if (normalizedDomain !== undefined) {
+      if (normalizedDomain) nextMetadata.domain = normalizedDomain;
+      else delete nextMetadata.domain;
+    }
+    if (nextWelcomeMessage !== undefined) {
+      if (nextWelcomeMessage) nextMetadata.welcomeMessage = nextWelcomeMessage;
+      else delete nextMetadata.welcomeMessage;
+    }
+
+    const now = new Date();
+
+    if (existing) {
+      await db
+        .update(integrations)
+        .set({
+          metadata: JSON.stringify(nextMetadata),
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(integrations.id, existing.id),
+            eq(integrations.businessId, membership.businessId),
+          ),
+        );
+    } else {
+      await db
+        .insert(integrations)
+        .values({
+          id: integrationId,
+          businessId: membership.businessId,
+          provider: "website_chat",
+          status: "inactive",
+          displayName: "Website Chat",
+          metadata: JSON.stringify(nextMetadata),
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing({ target: integrations.id });
+    }
+
+    const savedResult = await db
+      .select({
+        id: integrations.id,
+        publicKey: integrations.publicKey,
+        status: integrations.status,
+        metadata: integrations.metadata,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.businessId, membership.businessId),
+          eq(integrations.provider, "website_chat"),
+        ),
+      )
+      .limit(1);
+
+    const saved = savedResult[0];
+    const savedMetadata = parseWebsiteChatMetadata(saved?.metadata);
+
+    await createAuditLog({
+      businessId: membership.businessId,
+      userId: session.user.id,
+      action: "integration.website_chat.configured",
+      resource: "integration",
+      resourceId: integrationId,
+      description: "Updated Website Chat configuration.",
+      metadata: {
+        domainConfigured: Boolean(savedMetadata.domain),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      integration: saved
+        ? {
+            id: saved.id,
+            publicKey: saved.publicKey,
+            status: saved.status,
+            domain: savedMetadata.domain || null,
+            welcomeMessage: savedMetadata.welcomeMessage || null,
+          }
+        : null,
+    });
+  } catch (error) {
+    console.error(
+      "Update Website Chat configuration error:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        error: "Unable to update Website Chat configuration.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+// The widget script (public/kuba/chat.js) runs on the VISITOR's own website
+// — a different origin than this API — so its POST is a real cross-origin
+// browser request. A JSON Content-Type triggers a CORS preflight (OPTIONS),
+// and without a matching Access-Control-Allow-Origin response header the
+// browser would refuse to even deliver the actual POST response to the
+// page's JavaScript, regardless of how correct the server-side domain
+// allowlist below is. Reflecting the specific request Origin (rather than a
+// blanket "*") is safe here since this endpoint takes no cookies/session —
+// tenant identification is exclusively the publicKey — so it carries no
+// credential a hostile page could ride along with.
+function withCors(response: NextResponse, origin: string | null): NextResponse {
+  response.headers.set("Access-Control-Allow-Origin", origin || "*");
+  response.headers.set("Vary", "Origin");
+  return response;
+}
+
+export async function OPTIONS(request: Request) {
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set("Access-Control-Allow-Origin", request.headers.get("origin") || "*");
+  response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  response.headers.set("Vary", "Origin");
+  return response;
+}
+
 export async function POST(request: Request) {
+  const response = await handleWebsiteChatPost(request);
+  return withCors(response, request.headers.get("origin"));
+}
+
+async function handleWebsiteChatPost(request: Request): Promise<NextResponse> {
   let responseStage =
     "parse_request";
 
@@ -552,6 +833,63 @@ export async function POST(request: Request) {
         },
         { status: 403 },
       );
+    }
+
+    /**
+     * Enforce the configured allowed domain server-side. The widget script
+     * only ever runs in a visitor's browser, so a client-side check alone
+     * would be trivial to bypass — this is the actual security boundary.
+     * Only exact-hostname matches (after stripping protocol/www/port/path)
+     * are accepted, never substring/suffix/wildcard matching, so a domain
+     * like "example.com" cannot be satisfied by
+     * "example.com.evil.example" or "notexample.com".
+     *
+     * An integration with no domain configured yet is not restricted here
+     * (fail-open) so already-activated integrations from before this field
+     * existed keep working; once a business sets a domain, this becomes a
+     * real, enforced allowlist.
+     */
+    responseStage = "verify_domain";
+    const configuredMetadata = parseWebsiteChatMetadata(integration.metadata);
+    const allowedDomain = configuredMetadata.domain;
+
+    // A signed-in staff member testing their OWN business's widget from the
+    // dashboard (e.g. a "Send a test message" control) is not a public
+    // website visitor and has no Origin matching the configured domain to
+    // send. Exempt the domain check only when a real session resolves the
+    // CURRENTLY SELECTED business to this exact integration's business —
+    // this cannot be used to bypass another tenant's domain restriction,
+    // since a Realtegic staff session's own selected business will never
+    // match Kora's business id, or vice versa.
+    let isAuthenticatedOwnerTest = false;
+    try {
+      const { headers: getHeaders } = await import("next/headers");
+      const { auth } = await import("@/lib/auth");
+      const testSession = await auth.api.getSession({
+        headers: await getHeaders(),
+      });
+
+      if (testSession?.user) {
+        const { getCurrentMembership } = await import("@/lib/auth/tenant");
+        const testMembership = await getCurrentMembership();
+        isAuthenticatedOwnerTest = testMembership?.businessId === business.id;
+      }
+    } catch {
+      isAuthenticatedOwnerTest = false;
+    }
+
+    if (allowedDomain && !isAuthenticatedOwnerTest) {
+      const originHeader = request.headers.get("origin") || request.headers.get("referer") || "";
+      const requestDomain = originHeader ? normalizeDomain(originHeader) : null;
+
+      if (!requestDomain || requestDomain !== allowedDomain) {
+        return NextResponse.json(
+          {
+            error: "This website is not authorized to use this integration.",
+          },
+          { status: 403 },
+        );
+      }
     }
 
     /**

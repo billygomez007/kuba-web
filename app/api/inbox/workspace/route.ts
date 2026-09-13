@@ -10,6 +10,7 @@ import {
   conversations,
   followUps,
   handoffs,
+  integrations,
   leads,
   messages,
   tasks,
@@ -46,7 +47,7 @@ export async function GET() {
       );
     }
 
-    const [conversationRows, employeeRows, memberRows, messageRows, routingRows, handoffRows, leadRows, followUpRows, taskRows, approvalRows, ticketRows] = await Promise.all([
+    const [conversationRows, employeeRows, memberRows, messageRows, routingRows, handoffRows, leadRows, followUpRows, taskRows, approvalRows, ticketRows, integrationRows] = await Promise.all([
       db.select().from(conversations).where(eq(conversations.businessId, membership.businessId)).orderBy(desc(conversations.updatedAt)),
       db.select({ id: aiEmployees.id, name: aiEmployees.name, type: aiEmployees.type, status: aiEmployees.status }).from(aiEmployees).where(eq(aiEmployees.businessId, membership.businessId)),
       db.select({ id: businessUsers.id, userId: users.id, name: users.name, email: users.email }).from(businessUsers).innerJoin(users, eq(users.id, businessUsers.userId)).where(eq(businessUsers.businessId, membership.businessId)),
@@ -58,7 +59,20 @@ export async function GET() {
       db.select().from(tasks).where(eq(tasks.businessId, membership.businessId)),
       db.select({ id: actionApprovals.id }).from(actionApprovals).where(and(eq(actionApprovals.businessId, membership.businessId), eq(actionApprovals.status, "pending"))),
       db.select({ id: tickets.id, conversationId: tickets.conversationId, ticketReference: tickets.ticketReference, status: tickets.status, priority: tickets.priority }).from(tickets).where(eq(tickets.businessId, membership.businessId)),
+      db.select({ id: integrations.id, provider: integrations.provider }).from(integrations).where(eq(integrations.businessId, membership.businessId)),
     ]);
+
+    // conversations.integrationId is an opaque foreign key (a random UUID for
+    // most providers, `website_chat:<businessId>` for this one) — never a
+    // channel name — so it was previously surfaced to the Inbox UI as-is,
+    // which meant the client's channel label lookup (keyed by provider name)
+    // never matched anything for any channel. Resolve the real provider via
+    // this business's own integrations only, so the label is correct instead
+    // of showing the raw internal ID.
+    const integrationsById = new Map(integrationRows.map((integration) => [integration.id, integration]));
+    const channelLabelByProvider: Record<string, string> = {
+      website_chat: "website",
+    };
 
     const employeesById = new Map(employeeRows.map((employee) => [employee.id, employee]));
     const membersByUserId = new Map(memberRows.map((member) => [member.userId, member]));
@@ -96,7 +110,11 @@ export async function GET() {
         id: conversation.id,
         customerId: conversation.customerId,
         customerName: conversation.customerName || "Unknown customer",
-        channel: conversation.integrationId,
+        channel: (() => {
+          const provider = integrationsById.get(conversation.integrationId)?.provider;
+          if (!provider) return conversation.integrationId;
+          return channelLabelByProvider[provider] || provider;
+        })(),
         lastMessage: latestMessage?.content || "No messages yet.",
         lastMessageAt: latestMessage?.createdAt || conversation.updatedAt,
         assignedEmployee: assignedEmployee || null,

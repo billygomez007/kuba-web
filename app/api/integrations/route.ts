@@ -20,7 +20,7 @@ import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlemen
 const ALL_PROVIDERS = [
   "whatsapp",
   "email",
-  "website",
+  "website_chat",
   "sms",
   "voice",
   "meta",

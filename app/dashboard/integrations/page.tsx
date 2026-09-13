@@ -78,7 +78,7 @@ export default function IntegrationsPage() {
     },
     {
       name: "Website Chat",
-      provider: "website",
+      provider: "website_chat",
       category: "Communication Channels",
       description:
         "Add Kuba chat to your website.",
@@ -141,7 +141,7 @@ export default function IntegrationsPage() {
     const integration = integrations.find((i) => i.provider === provider);
     const isActive = integration?.status === "active";
     const isTransactionalEmail = provider === "email" && isActive;
-    const isWebsiteConfigured = provider === "website" && isActive;
+    const isWebsiteConfigured = provider === "website_chat" && isActive;
     const isWhatsAppConfigured = provider === "whatsapp" && isActive;
 
     return {
@@ -218,7 +218,7 @@ export default function IntegrationsPage() {
                       onClick={() => {
                         const routeMap: Record<string, string> = {
                           whatsapp: "/dashboard/integrations/whatsapp",
-                          website: "/dashboard/integrations/website-chat",
+                          website_chat: "/dashboard/integrations/website-chat",
                           meta: "/dashboard/integrations/meta",
                           telegram: "/dashboard/integrations/telegram",
                           email: "/dashboard/integrations/email",

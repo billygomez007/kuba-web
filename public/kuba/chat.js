@@ -11,6 +11,9 @@
       ? new URL(script.src).origin
       : "https://superkuba.com");
 
+  const welcomeMessage =
+    script?.dataset.welcome || "";
+
   if (!publicKey) {
     console.error(
       "Kuba Chat: data-public-key is required."
@@ -96,14 +99,6 @@
 
   document.body.appendChild(box);
 
-  button.onclick =
-    function () {
-      box.style.display =
-        box.style.display === "none"
-          ? "block"
-          : "none";
-    };
-
   const input =
     box.querySelector(
       "#kuba-input"
@@ -116,6 +111,29 @@
 
   let conversationId =
     null;
+
+  let welcomeShown =
+    false;
+
+  button.onclick =
+    function () {
+      box.style.display =
+        box.style.display === "none"
+          ? "block"
+          : "none";
+
+      if (
+        box.style.display === "block" &&
+        !welcomeShown &&
+        welcomeMessage
+      ) {
+        welcomeShown = true;
+        addMessage(
+          "Kuba",
+          welcomeMessage
+        );
+      }
+    };
 
   function addMessage(
     sender,

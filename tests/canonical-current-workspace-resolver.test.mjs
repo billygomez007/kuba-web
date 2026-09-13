@@ -88,13 +88,13 @@ for (const file of MIGRATED_FILES) {
   });
 }
 
-test("the 13 migrated files collectively account for all 16 known 'current selected workspace' call sites this session found and fixed", async () => {
+test("the 13 migrated files collectively account for all known 'current selected workspace' call sites — 16 from the original migration plus 2 added since for Website Widget config (PATCH) and its authenticated-owner test-message bypass in POST, both in the already-migrated app/api/integrations/website-chat/route.ts", async () => {
   let total = 0;
   for (const file of MIGRATED_FILES) {
     const source = await readFile(path.join(REPO_ROOT, file), "utf8");
     total += (source.match(/getCurrentMembership\(\)/g) || []).length;
   }
-  assert.equal(total, 16);
+  assert.equal(total, 18);
 });
 
 // ---- Part B: the 7 resource-scoped conversation routes are deliberately untouched ----
