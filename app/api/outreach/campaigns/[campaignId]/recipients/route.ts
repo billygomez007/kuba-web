@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/db";
-import { outreachCampaignRecipients } from "@/db/schema";
+import { outreachCampaignRecipients, outreachProspects } from "@/db/schema";
 import { requireCampaignAccess } from "@/lib/outreach/campaign-route-context";
 import { enrollRecipients } from "@/lib/outreach/recipient-enrollment";
 
@@ -14,10 +14,17 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { campaignId } = await context.params;
   const recipients = await db
-    .select()
+    .select({
+      recipient: outreachCampaignRecipients,
+      companyName: outreachProspects.companyName,
+    })
     .from(outreachCampaignRecipients)
+    .leftJoin(outreachProspects, eq(outreachProspects.id, outreachCampaignRecipients.prospectId))
     .where(and(eq(outreachCampaignRecipients.campaignId, campaignId), eq(outreachCampaignRecipients.businessId, access.businessId)));
-  return NextResponse.json({ recipients });
+
+  return NextResponse.json({
+    recipients: recipients.map((row) => ({ ...row.recipient, companyName: row.companyName ?? null })),
+  });
 }
 
 export async function POST(request: Request, context: RouteContext) {

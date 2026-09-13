@@ -1,5 +1,9 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { db } from "@/db";
+import { aiEmployees } from "@/db/schema";
+import { getCampaignMetrics } from "@/lib/outreach/campaign-metrics";
 import { requireCampaignAccess } from "@/lib/outreach/campaign-route-context";
 import { deleteDraftCampaign, getCampaignOrThrow, updateCampaignFields } from "@/lib/outreach/campaign-service";
 
@@ -12,7 +16,9 @@ export async function GET(_request: Request, context: RouteContext) {
   const { campaignId } = await context.params;
   try {
     const campaign = await getCampaignOrThrow(access.businessId, campaignId);
-    return NextResponse.json({ campaign });
+    const metrics = await getCampaignMetrics(access.businessId, campaignId);
+    const employeeRows = await db.select({ name: aiEmployees.name }).from(aiEmployees).where(eq(aiEmployees.id, campaign.employeeId)).limit(1);
+    return NextResponse.json({ campaign: { ...campaign, employeeName: employeeRows[0]?.name ?? null }, metrics });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Campaign not found." }, { status: 404 });
   }

@@ -1,6 +1,10 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { db } from "@/db";
+import { aiEmployees } from "@/db/schema";
 import { getBusinessEntitlements } from "@/lib/billing/entitlements";
+import { getCampaignMetrics } from "@/lib/outreach/campaign-metrics";
 import { canUseCampaigns } from "@/lib/outreach/campaign-policy";
 import { requireCampaignAccess } from "@/lib/outreach/campaign-route-context";
 import { createCampaign, listCampaigns } from "@/lib/outreach/campaign-service";
@@ -9,8 +13,20 @@ export async function GET() {
   const access = await requireCampaignAccess("view");
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const campaigns = await listCampaigns(access.businessId);
-  return NextResponse.json({ campaigns });
+  const [campaigns, employees] = await Promise.all([
+    listCampaigns(access.businessId),
+    db.select({ id: aiEmployees.id, name: aiEmployees.name }).from(aiEmployees).where(eq(aiEmployees.businessId, access.businessId)),
+  ]);
+  const employeeNameById = new Map(employees.map((employee) => [employee.id, employee.name]));
+
+  const campaignsWithMetrics = await Promise.all(
+    campaigns.map(async (campaign) => ({
+      ...campaign,
+      employeeName: employeeNameById.get(campaign.employeeId) ?? null,
+      metrics: await getCampaignMetrics(access.businessId, campaign.id),
+    })),
+  );
+  return NextResponse.json({ campaigns: campaignsWithMetrics });
 }
 
 export async function POST(request: Request) {

@@ -53,6 +53,7 @@ const navigationGroups: NavigationGroup[] = [
     icon: "✦",
     items: [
       { label: "AI Employees", href: "/dashboard/ai-employees", icon: "✦", permission: "workforce.view" },
+      { label: "Outreach Campaigns", href: "/dashboard/outreach/campaigns", icon: "▶", permission: "outreach.view" },
       { label: "AI Employee Builder", href: "/dashboard/ai-employees/create", icon: "+", permission: "workforce.view" },
       { label: "AI Teams", href: "/dashboard/workforce/team", icon: "♙", permission: "workforce.view" },
       { label: "Collections Agent", icon: "◫", status: "Coming Soon" },
@@ -168,6 +169,7 @@ const navigationGroups: NavigationGroup[] = [
 const navigationPermissions: Record<string, string> = {
   "/dashboard": "dashboard.view",
   "/dashboard/ai-employees": "workforce.view",
+  "/dashboard/outreach/campaigns": "outreach.view",
   "/dashboard/approvals": "messaging.manage",
   "/dashboard/business-operations": "dashboard.view",
   "/dashboard/workforce": "workforce.view",
@@ -207,6 +209,7 @@ const navigationPermissions: Record<string, string> = {
 
 const navigationCapabilities: Record<string, string> = {
   "/dashboard/ai-employees": "ai_workforce.core",
+  "/dashboard/outreach/campaigns": "outreach.campaigns",
   "/dashboard/ai-employees/create": "ai_workforce.builder",
   "/dashboard/workforce/team": "ai_workforce.teams",
   "/dashboard/workforce/deployment": "ai_workforce.deployment",
