@@ -2,7 +2,7 @@ import {
   PERMISSIONS,
   getRolePermissions,
   type Permission,
-} from "@/lib/auth/permissions";
+} from "@/lib/auth/permission-definitions";
 
 export type BusinessRole =
   | "owner"
