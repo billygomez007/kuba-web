@@ -10,14 +10,13 @@ import {
 } from "@/db/schema";
 
 import {
-  getBusinessMembership,
   hasPermission,
   PERMISSIONS,
   isBusinessRole,
   canManageRole,
   filterGrantablePermissions,
 } from "@/lib/auth/permissions";
-import { getBranchForBusiness } from "@/lib/auth/tenant";
+import { getBranchForBusiness, getCurrentMembership } from "@/lib/auth/tenant";
 
 import {
   createAuditLog,
@@ -38,9 +37,7 @@ export async function GET() {
     }
 
     const membership =
-      await getBusinessMembership(
-        session.user.id,
-      );
+      await getCurrentMembership();
 
     if (!membership) {
       return NextResponse.json(
@@ -129,9 +126,7 @@ export async function PATCH(
     }
 
     const membership =
-      await getBusinessMembership(
-        session.user.id,
-      );
+      await getCurrentMembership();
 
     if (!membership) {
       return NextResponse.json(
@@ -423,9 +418,7 @@ export async function DELETE(
     }
 
     const membership =
-      await getBusinessMembership(
-        session.user.id,
-      );
+      await getCurrentMembership();
 
     if (!membership) {
       return NextResponse.json(
