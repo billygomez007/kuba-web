@@ -109,22 +109,25 @@ See `OUTREACH_RESEARCH_PIPELINE_REPORT.md` for the detailed build report.
 Tenant scoping and prospect→lead promotion idempotency are solid (real
 atomic claim-then-create transaction, tested for concurrent duplicates).
 
-**Update: the Campaign Engine backend is now complete end-to-end**
-(commits `efe8b75` through `8f7bcd6`). Domain model, centralized campaign/
-recipient state machines, a durable DB-backed send worker (atomic
-claim/lease, capped retry/backoff), double suppression/consent gates,
-email delivery via the existing Resend integration with a deterministic
-provider idempotency key, a signed unsubscribe endpoint, a
-Vercel-Cron-driven processing loop, a full CRUD/enrollment/lifecycle
-service layer with centralized editability rules, thin authenticated API
-routes (`/api/outreach/campaigns/**`), deterministic AI tools for the
-Outreach employee to prepare (not execute) campaigns, and a shared Sales
-handoff core that both autonomous-research qualification and
-campaign-reply engagement converge into. **Not yet built**: the dashboard
-UI (deliberately last, backend-first) and live inbound reply correlation
-(the deterministic destination — `lib/outreach/campaign-reply-handoff.ts`
-— exists and is tested, but nothing calls it yet; see the production
-blocker below).
+**Update: the Campaign Engine is now feature-complete end-to-end,
+including the dashboard** (commits `efe8b75` through `5ae29b8`). Domain
+model, centralized campaign/recipient state machines, a durable DB-backed
+send worker (atomic claim/lease, capped retry/backoff), double
+suppression/consent gates, email delivery via the existing Resend
+integration with a deterministic provider idempotency key, a signed
+unsubscribe endpoint, a Vercel-Cron-driven processing loop, a full
+CRUD/enrollment/lifecycle service layer with centralized editability
+rules, thin authenticated API routes (`/api/outreach/campaigns/**`),
+deterministic AI tools for the Outreach employee to prepare (not execute)
+campaigns, a shared Sales handoff core that both autonomous-research
+qualification and campaign-reply engagement converge into, and a
+dashboard (list/create/detail-monitoring, integrated into the existing
+"AI Workforce" nav group and design system) for all of it. **Not yet
+done**: interactive browser verification of the dashboard (built and
+validated via typecheck/lint/production build only — no browser tooling
+in this session) and live inbound reply correlation (the deterministic
+destination — `lib/outreach/campaign-reply-handoff.ts` — exists and is
+tested, but nothing calls it yet; see the production blocker below).
 
 ### Outreach → Sales handoff — gated promotion, not live handoff
 
@@ -254,7 +257,7 @@ NEXT_PUBLIC_APP_ENV, NODE_ENV
 ```
 
 ## Baseline quality gate (`feature/outreach-ai-employee`, Campaign Engine
-backend complete, commit `8f7bcd6`)
++ dashboard complete, commit `5ae29b8`)
 
 - `npm test`: **1038/1038 passing** (up from 834 pre-reconciliation, 955
   post-reconciliation)
@@ -299,10 +302,10 @@ been pushed yet.
 
 ## Next recommended milestones
 
-1. Campaign Engine dashboard (list/detail/actions) — the backend
-   (schema, state machines, worker, CRUD/enrollment/lifecycle service
-   layer, API routes, AI tools, Sales handoff convergence) is complete and
-   tested; the UI is the remaining piece to make it usable end-to-end.
+1. Interactive browser QA of the Campaign Engine dashboard
+   (`/dashboard/outreach/campaigns`) — built and validated via
+   typecheck/lint/production build only; no session in this history has
+   exercised it in a real browser yet.
 2. Decide and configure inbound email receiving (Resend supports it) so
    `lib/outreach/campaign-reply-handoff.ts` — already built and tested —
    can actually be triggered by a real reply.
