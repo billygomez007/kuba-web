@@ -648,6 +648,12 @@ export default function DashboardLayout({
                 {businessSwitchError}
               </p>
             )}
+            <Link
+              href="/dashboard/businesses/new"
+              className="mt-2 block text-[11px] font-semibold text-cyan-300/70 hover:text-cyan-300"
+            >
+              + Add business
+            </Link>
           </div>
         )}
 
@@ -763,6 +769,13 @@ export default function DashboardLayout({
                     </option>
                   ))}
                 </select>
+                <Link
+                  href="/dashboard/businesses/new"
+                  onClick={() => setMobileNavigationOpen(false)}
+                  className="mt-2 block text-[11px] font-semibold text-cyan-300/70 hover:text-cyan-300"
+                >
+                  + Add business
+                </Link>
               </div>
             )}
             <nav aria-label="Dashboard mobile navigation">

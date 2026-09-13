@@ -38,12 +38,21 @@ test("granting a plan (complimentary or not) always writes an audit log capturin
 
 test("a complimentary grant sets status to the honest 'complimentary' literal, never disguised as 'active'", () => {
   const planBranch = adminRoute.slice(adminRoute.indexOf('action === "plan"'), adminRoute.indexOf('if (action === "trial"'));
-  assert.match(planBranch, /complimentary\s*\?\s*"complimentary"\s*:\s*"active"/);
+  assert.match(planBranch, /complimentary\s*\?\s*"complimentary"\s*:\s*plan === "enterprise"\s*\?\s*"enterprise_contract"\s*:\s*"active"/);
 });
 
-test("complimentary is rejected for the enterprise plan (enterprise already has its own truthful enterprise_contract status)", () => {
+// A real negotiated Enterprise deal (possibly at a genuine non-zero custom
+// price billed outside this system) still defaults to "enterprise_contract"
+// when the admin does NOT check "complimentary" — that status must never
+// imply GHS 0. But an explicit complimentary:true now applies to Enterprise
+// too (it did not before this task) — a Realtegic-owned or otherwise
+// genuinely free internal Enterprise workspace is exactly Enterprise-tier
+// capabilities with the same truthful, non-paying "complimentary" status
+// every other plan already gets, not a fabricated "contract."
+test("Enterprise defaults to 'enterprise_contract' when NOT explicitly complimentary, but an explicit complimentary grant now applies to Enterprise too", () => {
   const planBranch = adminRoute.slice(adminRoute.indexOf('action === "plan"'), adminRoute.indexOf('if (action === "trial"'));
-  assert.match(planBranch, /complimentary && plan === "enterprise"/);
+  assert.doesNotMatch(planBranch, /complimentary && plan === "enterprise"\)\s*return NextResponse\.json\(\{\s*error:/, "must no longer reject complimentary for enterprise");
+  assert.match(planBranch, /plan === "enterprise"\s*\?\s*"enterprise_contract"/, "enterprise still has its own non-complimentary default status");
 });
 
 test("every plan grant via this action uses provider \"internal\", never fabricating a Paystack/Stripe-looking record", () => {
@@ -105,6 +114,6 @@ test("the admin business detail page has a working 'grant plan' control wired to
   assert.match(adminUi, /reason\.trim\(\)/, "must still require a reason client-side too, matching the server-side requirement");
 });
 
-test("the admin UI disables the complimentary checkbox for Enterprise (matches the server-side rejection)", () => {
-  assert.match(adminUi, /disabled=\{grantPlan === "enterprise"\}/);
+test("the admin UI no longer disables the complimentary checkbox for Enterprise (a Realtegic-owned Enterprise workspace must be grantable as complimentary)", () => {
+  assert.doesNotMatch(adminUi, /disabled=\{grantPlan === "enterprise"\}/);
 });

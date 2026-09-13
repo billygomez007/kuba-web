@@ -3331,3 +3331,58 @@ export const outreachSuppressions = sqliteTable(
     ),
   ],
 );
+
+/*
+ * Organization / portfolio layer — the smallest durable abstraction for "one
+ * user owns/manages multiple separate business workspaces from one login."
+ * Deliberately a NEW, minimal layer rather than reuse of partnerOrganizations
+ * (an unrelated marketplace-partner/reseller concept) or businesses itself
+ * (which must remain a single isolated tenant per row).
+ *
+ * Three independent axes, on purpose:
+ *   - users.platformRole:        platform-wide (e.g. super_admin) — SuperKuba
+ *                                 the product, not any one customer.
+ *   - organizationMembers.role:  portfolio-wide (e.g. Realtegic owner) —
+ *                                 cross-business oversight for ONE portfolio.
+ *   - businessUsers.role:        per-business (e.g. owner of Kora OS) — what
+ *                                 actually drives operational permissions.
+ * None of these three ever substitutes for another. A platform Super Admin
+ * or a portfolio owner still needs an explicit businessUsers row to operate
+ * inside a specific business, and a business's subscription plan (
+ * subscriptions.plan, resolved by lib/billing/entitlements.ts purely from
+ * businessId) is never touched by either of the other two axes.
+ */
+export const organizations = sqliteTable("organizations", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+}, (table) => [uniqueIndex("organizations_slug_unique").on(table.slug)]);
+
+export const organizationMembers = sqliteTable("organization_members", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  userId: text("user_id").notNull(),
+  // "owner" | "admin" | "member" — portfolio-level only; grants no implicit
+  // access to any specific business's data or operations.
+  role: text("role").notNull().default("member"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+}, (table) => [
+  uniqueIndex("organization_members_org_user_unique").on(table.organizationId, table.userId),
+  index("organization_members_user_id_idx").on(table.userId),
+]);
+
+export const organizationBusinesses = sqliteTable("organization_businesses", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  businessId: text("business_id").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+}, (table) => [
+  // A business is linked to at most one portfolio in this minimal model —
+  // this link is oversight/grouping metadata only. It never grants access by
+  // itself: a portfolio member still needs their own businessUsers row to
+  // actually operate inside that business.
+  uniqueIndex("organization_businesses_business_id_unique").on(table.businessId),
+  index("organization_businesses_org_id_idx").on(table.organizationId),
+]);

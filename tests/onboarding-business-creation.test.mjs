@@ -212,8 +212,14 @@ test("Kora acceptance case: the exact reported payload succeeds end to end using
 
 // --- 5. The route file actually calls the real shared functions (not a private re-implementation) ---
 
-test("app/api/businesses/route.ts imports and calls the shared onboarding registry and website normalizer, not private duplicates", async () => {
-  const source = await readFile(path.join(REPO_ROOT, "app/api/businesses/route.ts"), "utf8");
+test("business creation imports and calls the shared onboarding registry and website normalizer, not private duplicates", async () => {
+  // This logic (along with the rest of business+membership creation) now
+  // lives in lib/onboarding/create-business.ts, shared by both
+  // app/api/businesses/route.ts (first-time onboarding) and
+  // app/api/businesses/additional/route.ts (a portfolio owner adding
+  // another business) — see tests/multi-business-portfolio.test.mjs for
+  // that extraction's own regression coverage.
+  const source = await readFile(path.join(REPO_ROOT, "lib/onboarding/create-business.ts"), "utf8");
   assert.match(source, /from ["']@\/lib\/onboarding\/registry["']/);
   assert.match(source, /from ["']@\/lib\/onboarding\/website["']/);
   assert.match(source, /isOnboardingIndustry\(/);
@@ -232,14 +238,14 @@ test("the route returns structured field-level errors, not only a generic messag
 // --- 6. Business creation atomicity ---
 
 test("business + owner membership are created inside one db.transaction — never as two independent writes that could leave one without the other", async () => {
-  const source = await readFile(path.join(REPO_ROOT, "app/api/businesses/route.ts"), "utf8");
+  const source = await readFile(path.join(REPO_ROOT, "lib/onboarding/create-business.ts"), "utf8");
   const transactionBlock = source.slice(source.indexOf("await db.transaction("), source.indexOf("if (countryCode && currencyCode && timezone)"));
   assert.match(transactionBlock, /tx\.insert\(businesses\)/);
   assert.match(transactionBlock, /tx\.insert\(businessUsers\)/);
 });
 
 test("selected-business cookie context is established immediately after business creation succeeds", async () => {
-  const source = await readFile(path.join(REPO_ROOT, "app/api/businesses/route.ts"), "utf8");
+  const source = await readFile(path.join(REPO_ROOT, "lib/onboarding/create-business.ts"), "utf8");
   assert.match(source, /cookies\(\)\)\.set\("superkuba_business_id", businessId/);
 });
 
@@ -282,8 +288,17 @@ test("no code introduced by this fix hard-codes Kora, koraafric.com, or Ghana as
 // --- 10. Onboarding never auto-grants Pro/complimentary ---
 
 test("onboarding's business creation always sets plan: \"starter\" — Pro/complimentary remains a separate, later platform-admin action", async () => {
-  const source = await readFile(path.join(REPO_ROOT, "app/api/businesses/route.ts"), "utf8");
+  // The actual business+membership creation (including the literal
+  // plan: "starter" default) now lives in lib/onboarding/create-business.ts,
+  // shared by both the first-time onboarding route and the additional-
+  // business route a portfolio owner uses — extracted so a second/third
+  // business a user creates goes through the exact same default-plan
+  // policy as their first one, not a second, drifting reimplementation.
+  const source = await readFile(path.join(REPO_ROOT, "lib/onboarding/create-business.ts"), "utf8");
   assert.match(source, /plan:\s*"starter"/);
   assert.doesNotMatch(source, /plan:\s*"pro"/);
   assert.doesNotMatch(source, /complimentary/);
+
+  const routeSource = await readFile(path.join(REPO_ROOT, "app/api/businesses/route.ts"), "utf8");
+  assert.match(routeSource, /createBusinessForUser/);
 });

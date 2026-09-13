@@ -39,14 +39,13 @@ test("clean bootstrap reproduces the current schema and accepts a generated futu
 
     const client = createClient({ url: `file:${databasePath}` });
     const tables = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
-    // 95 tables at the last time this literal was updated (post staging
-    // reconciliation), +5 for the Outreach Campaign Engine's own tables
-    // (outreach_campaigns, outreach_sequence_steps,
-    // outreach_campaign_recipients, outreach_campaign_sends,
-    // outreach_suppressions). Update this literal deliberately whenever a
-    // schema change legitimately adds or removes a table — it exists to
+    // 100 tables at the last time this literal was updated, +3 for the
+    // organization/portfolio layer (organizations, organization_members,
+    // organization_businesses — the multi-business "one login, many
+    // workspaces" architecture). Update this literal deliberately whenever
+    // a schema change legitimately adds or removes a table — it exists to
     // catch accidental drift, not to block real schema growth.
-    assert.equal(tables.rows.length, 100);
+    assert.equal(tables.rows.length, 103);
     assert.equal(tables.rows.some((row) => row.name === "__drizzle_migrations"), true);
     const emptyTables = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '__drizzle_migrations' AND sql NOT LIKE '%WITHOUT ROWID%'");
     for (const table of emptyTables.rows) {
