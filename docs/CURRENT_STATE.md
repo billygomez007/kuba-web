@@ -184,6 +184,69 @@ deploys successfully but sits behind Vercel's Deployment Protection (SSO)
 — see `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the preview URL and the
 manual checklist.
 
+### Canonical plan/pricing architecture — approved matrix now live (2026-09)
+
+A 4-tier Starter/Growth/Pro/Enterprise commercial model already existed and
+was mature (centralized capability system, AI Workforce entitlement policy,
+navigation gating, pricing page — all already driven from
+`lib/billing/plan-definitions.ts`). This pass audited it against a newly
+approved commercial matrix and closed the real gaps found, rather than
+rebuilding anything:
+
+- **Capability reassignment** (`lib/billing/plan-definitions.ts`):
+  `customer_ops.conversations`, `customer_ops.appointments`, and
+  `intelligence.basic` moved from Growth-and-up into Starter (Starter is
+  "your first AI employee" and needs a usable Receptionist from day one —
+  conversations, appointments, and basic analytics are core to that, not an
+  upsell). `customer_ops.leads` moved the other direction, from Starter into
+  Growth-and-up (Starter has no Sales AI employee at all under the approved
+  model, so it has no Leads/Sales page either). `customer_ops.tickets`
+  (Support) is unaffected — still Growth+.
+- **Real working prices and positioning** (`lib/billing/pricing-presentation.ts`):
+  replaced `"$XX"` placeholders with the approved GHS 699 / GHS 1,999 /
+  GHS 4,999 / Custom prices and the approved taglines ("Your first AI
+  employee" → "Your AI operating infrastructure"). Every surface (public
+  `/pricing`, the dashboard billing plan-comparison page, the billing
+  settings page) now reads from this one `pricingCopy` object — the billing
+  plan-comparison page previously had its OWN hand-written positioning copy
+  and deliberately withheld price ("No price is displayed until configured
+  by billing"), which was the one real pricing-duplication bug found.
+- **`getEmployeeAccessState()`** (new, in `ai-workforce-policy.ts`): a pure
+  named decomposition of the existing `canActivateEmployee` decision into
+  `{ visible, entitled, implemented, usageAvailable, requiredPlan }` — the
+  exact vocabulary requested for answering "is this visible/entitled/usage-
+  available" from one place. Introduces no new policy; active-employee
+  slots remain the only resource this codebase actually meters today (no
+  campaign-send/voice-minute/conversation quota enforcement exists yet —
+  that would need real metering infrastructure, not just a wider type).
+- **Richer upgrade CTA for Campaign Engine** (`app/dashboard/layout.tsx`):
+  the generic "Upgrade required" deep-link screen now special-cases
+  `outreach.campaigns`, pulling Kuba Outreach's own name/description/
+  capability list from the existing `ai-workforce-catalog.ts` (no invented
+  copy) instead of a generic capability-name label.
+- **Employee entitlement matrix, Campaign Engine entitlement, deep-link
+  protection, downgrade-preserves-data behavior**: all already correctly
+  implemented and already exhaustively tested (see
+  `tests/ai-workforce-policy-model.test.mjs`,
+  `tests/customer-operations-integration.test.mjs`) — confirmed, not
+  rebuilt. Deep-link protection is client-side pathname-driven
+  (`capabilityForPath` in `layout.tsx`, re-evaluated on every route change)
+  and is explicitly NOT the security boundary — every API route re-checks
+  entitlement server-side regardless of what the layout renders.
+- **Deliberately not added**: granular `sales.basic`/`sales.pipeline`/etc.
+  capability keys (section 12 of the brief) — no code-level distinction
+  between "basic" and "advanced" Sales exists today to gate differently;
+  the existing `customer_ops.leads` + `sales` employee-type entitlement
+  already correctly differentiates Starter (none) from Growth+ (the full
+  existing Sales feature set). A Growth-tier Voice add-on was also not
+  added — the current billing architecture has no clean partial-add-on
+  hook, so Voice remains Pro+ only rather than inventing one.
+
+32 new/updated tests (`tests/canonical-plan-catalog-policy.test.mjs` plus
+updates to five existing suites whose assertions encoded the prior
+capability placement). 1076/1076 passing, lint clean, typecheck clean,
+build clean.
+
 ### Outreach → Sales handoff — gated promotion, not live handoff
 
 `promote-outreach-prospect-to-sales.ts` requires: `qualificationStatus =
