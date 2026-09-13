@@ -109,25 +109,80 @@ See `OUTREACH_RESEARCH_PIPELINE_REPORT.md` for the detailed build report.
 Tenant scoping and prospect→lead promotion idempotency are solid (real
 atomic claim-then-create transaction, tested for concurrent duplicates).
 
-**Update: the Campaign Engine is now feature-complete end-to-end,
-including the dashboard** (commits `efe8b75` through `5ae29b8`). Domain
-model, centralized campaign/recipient state machines, a durable DB-backed
-send worker (atomic claim/lease, capped retry/backoff), double
+**Update: the Campaign Engine is feature-complete end-to-end, including
+the dashboard** (commits `efe8b75` through `b348890`). Domain model,
+centralized campaign/recipient state machines, a durable DB-backed send
+worker (atomic claim/lease, capped retry/backoff), double
 suppression/consent gates, email delivery via the existing Resend
 integration with a deterministic provider idempotency key, a signed
-unsubscribe endpoint, a Vercel-Cron-driven processing loop, a full
-CRUD/enrollment/lifecycle service layer with centralized editability
-rules, thin authenticated API routes (`/api/outreach/campaigns/**`),
-deterministic AI tools for the Outreach employee to prepare (not execute)
-campaigns, a shared Sales handoff core that both autonomous-research
-qualification and campaign-reply engagement converge into, and a
-dashboard (list/create/detail-monitoring, integrated into the existing
-"AI Workforce" nav group and design system) for all of it. **Not yet
-done**: interactive browser verification of the dashboard (built and
-validated via typecheck/lint/production build only — no browser tooling
-in this session) and live inbound reply correlation (the deterministic
-destination — `lib/outreach/campaign-reply-handoff.ts` — exists and is
-tested, but nothing calls it yet; see the production blocker below).
+unsubscribe endpoint, a full CRUD/enrollment/lifecycle service layer with
+centralized editability rules, thin authenticated API routes
+(`/api/outreach/campaigns/**`), deterministic AI tools for the Outreach
+employee to prepare (not execute) campaigns, a shared Sales handoff core
+that both autonomous-research qualification and campaign-reply engagement
+converge into, and a dashboard (list/create/detail-monitoring, integrated
+into the existing "AI Workforce" nav group and design system) for all of
+it.
+
+**Acceptance pass (this session, commits `75c2201`/`b348890`)**: pushed to
+a Vercel preview deployment and worked the fixes that surfaced from that —
+see "Acceptance pass findings" below for the two real defects fixed
+(cron-frequency deploy failure; incomplete Sales-handoff visibility) and
+what remains **NOT YET DONE**: real interactive browser click-testing.
+The preview deployment is reachable and builds clean, but sits behind
+Vercel's own Deployment Protection (SSO) — accessible only via a
+logged-in Vercel account session, which this environment does not have
+and no browser-automation tool is available in this session either. See
+`docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the full record and the manual
+checklist a human (or a future browser-capable agent/session) still needs
+to run before this branch can be called `READY FOR STAGING INTEGRATION`.
+Live inbound reply correlation also remains unbuilt: the deterministic
+destination (`lib/outreach/campaign-reply-handoff.ts`) exists and is
+tested, but nothing calls it yet — blocked on the DNS/inbound-receiving
+decision (production blocker #2 below), which is intentionally deferred,
+not forgotten.
+
+### Campaign Engine acceptance pass — two real defects found and fixed
+
+With no browser tool available in this session, acceptance work was
+diligence at the source/route/deployment level, not click-testing. Two
+genuine defects turned up this way (both fixed, both covered by new or
+existing automated tests — see `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md`):
+
+1. **The Vercel deployment failed outright.** `vercel.json`'s cron entry
+   for the send worker (`*/5 * * * *`) exceeds the Hobby plan's
+   once-per-day cron limit, and Vercel rejects the whole deployment when
+   any cron expression exceeds the plan's allowed frequency — confirmed
+   via Vercel's own cron usage/pricing docs. Fixed properly, not worked
+   around: `vercel.json`'s entry is now a once-daily safety-net fallback,
+   and `.github/workflows/campaign-send-cron.yml` is the real 5-minute
+   trigger, calling the same `CRON_SECRET`-protected endpoint over HTTP.
+   Inert until merged to the default branch (GitHub only evaluates
+   scheduled workflows there) and requires two values in the repo's
+   Actions secrets/variables to do anything once merged — see the
+   workflow file's own header comment.
+2. **Sales handoff visibility was incomplete.** The recipient table
+   showed a "Handed off" badge but no Sales lead reference, assigned
+   employee, or reason — the approved dashboard brief explicitly required
+   all of those. Fixed by joining `leads`/`aiEmployees` (business-scoped)
+   into the recipients route and rendering a safe, fixed-allowlist reason
+   label. Also added an honest static notice explaining that reply/hand-off
+   detection requires inbound email receiving to be configured — the
+   dashboard never claims reply tracking is active.
+
+22 new dashboard/route-boundary tests were added
+(`tests/outreach-campaign-dashboard-policy.test.mjs`) covering nav
+entitlement, fabricated-metric prevention, the email-only channel,
+eligibility-check completeness against the real backend gate, draft-only
+mutability, exact per-status action mapping, preview non-sending, the
+launch/AI boundary, and the new (previously zero-coverage)
+`/api/outreach/contacts` route's tenant scoping.
+
+**Still required before staging integration**: real interactive browser
+acceptance. The Vercel preview deployment for this branch builds and
+deploys successfully but sits behind Vercel's Deployment Protection (SSO)
+— see `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the preview URL and the
+manual checklist.
 
 ### Outreach → Sales handoff — gated promotion, not live handoff
 
@@ -257,14 +312,17 @@ NEXT_PUBLIC_APP_ENV, NODE_ENV
 ```
 
 ## Baseline quality gate (`feature/outreach-ai-employee`, Campaign Engine
-+ dashboard complete, commit `5ae29b8`)
++ dashboard + acceptance-pass fixes, commit `b348890`)
 
-- `npm test`: **1038/1038 passing** (up from 834 pre-reconciliation, 955
-  post-reconciliation)
+- `npm test`: **1060/1060 passing** (1038 pre-acceptance-pass baseline +
+  22 new dashboard/route-boundary policy tests)
 - `npm run lint`: **0 errors**, 60 pre-existing warnings (unused vars,
   `<img>` vs `next/image`) — none introduced by this work
 - `npx tsc --noEmit`: **clean**
 - `npm run build`: **clean** (Next.js 16, webpack build)
+- Vercel deployment for `b348890`: **success** (Preview environment;
+  behind Vercel Deployment Protection/SSO — see
+  `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the URL)
 
 ## Production blockers (in rough priority order)
 
@@ -294,18 +352,26 @@ NEXT_PUBLIC_APP_ENV, NODE_ENV
    grepping the codebase.
 7. Unify the four tenant-resolution helpers, at least fixing the
    `getBusinessMembership()` cookie gap (#2 in Known Issues).
+8. The campaign send worker's real 5-minute cadence in production depends
+   on `.github/workflows/campaign-send-cron.yml`, which needs `CRON_SECRET`
+   and `PRODUCTION_APP_URL` configured in this repo's Actions
+   secrets/variables after merge (Vercel's own cron can only run this
+   worker once/day on the current plan tier — see the acceptance-pass
+   section above).
 
 `staging` and `feature/outreach-ai-employee` are reconciled as of `b1a31ff`.
-`feature/outreach-ai-employee` was pushed to origin through `0892214`; the
-Campaign Engine commits since then (`704a00a` through `8f7bcd6`) have not
-been pushed yet.
+`feature/outreach-ai-employee` is pushed to origin through `b348890`
+(local and remote confirmed matching). **Not yet merged into `staging` or
+`main` — do not merge until real browser acceptance (see
+`docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md`) has actually been run.**
 
 ## Next recommended milestones
 
-1. Interactive browser QA of the Campaign Engine dashboard
-   (`/dashboard/outreach/campaigns`) — built and validated via
-   typecheck/lint/production build only; no session in this history has
-   exercised it in a real browser yet.
+1. **Real interactive browser acceptance of the Campaign Engine
+   dashboard** — the actual blocker to staging integration right now. See
+   `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the preview URL (behind
+   Vercel SSO — needs a logged-in Vercel session to open) and the exact
+   manual checklist.
 2. Decide and configure inbound email receiving (Resend supports it) so
    `lib/outreach/campaign-reply-handoff.ts` — already built and tested —
    can actually be triggered by a real reply.
@@ -313,3 +379,7 @@ been pushed yet.
    platform-wide `EMAIL_FROM`).
 4. Independently audit Sales AI's conversation/CRM sync depth (not covered
    in this pass) before calling it production-ready.
+5. Once merged to the default branch, add `CRON_SECRET` (secret) and
+   `PRODUCTION_APP_URL` (variable) to this repo's GitHub Actions
+   configuration so `.github/workflows/campaign-send-cron.yml` actually
+   drives the 5-minute send-worker tick in production.
