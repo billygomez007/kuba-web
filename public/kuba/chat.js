@@ -15,7 +15,7 @@
 
   const kubaApi =
     script.dataset.apiUrl ||
-    (script.src ? new URL(script.src).origin : "https://superkuba.com");
+    "https://www.superkuba.com";
 
   if (!publicKey) {
     console.error("Kuba Chat: data-public-key is required.");
@@ -132,7 +132,8 @@
     input.value = "";
 
     try {
-      const response = await fetch(`${kubaApi}/api/integrations/website-chat`, {
+      const chatEndpoint = `${kubaApi}/api/integrations/website-chat?publicKey=${encodeURIComponent(publicKey)}`;
+      const response = await fetch(chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ publicKey, message: text, conversationId }),

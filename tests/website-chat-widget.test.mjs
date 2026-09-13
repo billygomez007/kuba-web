@@ -20,6 +20,12 @@ test("keeps title and welcome message separate with a generic fallback", () => {
   assert.match(source, /Ask us anything/);
 });
 
+test("makes the public key available to preflight without adding credentials", () => {
+  assert.match(source, /website-chat\?publicKey=\$\{encodeURIComponent\(publicKey\)\}/);
+  assert.doesNotMatch(source, /credentials\s*:/);
+  assert.doesNotMatch(source, /Authorization/);
+});
+
 test("prevents duplicate widget instances", () => {
   assert.match(source, /document\.querySelector\(widgetMarker\)/);
   assert.match(source, /data-kuba-chat-widget/);

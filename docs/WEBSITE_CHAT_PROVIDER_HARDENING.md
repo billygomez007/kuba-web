@@ -43,6 +43,35 @@ The approved Kora production configuration is exactly:
 ["https://koraafric.com", "https://www.koraafric.com"]
 ```
 
+## Browser CORS contract
+
+The public widget sends its `kuba_pk_*` identifier in both the JSON body and a
+query parameter. The query parameter is intentionally public and lets the
+provider resolve the integration during the browser's `OPTIONS` preflight,
+before a JSON body exists. The provider returns a `204` preflight only when
+the active integration has a configured allowlist and the request `Origin`
+matches exactly.
+
+Approved preflight and successful POST responses contain only the exact origin
+headers needed by the widget:
+
+```text
+Access-Control-Allow-Origin: <exact configured origin>
+Vary: Origin
+Access-Control-Allow-Methods: POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+```
+
+The provider never emits a wildcard origin or credential support. Unknown
+keys, missing or malformed origins, and origin denials receive the same
+generic 403 response without CORS headers. Legacy `null`/empty allowlists keep
+their application-level compatibility behavior but do not receive a browser
+CORS response until an administrator configures an allowlist.
+
+The public widget calls the canonical provider host
+`https://www.superkuba.com` directly. `https://superkuba.com` redirects to
+that host, and preflight requests must not depend on following that redirect.
+
 No production or staging database was changed in this branch. After the
 migration has been applied, an authorized operator can inspect the target row:
 

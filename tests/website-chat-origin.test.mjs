@@ -6,6 +6,8 @@ const {
   KORA_PRODUCTION_WIDGET_ORIGINS,
   normalizeOrigin,
   parseAllowedOrigins,
+  getWebsiteChatCorsHeaders,
+  getWebsiteChatPreflightHeaders,
 } = await import("../lib/integrations/website-chat-origin.ts");
 
 const koraOrigins = JSON.stringify([
@@ -48,4 +50,40 @@ test("normalizes origins without accepting paths, credentials, or wildcards", ()
   assert.equal(normalizeOrigin("https://koraafric.com/path"), null);
   assert.equal(normalizeOrigin("https://user:pass@koraafric.com"), null);
   assert.equal(normalizeOrigin("https://*.koraafric.com"), null);
+});
+
+test("returns the exact preflight contract for approved origins", () => {
+  for (const origin of ["https://koraafric.com", "https://www.koraafric.com"]) {
+    assert.deepEqual(getWebsiteChatPreflightHeaders(koraOrigins, origin), {
+      "Access-Control-Allow-Origin": origin,
+      Vary: "Origin",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    });
+  }
+});
+
+test("denies CORS headers for rejected, missing, malformed, and legacy origins", () => {
+  for (const origin of [
+    "https://evil.example",
+    "https://koraafric.com.evil.example",
+    "http://koraafric.com",
+    "https://koraafric.com:444",
+    null,
+    "not an origin",
+  ]) {
+    assert.equal(getWebsiteChatPreflightHeaders(koraOrigins, origin), null);
+  }
+
+  assert.equal(getWebsiteChatPreflightHeaders(null, "https://koraafric.com"), null);
+  assert.equal(getWebsiteChatPreflightHeaders("malformed", "https://koraafric.com"), null);
+});
+
+test("returns only exact origin headers for approved POST responses", () => {
+  for (const origin of ["https://koraafric.com", "https://www.koraafric.com"]) {
+    assert.deepEqual(getWebsiteChatCorsHeaders(koraOrigins, origin), {
+      "Access-Control-Allow-Origin": origin,
+      Vary: "Origin",
+    });
+  }
 });

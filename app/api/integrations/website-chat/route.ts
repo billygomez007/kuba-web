@@ -22,7 +22,11 @@ import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { runAutomationTrigger } from "@/lib/automations/engine";
 import { createAuditLog } from "@/lib/auth/audit";
-import { isWebsiteChatOriginAllowed } from "@/lib/integrations/website-chat-origin";
+import {
+  getWebsiteChatCorsHeaders,
+  getWebsiteChatPreflightHeaders,
+  isWebsiteChatOriginAllowed,
+} from "@/lib/integrations/website-chat-origin";
 
 function websiteChatUnavailableResponse() {
   return NextResponse.json(
@@ -463,6 +467,56 @@ export async function PUT() {
   }
 }
 
+/**
+ * Resolve the public integration before answering a browser preflight. The
+ * widget supplies its intentionally public key in the query string because
+ * browsers do not include JSON POST bodies in OPTIONS requests.
+ */
+export async function OPTIONS(request: Request) {
+  const requestOrigin = request.headers.get("origin");
+  const publicKey = new URL(request.url).searchParams.get("publicKey")?.trim();
+
+  if (!requestOrigin || !publicKey) {
+    return websiteChatUnavailableResponse();
+  }
+
+  try {
+    const integrationResult = await db
+      .select({
+        allowedOrigins: integrations.allowedOrigins,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(integrations.publicKey, publicKey),
+          eq(integrations.provider, "website_chat"),
+          eq(integrations.status, "active"),
+        ),
+      )
+      .limit(1);
+
+    const integration = integrationResult[0];
+    const corsHeaders = integration
+      ? getWebsiteChatPreflightHeaders(
+          integration.allowedOrigins,
+          requestOrigin,
+        )
+      : null;
+
+    if (!corsHeaders) {
+      return websiteChatUnavailableResponse();
+    }
+
+    return new NextResponse(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
+  } catch (error) {
+    console.error("Website Chat preflight error:", error);
+    return websiteChatUnavailableResponse();
+  }
+}
+
 export async function POST(request: Request) {
   let responseStage =
     "parse_request";
@@ -473,6 +527,7 @@ export async function POST(request: Request) {
     const publicKey = String(
       body.publicKey || "",
     ).trim();
+    const requestOrigin = request.headers.get("origin");
 
     const message = String(
       body.message || "",
@@ -552,7 +607,7 @@ export async function POST(request: Request) {
     if (
       !isWebsiteChatOriginAllowed(
         integration.allowedOrigins,
-        request.headers.get("origin"),
+        requestOrigin,
       )
     ) {
       return websiteChatUnavailableResponse();
@@ -1227,7 +1282,7 @@ Answer naturally, helpfully and professionally.
         ),
       );
 
-    return NextResponse.json({
+    const successResponse = NextResponse.json({
       success:
         true,
 
@@ -1253,6 +1308,18 @@ Answer naturally, helpfully and professionally.
           routingDecision.confidence,
       },
     });
+
+    const corsHeaders = getWebsiteChatCorsHeaders(
+      integration.allowedOrigins,
+      requestOrigin,
+    );
+    if (corsHeaders) {
+      for (const [name, value] of Object.entries(corsHeaders)) {
+        successResponse.headers.set(name, value);
+      }
+    }
+
+    return successResponse;
   } catch (error) {
     console.error(
       "Website chat error:",

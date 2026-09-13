@@ -63,6 +63,53 @@ export function isWebsiteChatOriginAllowed(
   return normalizedRequestOrigin !== null && allowedOrigins.includes(normalizedRequestOrigin);
 }
 
+export type WebsiteChatCorsHeaders = Record<string, string>;
+
+/**
+ * Build the browser transport headers only for an explicitly configured,
+ * exact-match origin. Legacy integrations without an allowlist remain
+ * compatible with the application authorization policy, but do not receive
+ * a permissive CORS response until an administrator configures one.
+ */
+export function getWebsiteChatCorsHeaders(
+  serializedAllowedOrigins: string | null | undefined,
+  requestOrigin: string | null | undefined,
+): WebsiteChatCorsHeaders | null {
+  const allowedOrigins = parseAllowedOrigins(serializedAllowedOrigins);
+  if (allowedOrigins === null) return null;
+
+  const normalizedRequestOrigin = normalizeOrigin(requestOrigin);
+  if (
+    normalizedRequestOrigin === null ||
+    !allowedOrigins.includes(normalizedRequestOrigin)
+  ) {
+    return null;
+  }
+
+  return {
+    "Access-Control-Allow-Origin": normalizedRequestOrigin,
+    Vary: "Origin",
+  };
+}
+
+/** Add the method/header contract required by the JSON POST preflight. */
+export function getWebsiteChatPreflightHeaders(
+  serializedAllowedOrigins: string | null | undefined,
+  requestOrigin: string | null | undefined,
+): WebsiteChatCorsHeaders | null {
+  const corsHeaders = getWebsiteChatCorsHeaders(
+    serializedAllowedOrigins,
+    requestOrigin,
+  );
+  if (!corsHeaders) return null;
+
+  return {
+    ...corsHeaders,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+
 export const KORA_PRODUCTION_WIDGET_ORIGINS = [
   "https://koraafric.com",
   "https://www.koraafric.com",
