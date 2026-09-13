@@ -4,6 +4,63 @@ Written from a full repository audit on 2026-09-12. This is a living document �
 update it as major features land or architecture changes, rather than adding
 another dated point-in-time report to the repo root.
 
+## 2026-09-13 update — live bug fixes, platform provisioning, full clickability audit
+
+Verified in this session, on `feature/outreach-ai-employee`:
+
+- **Team & Staff and Billing & Subscription live crashes fixed.** Team &
+  Staff's client bundle was transitively importing the database module
+  (`lib/auth/permissions.ts` → `@/db`), which threw `LibsqlError: URL_INVALID`
+  the instant the browser evaluated the bundle (server-only env var, unset
+  client-side) — reproduced with a headless browser, not guessed. Split into
+  `lib/auth/permission-definitions.ts` (pure, no DB import) +
+  `lib/auth/permissions.ts` (DB-touching functions only). Billing's earlier
+  "Unable to load billing" was proven to already be fixed by the time this
+  session started; see `tests/staging-schema-drift-live-repro.test.mjs` and
+  `tests/client-bundle-no-database-import.test.mjs`.
+- **Migrations 0042/0043/0044 applied to the non-production staging Turso
+  database** (`superkuba-staging-*`). 0042's two tables existed on the real
+  schema but were never recorded in the ledger (likely an earlier
+  `drizzle-kit push`); reconciled the ledger for 0042, then applied 0043/0044
+  for real via `drizzle-orm/libsql/migrator` directly (`drizzle-kit migrate`
+  itself fails silently against this database — no error text, exit code 1;
+  use the ORM migrator, matching `scripts/reconcile-staging-migration-ledger.mjs`'s
+  own documented reasoning for avoiding the CLI).
+- **Super Admin bootstrapped**: `info@realtegicworks.com` → `platformRole:
+  super_admin` on the staging database, via the canonical
+  `scripts/bootstrap-platform-admin.mjs` (zero admins existed). The older
+  `scripts/bootstrap-super-admin.mjs` is now a deprecated shim delegating to
+  it — it previously had no guard against promoting a second admin outside
+  the audited flow and wrote `updated_at` in the wrong unit.
+- **Realtegic Enterprise-complimentary grant, Realtegic portfolio creation,
+  and Kora OS linkage/dual-ownership were NOT executed by Claude** — these
+  are real business/billing data writes to the shared staging database and
+  were blocked by the session's own safety controls ("Modify Shared
+  Resources"). Per the account holder, these were completed manually via the
+  real `/admin/businesses/[id]` and `/admin/organizations` UI (now that
+  `info@realtegicworks.com` has `super_admin` access) — Claude has not
+  independently re-verified this state on the database.
+- **Full clickability/destination audit** across Starter/Growth/Pro/Enterprise
+  and the admin surfaces — see `docs/acceptance/FULL_CLICK_AUDIT.md` for the
+  complete matrix, findings, and fixes (Help was a dead `/help` link with no
+  route at all; two dead hrefs on the admin home page and the Command Center
+  hub; two integration pages with a fully inert "Connect" button and no
+  backend; one orphaned fake-chat component deleted; `isBusinessRole()` was
+  silently rejecting "admin" and "member" — two of the six roles the Team &
+  Staff page itself offers — for every real caller, including team
+  invitations). A static TypeScript-AST-based scanner
+  (`scripts/lib/clickability-scanner.mjs`) now runs as a permanent regression
+  test (`tests/clickability-audit.test.mjs`) across
+  `app/dashboard`, `app/admin`, `app/onboarding`, `app/components`.
+- **Known non-blocking issue found, not yet root-caused**: a minified React
+  hydration warning (error #418) reproducibly occurs on
+  `/dashboard/settings`, `/dashboard/settings/profile`,
+  `/dashboard/settings/ai`, and the `/dashboard/human-workforce/[section]`
+  sub-pages. Does not crash the page (React's automatic hydration recovery
+  renders the correct content) and was not root-caused within this session's
+  scope — needs a `next dev` (non-Turbopack-HMR-interfered) investigation
+  with the full non-minified error. Tracked as a follow-up, not fixed here.
+
 ## Where this lives
 
 The canonical repo is `billygomez007/kuba-web`. Three local checkouts exist:

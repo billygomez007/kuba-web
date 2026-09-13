@@ -385,7 +385,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <nav className="mt-6 flex flex-wrap gap-4 sm:gap-6 text-xs text-white/30" aria-label="Dashboard trust links">
-              <Link href="/help" className="transition hover:text-white/60">Help Center</Link>
+              <Link href="/dashboard/help" className="transition hover:text-white/60">Help Center</Link>
               <Link href="/security" className="transition hover:text-white/60">Security</Link>
               <Link href="/privacy" className="transition hover:text-white/60">Privacy</Link>
               <Link href="/dashboard/settings" className="transition hover:text-white/60">Settings</Link>

@@ -113,6 +113,7 @@ export default function IntegrationsPage() {
           <FaFacebook size={40} />
           <FaInstagram size={40} />
         </div>,
+      status: "coming-soon",
     },
     {
       name: "Telegram",
@@ -121,6 +122,7 @@ export default function IntegrationsPage() {
       description:
         "Connect Telegram for customer conversations.",
       icon: <FaTelegram size={40} />,
+      status: "coming-soon",
     },
   ];
 
@@ -247,6 +249,7 @@ export default function IntegrationsPage() {
         <div className="grid gap-5 md:grid-cols-2">
           {socialChannels.map((item) => {
             const { connected } = getIntegrationStatus(item.provider);
+            const isComingSoon = item.status === "coming-soon";
 
             return (
               <div
@@ -256,7 +259,7 @@ export default function IntegrationsPage() {
                 <div className="flex items-start justify-between">
                   <div className="text-white">{item.icon}</div>
                   {connected && <FaCheckCircle className="text-green-400" size={24} />}
-                  {!connected && <FaTimesCircle className="text-white/40" size={24} />}
+                  {!connected && !isComingSoon && <FaTimesCircle className="text-white/40" size={24} />}
                 </div>
 
                 <h3 className="mt-4 text-xl font-bold">{item.name}</h3>
@@ -265,25 +268,27 @@ export default function IntegrationsPage() {
 
                 <div className="mt-5 flex items-center justify-between">
                   <span className="text-xs uppercase text-white/40">
-                    {connected ? "Connected" : "Not connected"}
+                    {isComingSoon ? "Coming Soon" : connected ? "Connected" : "Not connected"}
                   </span>
 
-                  <button
-                    onClick={() => {
-                      const routeMap: Record<string, string> = {
-                        meta: "/dashboard/integrations/meta",
-                        telegram: "/dashboard/integrations/telegram",
-                      };
+                  {!isComingSoon && (
+                    <button
+                      onClick={() => {
+                        const routeMap: Record<string, string> = {
+                          meta: "/dashboard/integrations/meta",
+                          telegram: "/dashboard/integrations/telegram",
+                        };
 
-                      const nextRoute = routeMap[item.provider];
-                      if (nextRoute) {
-                        router.push(nextRoute);
-                      }
-                    }}
-                    className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black transition-opacity hover:opacity-90"
-                  >
-                    {connected ? "Manage" : "Connect"}
-                  </button>
+                        const nextRoute = routeMap[item.provider];
+                        if (nextRoute) {
+                          router.push(nextRoute);
+                        }
+                      }}
+                      className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black transition-opacity hover:opacity-90"
+                    >
+                      {connected ? "Manage" : "Connect"}
+                    </button>
+                  )}
                 </div>
               </div>
             );

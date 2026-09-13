@@ -708,7 +708,7 @@ export default function DashboardLayout({
         <div className="border-t border-white/[0.07] p-4">
 
           <Link
-            href="/help"
+            href="/dashboard/help"
             className="mt-1.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white/70"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-base text-white/40">

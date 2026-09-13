@@ -1,4 +1,4 @@
-"use client";
+import Link from "next/link";
 
 export default function MetaIntegrationPage() {
   return (
@@ -6,7 +6,9 @@ export default function MetaIntegrationPage() {
 
       <div className="mx-auto max-w-2xl rounded-3xl border border-white/10 bg-white/[0.04] p-8">
 
-        <h1 className="text-3xl font-black">
+        <Link href="/dashboard/integrations" className="text-xs font-semibold text-white/40 hover:text-cyan-300">← Integrations</Link>
+
+        <h1 className="mt-5 text-3xl font-black">
           Facebook & Instagram
         </h1>
 
@@ -15,10 +17,16 @@ export default function MetaIntegrationPage() {
         </p>
 
         <button
-          className="mt-8 rounded-xl bg-white px-8 py-4 font-bold text-black"
+          type="button"
+          disabled
+          className="mt-8 cursor-not-allowed rounded-xl bg-white/10 px-8 py-4 font-bold text-white/35"
         >
-          Connect Meta Account
+          Coming soon
         </button>
+
+        <p className="mt-3 text-xs text-white/35">
+          Facebook and Instagram messaging is not yet available in SuperKuba.
+        </p>
 
       </div>
 

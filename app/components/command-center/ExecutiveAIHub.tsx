@@ -9,7 +9,7 @@ const executives = [
     description:
       "Business intelligence, decisions, and executive guidance.",
     action: "Ask Kuba",
-    href: "#kuba-chat",
+    href: "/dashboard/ai-employees",
   },
   {
     icon: "↗",
@@ -17,7 +17,7 @@ const executives = [
     description:
       "Revenue growth, leads, opportunities, and follow-ups.",
     action: "Open Sales",
-    href: "/dashboard/employees",
+    href: "/dashboard/ai-employees",
   },
   {
     icon: "◎",
@@ -25,7 +25,7 @@ const executives = [
     description:
       "Customer conversations and business enquiries.",
     action: "Open Receptionist",
-    href: "/dashboard/employees",
+    href: "/dashboard/ai-employees",
   },
   {
     icon: "◈",
@@ -33,7 +33,7 @@ const executives = [
     description:
       "Financial intelligence and accounting workflows.",
     action: "Open Finance",
-    href: "/dashboard/employees",
+    href: "/dashboard/ai-employees",
   },
 ];
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Briefing = {
   headline: string;
@@ -16,6 +17,8 @@ type Briefing = {
 
 
 export default function ExecutiveBriefing() {
+
+  const router = useRouter();
 
   const [briefing, setBriefing] =
     useState<Briefing | null>(null);
@@ -120,6 +123,8 @@ export default function ExecutiveBriefing() {
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
 
         <button
+          type="button"
+          onClick={() => document.getElementById("kuba-priorities")?.scrollIntoView({ behavior: "smooth" })}
           className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-white/90"
         >
           Review Priorities
@@ -127,6 +132,8 @@ export default function ExecutiveBriefing() {
 
 
         <button
+          type="button"
+          onClick={() => router.push("/dashboard/ai-employees")}
           className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white/70 transition hover:bg-white/[0.08]"
         >
           Ask Kuba
@@ -171,7 +178,7 @@ export default function ExecutiveBriefing() {
 
 
       {briefing?.priorities && briefing.priorities.length > 0 && (
-        <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
+        <div id="kuba-priorities" className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
 
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/30">
             Kuba recommends
