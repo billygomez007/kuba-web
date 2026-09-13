@@ -254,10 +254,12 @@ export function hasPermission(
 
 export const BUSINESS_ROLES = {
   OWNER: "owner",
+  ADMIN: "admin",
   MANAGER: "manager",
   SALES: "sales",
   RECEPTIONIST: "receptionist",
   ACCOUNTANT: "accountant",
+  MEMBER: "member",
   CUSTOM: "custom",
 } as const;
 
@@ -307,10 +309,12 @@ export function isBusinessRole(
 ): role is BusinessRole {
   return (
     role === BUSINESS_ROLES.OWNER ||
+    role === BUSINESS_ROLES.ADMIN ||
     role === BUSINESS_ROLES.MANAGER ||
     role === BUSINESS_ROLES.SALES ||
     role === BUSINESS_ROLES.RECEPTIONIST ||
     role === BUSINESS_ROLES.ACCOUNTANT ||
+    role === BUSINESS_ROLES.MEMBER ||
     role === BUSINESS_ROLES.CUSTOM
   );
 }
