@@ -4,14 +4,15 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { subscriptions } from "@/db/schema";
 import { auth } from "@/lib/auth";
-import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { activeBillingProvider, getBillingProvider } from "@/lib/billing/provider";
 import { createAuditLog } from "@/lib/auth/audit";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const membership = await getBusinessMembership(session.user.id);
+  const membership = await getCurrentMembership();
   if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.BILLING_MANAGE)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const subscription = (await db.select({ id: subscriptions.id, providerSubscriptionId: subscriptions.providerSubscriptionId, providerCustomerId: subscriptions.providerCustomerId }).from(subscriptions).where(eq(subscriptions.businessId, membership.businessId)).limit(1))[0];
   const provider = getBillingProvider();

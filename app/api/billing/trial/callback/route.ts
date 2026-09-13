@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { subscriptions } from "@/db/schema";
-import { getBusinessMembership } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { normalizePlan } from "@/lib/billing/entitlements";
 import { getConfiguredPriceId, paystackProvider, TRIAL_DAYS } from "@/lib/billing/provider";
 import { createAuditLog } from "@/lib/auth/audit";
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return NextResponse.redirect(`${origin}/login`);
 
-  const membership = await getBusinessMembership(session.user.id);
+  const membership = await getCurrentMembership();
   const fallbackPlan = url.searchParams.get("plan") || "growth";
   if (!membership) return fail(fallbackPlan, "Business access denied.");
   if (!reference) return fail(fallbackPlan, "Missing verification reference.");

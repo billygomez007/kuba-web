@@ -8,10 +8,10 @@ import { encrypt } from "@/lib/encryption";
 import { integrations } from "@/db/schema";
 
 import {
-  getBusinessMembership,
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 
 import {
   unauthorizedResponse,
@@ -28,9 +28,7 @@ async function getAccess() {
   }
 
   const membership =
-    await getBusinessMembership(
-      session.user.id,
-    );
+    await getCurrentMembership();
 
   if (!membership) {
     return null;
@@ -60,9 +58,7 @@ export async function POST(request: Request) {
   }
 
   const membership =
-    await getBusinessMembership(
-      session.user.id,
-    );
+    await getCurrentMembership();
 
   if (!membership) {
     return forbiddenResponse();
@@ -256,9 +252,7 @@ export async function DELETE() {
   }
 
   const membership =
-    await getBusinessMembership(
-      session.user.id,
-    );
+    await getCurrentMembership();
 
   if (!membership) {
     return forbiddenResponse();

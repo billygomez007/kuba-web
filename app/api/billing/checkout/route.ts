@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { getConfiguredPriceId, getBillingProvider, activeBillingProvider } from "@/lib/billing/provider";
 import { subscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const membership = await getBusinessMembership(session.user.id);
+    const membership = await getCurrentMembership();
     if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.BILLING_MANAGE)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const body = await request.json();
     const plan = normalizePlan(typeof body.plan === "string" ? body.plan : "");

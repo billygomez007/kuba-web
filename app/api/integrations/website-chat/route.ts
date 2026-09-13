@@ -155,10 +155,10 @@ export async function GET() {
     const { headers } = await import("next/headers");
     const { auth } = await import("@/lib/auth");
     const {
-      getBusinessMembership,
       hasPermission,
       PERMISSIONS,
     } = await import("@/lib/auth/permissions");
+    const { getCurrentMembership } = await import("@/lib/auth/tenant");
 
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -172,7 +172,7 @@ export async function GET() {
     }
 
     const membership =
-      await getBusinessMembership(session.user.id);
+      await getCurrentMembership();
 
     if (!membership) {
       return NextResponse.json(
@@ -249,10 +249,10 @@ export async function PUT() {
     const { headers } = await import("next/headers");
     const { auth } = await import("@/lib/auth");
     const {
-      getBusinessMembership,
       hasPermission,
       PERMISSIONS,
     } = await import("@/lib/auth/permissions");
+    const { getCurrentMembership } = await import("@/lib/auth/tenant");
     const {
       unauthorizedResponse,
       forbiddenResponse,
@@ -267,7 +267,7 @@ export async function PUT() {
     }
 
     const membership =
-      await getBusinessMembership(session.user.id);
+      await getCurrentMembership();
 
     if (!membership) {
       return forbiddenResponse();

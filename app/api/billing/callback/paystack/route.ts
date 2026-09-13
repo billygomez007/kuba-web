@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { getBusinessMembership } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { activeBillingProvider, getBillingProvider } from "@/lib/billing/provider";
 import { getConfiguredPriceId } from "@/lib/billing/provider";
 import { saveSubscription } from "@/lib/billing/subscription-service";
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const reference = new URL(request.url).searchParams.get("reference") || "";
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return NextResponse.redirect(`${origin}/dashboard/billing?payment=pending`);
-  const membership = await getBusinessMembership(session.user.id);
+  const membership = await getCurrentMembership();
   if (!membership || !reference || activeBillingProvider() !== "paystack") return NextResponse.redirect(`${origin}/dashboard/billing?payment=failed`);
   const verifier = getBillingProvider().verifyTransaction;
   if (!verifier) return NextResponse.redirect(`${origin}/dashboard/billing?payment=failed`);

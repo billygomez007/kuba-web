@@ -74,9 +74,14 @@ test("entitlements.ts documents and implements complimentary as usable without a
 
 // --- 4. Billing UI never shows a fake price, renewal date, or cancel/manage-billing action for a complimentary account ---
 
-test("the billing page shows 'Complimentary' instead of a real price for a complimentary subscription", () => {
+test("the billing page shows 'GHS 0' and 'Complimentary — Lifetime' instead of a real price/status for a complimentary subscription", () => {
   assert.match(billingPage, /isComplimentary\s*=\s*data\.subscription\?\.status === "complimentary"/);
-  assert.match(billingPage, /isComplimentary \? "Complimentary"/);
+  assert.match(billingPage, /isComplimentary \? "GHS 0"/);
+  assert.match(billingPage, /isComplimentary \? "Complimentary — Lifetime/);
+});
+
+test("the billing page never shows a stale/fake payment method for a complimentary subscription", () => {
+  assert.match(billingPage, /!isComplimentary && data\.subscription\?\.paymentMethodSummary/);
 });
 
 test("the billing page never shows a renewal date for a complimentary subscription", () => {

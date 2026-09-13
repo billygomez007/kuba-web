@@ -296,9 +296,18 @@ test("26. tenant isolation: trial/subscription state for one business never leak
 
 // --- 27. foreign business rejection (same pattern already proven for appointments/tickets; re-confirmed for billing) ---
 test("27. billing routes resolve the acting business via server-side membership lookup, never a client-supplied business id", async () => {
+  // These routes were migrated from the legacy getBusinessMembership(userId)
+  // helper (which ignored the selected-business cookie and broke for any
+  // multi-business account) to the canonical, cookie-aware
+  // getCurrentMembership() — see tests/canonical-current-workspace-
+  // resolver.test.mjs for the full migration regression coverage. The
+  // security property this test guards — business resolution is always
+  // server-side/authenticated, never a client-supplied id — still holds,
+  // now via the stronger canonical resolver.
   for (const file of ["app/api/billing/checkout/route.ts", "app/api/billing/trial/route.ts", "app/api/billing/subscription/route.ts", "app/api/billing/portal/route.ts"]) {
     const source = await readFile(path.join(REPO_ROOT, file), "utf8");
-    assert.match(source, /getBusinessMembership\(session\.user\.id\)/, `${file} must resolve business via authenticated membership`);
+    assert.match(source, /getCurrentMembership\(\)/, `${file} must resolve business via authenticated membership`);
+    assert.doesNotMatch(source, /businessId:\s*(?:request|body)\./, `${file} must not accept a client-supplied businessId`);
   }
 });
 

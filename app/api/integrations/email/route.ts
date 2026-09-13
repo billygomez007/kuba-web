@@ -8,10 +8,10 @@ import {
   integrations,
 } from "@/db/schema";
 import {
-  getBusinessMembership,
   hasPermission,
   PERMISSIONS,
 } from "@/lib/auth/permissions";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import {
   unauthorizedResponse,
   forbiddenResponse,
@@ -30,9 +30,7 @@ export async function POST(
   }
 
   const membership =
-    await getBusinessMembership(
-      session.user.id,
-    );
+    await getCurrentMembership();
 
   if (!membership) {
     return forbiddenResponse();
