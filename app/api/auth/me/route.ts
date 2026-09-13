@@ -43,7 +43,19 @@ export async function GET() {
     // participates in the business-membership resolution above or in any
     // entitlement decision; those remain governed entirely by businessUsers/
     // subscriptions, unaffected by which portfolios this user belongs to.
-    const organizations = (await getUserOrganizations(session.user.id)).map((row) => ({ id: row.organization.id, name: row.organization.name, role: row.role }));
+    // Deliberately isolated in its own try/catch: this is optional metadata
+    // for EVERY authenticated user's navigation load, so it must never take
+    // down the entire dashboard — whether because a given environment's
+    // database hasn't yet had the organizations/organization_members
+    // migration applied, or for any other transient reason. A real
+    // authentication or tenant-authorization failure is never masked by
+    // this — those are decided entirely above/below this block, untouched.
+    let organizations: { id: string; name: string; role: string }[] = [];
+    try {
+      organizations = (await getUserOrganizations(session.user.id)).map((row) => ({ id: row.organization.id, name: row.organization.name, role: row.role }));
+    } catch (organizationsError) {
+      console.error("Portfolio membership lookup failed (non-fatal — navigation continues without a portfolio entry point):", organizationsError);
+    }
 
     const membershipStatus = await getBusinessMembershipStatus();
 

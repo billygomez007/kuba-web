@@ -20,7 +20,18 @@ export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const organizations = await getCurrentUserOrganizations();
+  // Same non-fatal treatment as /api/auth/me: a user with genuinely zero
+  // portfolio memberships and one whose environment can't yet resolve the
+  // organizations tables must look identical here — an honest empty
+  // portfolio list, never a 500 for this dedicated (non-navigation-
+  // blocking) page.
+  let organizations: Awaited<ReturnType<typeof getCurrentUserOrganizations>> = [];
+  try {
+    organizations = await getCurrentUserOrganizations();
+  } catch (organizationsError) {
+    console.error("Portfolio lookup failed (non-fatal — an empty portfolio list is returned):", organizationsError);
+    return NextResponse.json({ portfolios: [] });
+  }
 
   const myBusinessMemberships = await db
     .select({ businessId: businessUsers.businessId, role: businessUsers.role })
