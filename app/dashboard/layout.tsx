@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { capabilityMinimumPlan, planDefinitions } from "@/lib/billing/plan-definitions";
 import { getCatalogEntry } from "@/lib/billing/ai-workforce-catalog";
 import LogoutControl from "../components/settings/LogoutControl";
@@ -315,6 +315,16 @@ export default function DashboardLayout({
   const [entitlements, setEntitlements] =
     useState<BusinessEntitlements | null>(null);
 
+  // Distinct from "permissions is an empty array because this account
+  // genuinely has none" — set only when the request that loads permissions/
+  // entitlements itself fails (network error, non-2xx response). An empty
+  // permissions array on a successful response is a legitimate state
+  // (canShowItem correctly hides everything); a failed request is not, and
+  // must never silently render the same way. See the sidebar's own render
+  // branch below.
+  const [navigationLoadError, setNavigationLoadError] =
+    useState<string | null>(null);
+
   const [blockedCapability, setBlockedCapability] =
     useState<string | null>(null);
 
@@ -345,81 +355,92 @@ export default function DashboardLayout({
   const isStaging =
     process.env.NEXT_PUBLIC_APP_ENV === "staging";
 
+  const loadPermissions = useCallback(async () => {
+    try {
+      const response = await fetch("/api/auth/me", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        // A failed request is NOT the same state as "this account has no
+        // permissions" — permissions/entitlements/role are deliberately
+        // left untouched (never forced to an empty array) so a stale-but-
+        // valid previous nav doesn't silently look emptier than it should,
+        // and so canShowItem's permission gate (which only activates once
+        // `permissions !== null`) never mistakes "failed to load" for
+        // "loaded, and there is nothing." See navigationLoadError below.
+        setNavigationLoadError(
+          `Unable to load your navigation (${response.status}). Try refreshing the page.`,
+        );
+        return;
+      }
+
+      const data = await response.json();
+
+      const userPermissions = Array.isArray(
+        data.membership?.permissions,
+      )
+        ? data.membership.permissions
+        : [];
+
+      setNavigationLoadError(null);
+      setPermissions(userPermissions);
+      setEntitlements(data.membership?.entitlements || null);
+
+      setRole(
+        data.membership?.role || null,
+      );
+
+      setBusinesses(
+        Array.isArray(data.businesses) ? data.businesses : [],
+      );
+
+      setSelectedBusinessId(
+        data.membership?.businessId || "",
+      );
+
+      const matchedRoute = Object.keys(
+        navigationPermissions,
+      )
+        .sort((a, b) => b.length - a.length)
+        .find(
+          (route) =>
+            pathname === route ||
+            pathname.startsWith(`${route}/`),
+        );
+      const matchedCapability = capabilityForPath(pathname);
+
+      if (matchedRoute && !userPermissions.includes(navigationPermissions[matchedRoute])) {
+        router.replace("/dashboard");
+      } else if (matchedCapability && !data.membership?.entitlements?.capabilities?.includes(matchedCapability)) {
+        setBlockedCapability(matchedCapability);
+      } else {
+        setBlockedCapability(null);
+      }
+    } catch {
+      setNavigationLoadError(
+        "Unable to load your navigation. Check your connection and try again.",
+      );
+    } finally {
+      // Marks authorization "ready" on both success and failure — a failed
+      // request gets a clear error state to show (navigationLoadError),
+      // never an infinite loading spinner.
+      setAuthorizationReady(true);
+    }
+  }, [pathname, router]);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadPermissions() {
-      try {
-        const response = await fetch("/api/auth/me", {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          if (!cancelled) {
-            setPermissions([]);
-            setAuthorizationReady(true);
-          }
-          return;
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          const userPermissions = Array.isArray(
-            data.membership?.permissions,
-          )
-            ? data.membership.permissions
-            : [];
-
-          setPermissions(userPermissions);
-          setEntitlements(data.membership?.entitlements || null);
-
-          setRole(
-            data.membership?.role || null,
-          );
-
-          setBusinesses(
-            Array.isArray(data.businesses) ? data.businesses : [],
-          );
-
-          setSelectedBusinessId(
-            data.membership?.businessId || "",
-          );
-
-          const matchedRoute = Object.keys(
-            navigationPermissions,
-          )
-            .sort((a, b) => b.length - a.length)
-            .find(
-              (route) =>
-                pathname === route ||
-                pathname.startsWith(`${route}/`),
-            );
-          const matchedCapability = capabilityForPath(pathname);
-
-          if (matchedRoute && !userPermissions.includes(navigationPermissions[matchedRoute])) {
-            router.replace("/dashboard");
-          } else if (matchedCapability && !data.membership?.entitlements?.capabilities?.includes(matchedCapability)) {
-            setBlockedCapability(matchedCapability);
-          } else {
-            setBlockedCapability(null);
-          }
-          setAuthorizationReady(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setPermissions([]);
-          setAuthorizationReady(true);
-        }
-      }
-    }
-
-    loadPermissions();
+    (async () => {
+      await loadPermissions();
+      if (cancelled) return;
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [pathname, router]);
+  }, [loadPermissions]);
 
   const activeGroup = useMemo(
     () => activeGroupForPath(pathname),
@@ -620,10 +641,27 @@ export default function DashboardLayout({
 
         {/* Navigation Workspace */}
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-gutter:stable]">
+          {/* This label previously said "Enterprise workspace" unconditionally
+              for every plan — pure static copy, never derived from the
+              business's actual plan, but misleading regardless. Now reflects
+              the real resolved plan name. */}
           <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/25">
-            Enterprise workspace
+            {entitlements ? `${entitlements.planName} workspace` : "Workspace"}
           </p>
-          {navigationGroups.map((group) => renderNavigationGroup(group))}
+          {navigationLoadError ? (
+            <div className="mx-1 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs text-amber-200">
+              <p>{navigationLoadError}</p>
+              <button
+                type="button"
+                onClick={() => void loadPermissions()}
+                className="mt-2 rounded-lg border border-amber-300/30 px-2.5 py-1 text-[11px] font-semibold text-amber-100 hover:bg-amber-300/10"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            navigationGroups.map((group) => renderNavigationGroup(group))
+          )}
         </nav>
 
         {/* Bottom Sidebar Section */}
@@ -681,7 +719,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              aria-label="Toggle enterprise navigation"
+              aria-label="Toggle dashboard navigation"
               aria-expanded={mobileNavigationOpen}
               onClick={() => setMobileNavigationOpen((open) => !open)}
               className="flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 text-xs font-semibold text-white/60 transition hover:bg-white/[0.08]"
@@ -715,8 +753,21 @@ export default function DashboardLayout({
                 </select>
               </div>
             )}
-            <nav aria-label="Enterprise mobile navigation">
-              {navigationGroups.map((group) => renderNavigationGroup(group, true))}
+            <nav aria-label="Dashboard mobile navigation">
+              {navigationLoadError ? (
+                <div className="mx-1 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs text-amber-200">
+                  <p>{navigationLoadError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadPermissions()}
+                    className="mt-2 rounded-lg border border-amber-300/30 px-2.5 py-1 text-[11px] font-semibold text-amber-100 hover:bg-amber-300/10"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                navigationGroups.map((group) => renderNavigationGroup(group, true))
+              )}
             </nav>
             <LogoutControl compact />
           </div>

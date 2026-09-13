@@ -31,7 +31,12 @@ type WorkforceData = {
 
 export default function AIWorkforceOverview() {
   const [data, setData] = useState<WorkforceData | null>(null);
-  const [error, setError] = useState(false);
+  // Distinct from "no error" — carries the actual status/reason so a real
+  // failure is never indistinguishable from "there's simply nothing to
+  // show yet." Never displays raw server internals (stack traces, secrets)
+  // — only the safe {error, code} shape the API itself already returns for
+  // expected failure cases (403 FEATURE_NOT_ENTITLED, 404 no business, ...).
+  const [error, setError] = useState<{ status: number; message: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +48,10 @@ export default function AIWorkforceOverview() {
         });
 
         if (!response.ok) {
-          throw new Error("Unable to load AI workforce.");
+          const body = await response.json().catch(() => ({}));
+          throw new Error(
+            JSON.stringify({ status: response.status, message: body?.error || "Unable to load AI workforce." }),
+          );
         }
 
         const result = (await response.json()) as {
@@ -51,11 +59,16 @@ export default function AIWorkforceOverview() {
         };
 
         if (!cancelled) {
+          setError(null);
           setData(result.workforce ?? null);
         }
-      } catch {
+      } catch (caught) {
         if (!cancelled) {
-          setError(true);
+          try {
+            setError(JSON.parse((caught as Error).message));
+          } catch {
+            setError({ status: 0, message: "Unable to load AI workforce — check your connection." });
+          }
         }
       }
     }
@@ -89,7 +102,8 @@ export default function AIWorkforceOverview() {
 
       {error ? (
         <div className="mt-6 rounded-2xl border border-red-400/15 bg-red-400/[0.05] p-5 text-sm text-red-200">
-          AI workforce data is temporarily unavailable.
+          <p>AI workforce data is temporarily unavailable.</p>
+          <p className="mt-1 text-xs text-red-300/70">{error.message}{error.status ? ` (${error.status})` : ""}</p>
         </div>
       ) : (
         <>
