@@ -87,10 +87,12 @@ test("Numeric limit overrides replace the effective limit", () => {
 });
 
 test("Entitlement and RBAC are both required", () => {
-  const permission = { capability: "intelligence.basic", rbac: "analytics.view" };
-  assert.equal(canAccess(resolve("growth"), permission, ["analytics.view"]), true);
+  // customer_ops.leads (Sales/Leads) is Growth-and-up only — Starter has no
+  // Sales AI employee at all under the approved canonical model.
+  const permission = { capability: "customer_ops.leads", rbac: "sales.view" };
+  assert.equal(canAccess(resolve("growth"), permission, ["sales.view"]), true);
   assert.equal(canAccess(resolve("growth"), permission, []), false);
-  assert.equal(canAccess(resolve("starter"), permission, ["analytics.view"]), false);
+  assert.equal(canAccess(resolve("starter"), permission, ["sales.view"]), false);
 });
 
 test("Starter cannot access enterprise APIs even as owner", () => {
@@ -109,9 +111,13 @@ test("Stale business selection remains denied", () => {
 });
 
 test("Sidebar projection is intentionally minimal for Starter", () => {
+  // Starter now includes basic Analytics ("your first AI employee" should
+  // still see how their Receptionist is doing) alongside the original core
+  // set — Business Operations and Human Workforce remain Growth+/Pro+.
   const visible = projectSidebar("starter");
-  assert.deepEqual(visible, ["Command Center", "AI Workforce", "Customer Operations", "Integrations", "Business Brain"]);
+  assert.deepEqual(visible, ["Command Center", "AI Workforce", "Customer Operations", "Intelligence", "Integrations", "Business Brain"]);
   assert.equal(visible.includes("Human Workforce"), false);
+  assert.equal(visible.includes("Business Operations"), false);
 });
 
 test("Growth sidebar expands without exposing enterprise hierarchy", () => {
@@ -221,7 +227,7 @@ test("capabilityMinimumPlan is derived from the real plan matrix, not hand-maint
   assert.equal(capabilityMinimumPlan["human_workforce.core"], "pro");
   assert.equal(capabilityMinimumPlan["enterprise.multi_business"], "enterprise");
   assert.equal(capabilityMinimumPlan["command_center.basic"], "starter");
-  assert.equal(capabilityMinimumPlan["intelligence.basic"], "growth");
+  assert.equal(capabilityMinimumPlan["intelligence.basic"], "starter");
   // Every capability that exists anywhere in a plan resolves to a minimum plan.
   for (const capability of enterprise) {
     assert.equal(typeof capabilityMinimumPlan[capability], "string");

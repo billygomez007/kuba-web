@@ -38,9 +38,13 @@ test("4. Stale selected-business context is denied", () => {
 
 const intelligenceCapabilities = ["intelligence.basic", "intelligence.advanced", "intelligence.sales", "intelligence.customer", "intelligence.ai_workforce", "intelligence.human_workforce", "intelligence.operations", "intelligence.reports"];
 
-test("5. Starter is denied every Intelligence capability", () => {
+test("5. Starter has only basic Intelligence (Basic Analytics), denied every advanced Intelligence capability", () => {
+  // Approved canonical model: Starter includes "Basic Analytics" as a core
+  // primary-experience item — only the advanced/segmented Intelligence
+  // capabilities remain Pro-and-up.
   const starter = getPlanDefinition("starter").capabilities;
-  for (const capability of [...intelligenceCapabilities, "intelligence.inventory"]) {
+  assert.equal(starter.includes("intelligence.basic"), true);
+  for (const capability of [...intelligenceCapabilities.filter((c) => c !== "intelligence.basic"), "intelligence.inventory"]) {
     assert.equal(starter.includes(capability), false, `starter should not have ${capability}`);
   }
 });

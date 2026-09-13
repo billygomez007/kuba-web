@@ -1,10 +1,12 @@
-// Prior audit finding: a Starter-tier business could perform Growth-gated
-// conversation management (takeover/assign/status-change/resume) because
-// /api/inbox/workspace and the conversation mutation routes had no
-// server-side capability check — only the dashboard nav hid the
-// Growth-gated /dashboard/conversations page. Viewing the Inbox itself
-// stays Starter-accessible (customer_ops.inbox is Starter-included); the
-// bug was specifically the advanced conversation-management actions.
+// Prior audit finding: a business could perform conversation-management
+// mutations (takeover/assign/status-change/resume) it wasn't entitled to,
+// because /api/inbox/workspace and the conversation mutation routes had no
+// server-side capability check — only the dashboard nav hid the gated
+// /dashboard/conversations page. The fix (server-side hasCapability +
+// customer_ops.conversations on every mutation route) is plan-independent;
+// which plan actually carries customer_ops.conversations has since changed
+// (2026-09 canonical matrix moved it into Starter, "your first AI
+// employee") but the enforcement mechanism these tests check did not.
 //
 // Matches the static-source-inspection style of tests/ai-authority-policy.test.mjs
 // and tests/whatsapp-webhook-policy.test.mjs: these routes import the full
@@ -39,16 +41,14 @@ test("app/api/inbox/workspace/route.ts asserts the base customer_ops.inbox capab
   assert.match(source, /customer_ops\.inbox/);
 });
 
-test("Starter does not include customer_ops.conversations (the capability the mutation routes now require)", () => {
+test("Starter includes customer_ops.conversations under the approved canonical model (basic conversations are core Starter, not a Growth upsell)", () => {
   const starter = getPlanDefinition("starter");
-  assert.equal(starter.capabilities.includes("customer_ops.conversations"), false);
-  // Starter must still be able to view its own Inbox — this bug fix must
-  // not regress the Starter-included base Inbox experience.
+  assert.equal(starter.capabilities.includes("customer_ops.conversations"), true);
   assert.equal(starter.capabilities.includes("customer_ops.inbox"), true);
 });
 
-test("Growth, Pro, and Enterprise all include customer_ops.conversations (the positive cases)", () => {
-  for (const planId of ["growth", "pro", "enterprise"]) {
+test("Starter, Growth, Pro, and Enterprise all include customer_ops.conversations (the positive cases)", () => {
+  for (const planId of ["starter", "growth", "pro", "enterprise"]) {
     const plan = getPlanDefinition(planId);
     assert.equal(plan.capabilities.includes("customer_ops.conversations"), true, `${planId} should include customer_ops.conversations`);
   }

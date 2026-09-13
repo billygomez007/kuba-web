@@ -36,9 +36,11 @@ async function pricingSources() {
   return `${page}\n${presentation}`;
 }
 
-test("public pricing preserves placeholder prices and Enterprise contact CTA", async () => {
+test("public pricing shows real approved working prices and the Enterprise contact CTA", async () => {
   const source = await pricingSources();
-  assert.match(source, /\$XX/);
+  assert.match(source, /GHS 699/);
+  assert.match(source, /GHS 1,999/);
+  assert.match(source, /GHS 4,999/);
   assert.match(source, /Custom/);
   assert.match(source, /Contact Sales/);
   assert.match(source, /Coming Soon/);
@@ -56,10 +58,10 @@ test("progressive cards use customer-friendly tier-specific presentation", async
     readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8"),
   ]);
   const combined = `${source}\n${presentation}`;
-  assert.match(combined, /Run Your Business/);
-  assert.match(combined, /Automate Your Business/);
-  assert.match(combined, /Operate With AI/);
-  assert.match(combined, /Complete Business Operating System/);
+  assert.match(combined, /Your first AI employee/);
+  assert.match(combined, /Your AI customer and sales team/);
+  assert.match(combined, /Your complete AI workforce/);
+  assert.match(combined, /Your AI operating infrastructure/);
   assert.match(source, /Everything in \{planDefinitions\.find/);
   assert.match(combined, /AI-assisted Appointments & Tickets/);
   assert.doesNotMatch(combined, /Global currency|Business Profile|Business Brain.*tier/);
@@ -76,8 +78,11 @@ test("requested operations and AI-assist placements follow canonical tiers", () 
   assert.equal(enterprise.has("enterprise.multi_business"), true);
 });
 
-test("pricing amounts remain unchanged placeholders", async () => {
+test("pricing amounts are the approved real working prices, not placeholders", async () => {
   const source = await readFile(new URL("../lib/billing/pricing-presentation.ts", import.meta.url), "utf8");
-  assert.equal((source.match(/price: "\$XX"/g) || []).length, 3);
+  assert.doesNotMatch(source, /\$XX/);
+  assert.match(source, /price: "GHS 699"/);
+  assert.match(source, /price: "GHS 1,999"/);
+  assert.match(source, /price: "GHS 4,999"/);
   assert.match(source, /price: "Custom"/);
 });

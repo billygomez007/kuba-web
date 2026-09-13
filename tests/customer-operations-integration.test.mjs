@@ -285,21 +285,25 @@ test("entitlement AND permission are both independently required for access (rea
   }
   const enterpriseCaps = planDefs.getPlanDefinition("enterprise").capabilities;
   const starterCaps = planDefs.getPlanDefinition("starter").capabilities;
-  assert.equal(wouldGrantAccess("owner", null, permissions.PERMISSIONS.RECEPTION_MANAGE, enterpriseCaps, "customer_ops.appointments"), true);
-  assert.equal(wouldGrantAccess("owner", null, permissions.PERMISSIONS.RECEPTION_MANAGE, starterCaps, "customer_ops.appointments"), false, "permission alone must not bypass the entitlement gate");
+  // Tickets remains Growth-and-up under the approved model (Appointments
+  // moved to Starter — see below — but Tickets/Support did not).
+  assert.equal(wouldGrantAccess("owner", null, permissions.PERMISSIONS.MESSAGING_VIEW, enterpriseCaps, "customer_ops.tickets"), true);
+  assert.equal(wouldGrantAccess("owner", null, permissions.PERMISSIONS.MESSAGING_VIEW, starterCaps, "customer_ops.tickets"), false, "permission alone must not bypass the entitlement gate");
 });
 
 // --- Commercial tier placement, verified against the real plan-definitions module ---
-// Approved model: Starter = no Appointments/Tickets. Growth = core (human)
-// Appointments/Tickets. Pro = Growth + AI-assisted workflows. Enterprise = Pro + governance.
+// Approved model (2026-09 canonical matrix): Starter = core (human)
+// Appointments included (part of "your first AI employee"), but no Tickets/
+// Support yet. Growth = adds Tickets/Support. Pro = Growth + AI-assisted
+// workflows. Enterprise = Pro + governance.
 
-test("1-2. Starter is not entitled to Appointments or Tickets", () => {
+test("1-2. Starter is entitled to Appointments (core) but not Tickets", () => {
   const caps = planDefs.getPlanDefinition("starter").capabilities;
-  assert.equal(caps.includes("customer_ops.appointments"), false);
+  assert.equal(caps.includes("customer_ops.appointments"), true);
   assert.equal(caps.includes("customer_ops.tickets"), false);
 });
-test("3. Starter's required plan for Appointments and Tickets is Growth (derived, not hand-coded)", () => {
-  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.appointments"], "growth");
+test("3. Starter's required plan for Appointments is Starter itself; Tickets remains Growth (derived, not hand-coded)", () => {
+  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.appointments"], "starter");
   assert.equal(planDefs.capabilityMinimumPlan["customer_ops.tickets"], "growth");
 });
 test("4-5. Growth is entitled to core Appointments and Tickets", () => {
@@ -366,14 +370,14 @@ test("18. direct foreign ticket lookup returns nothing when scoped to the wrong 
 
 // --- 21. Business switch refreshes entitlements (same render-time-invalidation contract as tests/four-tier-qa.test.mjs) ---
 
-test("21. switching a session's business from Enterprise to Starter immediately drops Appointments/Tickets access", () => {
+test("21. switching a session's business from Enterprise to Starter immediately drops Tickets access", () => {
   function pageAccessAfterSwitch(capability, newPlanCapabilities) {
     return newPlanCapabilities.includes(capability) ? "renders" : "upgrade_required";
   }
   const enterpriseCaps = planDefs.getPlanDefinition("enterprise").capabilities;
   const starterCaps = planDefs.getPlanDefinition("starter").capabilities;
-  assert.equal(pageAccessAfterSwitch("customer_ops.appointments", enterpriseCaps), "renders");
-  assert.equal(pageAccessAfterSwitch("customer_ops.appointments", starterCaps), "upgrade_required");
+  assert.equal(pageAccessAfterSwitch("customer_ops.tickets", enterpriseCaps), "renders");
+  assert.equal(pageAccessAfterSwitch("customer_ops.tickets", starterCaps), "upgrade_required");
 });
 test("21b. switching from Growth to Pro immediately grants AI-assisted customer-ops access", () => {
   function pageAccessAfterSwitch(capability, newPlanCapabilities) {
@@ -402,8 +406,8 @@ test("23. the dashboard billing plan comparison derives from the real plan-defin
 
 // --- 24-25. capabilityMinimumPlan resolves automatically from the canonical matrix ---
 
-test("24. capabilityMinimumPlan(Appointments) = Growth", () => {
-  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.appointments"], "growth");
+test("24. capabilityMinimumPlan(Appointments) = Starter", () => {
+  assert.equal(planDefs.capabilityMinimumPlan["customer_ops.appointments"], "starter");
 });
 test("25. capabilityMinimumPlan(Tickets) = Growth", () => {
   assert.equal(planDefs.capabilityMinimumPlan["customer_ops.tickets"], "growth");
