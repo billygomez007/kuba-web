@@ -22,12 +22,15 @@ export async function getBusinessEntitlements(businessId: string): Promise<Busin
   const now = Date.now();
   // Fail CLOSED on missing/malformed dates — a "trialing"/"past_due"/"canceled"
   // row with no trialEnd/currentPeriodEnd must never be treated as
-  // indefinitely usable. Only "active" and admin-managed "enterprise_contract"
-  // are usable without a date check, since the provider/admin is the
-  // authority on those states directly.
+  // indefinitely usable. "active", "enterprise_contract", and
+  // "complimentary" are all usable without a date check, since the
+  // provider/admin is the authority on those states directly rather than a
+  // payment-provider-verified period. "complimentary" is distinct from
+  // "active" specifically so the billing UI can tell an admin-granted free
+  // account apart from a real paid one and never claim a fake renewal.
   let usable = false;
   if (current) {
-    if (current.status === "active" || current.status === "enterprise_contract") {
+    if (current.status === "active" || current.status === "enterprise_contract" || current.status === "complimentary") {
       usable = true;
     } else if (current.status === "trialing") {
       usable = current.trialEnd != null && current.trialEnd.getTime() > now;
