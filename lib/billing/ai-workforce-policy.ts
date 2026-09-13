@@ -235,3 +235,51 @@ export function canActivateEmployee(
     message: `${employeeType} is not available on ${entitlements.planName}.`,
   };
 }
+
+export type EmployeeAccessState = {
+  /** Can the business discover this type at all (catalog listing)? Always
+   * true — the AI Workforce catalog is a deliberate upgrade-discovery
+   * surface (approved model), never hidden per plan. */
+  visible: true;
+  /** Dimension A: does the CURRENT plan commercially include this type? */
+  entitled: boolean;
+  /** Dimension B: does this type have a real runtime today, regardless of plan? */
+  implemented: boolean;
+  /** Dimension C: given entitled + implemented both hold, is there a free
+   * active-employee slot right now? Always true when not entitled or not
+   * implemented — those dimensions already block activation on their own,
+   * so a slot count doesn't add information in that case. */
+  usageAvailable: boolean;
+  /** The plan this type would first require, for upgrade copy — undefined
+   * when already entitled, or when only an Enterprise module grant (never
+   * a plan upgrade) could unlock it. */
+  requiredPlan?: Exclude<PlanId, "enterprise">;
+};
+
+/**
+ * The three-question decomposition the approved model asks for everywhere
+ * (visible / entitled / usage available) applied to one concrete, already-
+ * implemented resource: AI employee activation slots. This is a pure named
+ * view over canActivateEmployee's decision — it introduces no new policy,
+ * so it can never disagree with the real activation route.
+ *
+ * There is deliberately no general cross-resource "usage available" helper
+ * (campaign sends, voice minutes, conversations) yet — active-employee slots
+ * are the only resource this codebase actually meters and enforces a limit
+ * on today. Extending this to other resources requires real metering
+ * infrastructure that does not exist yet, not just a wider type.
+ */
+export function getEmployeeAccessState(
+  entitlements: BusinessEntitlements,
+  employeeType: string,
+  currentActiveEmployeeCount: number,
+): EmployeeAccessState {
+  const entitled = isEmployeeTypeEntitled(entitlements, employeeType);
+  const implemented = isEmployeeImplementationAvailable(employeeType);
+  const decision = canActivateEmployee(entitlements, employeeType, currentActiveEmployeeCount);
+  const usageAvailable = decision.allowed || decision.code !== "EMPLOYEE_LIMIT_REACHED";
+  const type = normalizeType(employeeType);
+  const requiredPlan = entitled ? undefined : STANDARD_EMPLOYEE_TYPES[type]?.minPlan;
+
+  return { visible: true, entitled, implemented, usageAvailable, requiredPlan };
+}

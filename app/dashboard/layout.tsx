@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { capabilityMinimumPlan, planDefinitions } from "@/lib/billing/plan-definitions";
+import { getCatalogEntry } from "@/lib/billing/ai-workforce-catalog";
 import LogoutControl from "../components/settings/LogoutControl";
 import TrialBanner from "../components/dashboard/TrialBanner";
 
@@ -297,6 +298,25 @@ const planNameById = Object.fromEntries(
 function requiredPlanNameForCapability(capability: string) {
   const planId = capabilityMinimumPlan[capability];
   return planId ? planNameById[planId] : undefined;
+}
+
+// A capability tied to a specific AI employee gets its upgrade copy from
+// that employee's own catalog entry (name/description/capabilities) instead
+// of a generic "capability name, upgrade to X" message — reuses the single
+// existing copy source (lib/billing/ai-workforce-catalog.ts) rather than
+// hand-writing a second description. Extend this map only for capabilities
+// that really do correspond to one specific employee; most capabilities
+// (e.g. business_ops.workflows) have no single employee to name and should
+// keep the generic message below.
+const capabilityEmployeeType: Partial<Record<string, string>> = {
+  "outreach.campaigns": "outreach",
+};
+
+function capabilityUpgradeCopy(capability: string): { title: string; description: string; benefits: string[] } | null {
+  const employeeType = capabilityEmployeeType[capability];
+  const entry = employeeType ? getCatalogEntry(employeeType) : undefined;
+  if (!entry) return null;
+  return { title: `Unlock ${entry.name}`, description: entry.description, benefits: entry.capabilities };
 }
 
 function isRouteActive(pathname: string, href?: string) {
@@ -765,8 +785,30 @@ export default function DashboardLayout({
           <main className="flex min-h-screen items-center justify-center px-6 py-12 text-white">
             <section className="w-full max-w-xl rounded-3xl border border-amber-300/20 bg-amber-300/[0.05] p-8">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-200/70">Upgrade required</p>
-              <h1 className="mt-3 text-3xl font-black">{blockedCapability.replace(/[._]/g, " ")}</h1>
-              <p className="mt-3 text-sm leading-6 text-white/60">This capability is not included in your current {entitlements?.planName || "plan"} plan. Upgrade to {requiredPlanNameForCapability(blockedCapability) || "a higher plan"} to unlock it for this business.</p>
+              {(() => {
+                const copy = capabilityUpgradeCopy(blockedCapability);
+                return copy ? (
+                  <>
+                    <h1 className="mt-3 text-3xl font-black">{copy.title}</h1>
+                    <p className="mt-3 text-sm leading-6 text-white/60">{copy.description}</p>
+                    <ul className="mt-4 flex flex-wrap gap-2">
+                      {copy.benefits.map((benefit) => (
+                        <li key={benefit} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-white/70">
+                          {benefit}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-4 text-sm leading-6 text-white/60">
+                      Available on <span className="font-bold text-amber-200">{requiredPlanNameForCapability(blockedCapability) || "a higher plan"}</span>.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="mt-3 text-3xl font-black">{blockedCapability.replace(/[._]/g, " ")}</h1>
+                    <p className="mt-3 text-sm leading-6 text-white/60">This capability is not included in your current {entitlements?.planName || "plan"} plan. Upgrade to {requiredPlanNameForCapability(blockedCapability) || "a higher plan"} to unlock it for this business.</p>
+                  </>
+                );
+              })()}
               <Link href="/dashboard/billing/plans" className="mt-6 inline-flex rounded-xl bg-cyan-400 px-4 py-3 text-sm font-bold text-black">View plans</Link>
             </section>
           </main>
