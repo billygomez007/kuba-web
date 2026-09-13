@@ -53,6 +53,7 @@ export default function DashboardPage() {
   const [userTimezone, setUserTimezone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [needsBusinessSelection, setNeedsBusinessSelection] = useState<{ id: string; name: string }[] | null>(null);
   const [entitlements, setEntitlements] = useState<BusinessEntitlements | null>(null);
 
   useEffect(() => {
@@ -63,9 +64,9 @@ export default function DashboardPage() {
         });
 
         if (response.status === 404) {
-          const data = await response.json();
+          const notFoundData = await response.json();
 
-          if (data?.onboardingStatus === "new_user") {
+          if (notFoundData?.onboardingStatus === "new_user") {
             setBusiness(null);
             setEmployees([]);
             setBusinessTimezone(null);
@@ -80,6 +81,21 @@ export default function DashboardPage() {
         }
 
         const data = await response.json();
+
+        // A real, multi-business account with no current selection yet
+        // (e.g. a fresh session on a fresh preview host, before the
+        // sidebar's business switcher has been used) — real business data
+        // exists, so this must never render as an empty "new user"
+        // dashboard, and must never let the Command Center widgets below
+        // mount against no resolved business at all. 200 + a
+        // distinguishing `code`, matching the same convention
+        // app/api/auth/me and app/api/command-center/overview already use
+        // for this exact recoverable (not a failure) state.
+        if (data?.code === "AMBIGUOUS_BUSINESS_SELECTION") {
+          setNeedsBusinessSelection(Array.isArray(data.businesses) ? data.businesses : []);
+          setLoadFailed(false);
+          return;
+        }
 
         setBusiness(data.business ?? data);
         setEmployees(data.employees ?? []);
@@ -112,6 +128,37 @@ export default function DashboardPage() {
 
   if (loading) {
     return <LoadingState variant="page" message="Getting your workspace ready..." />;
+  }
+
+  if (needsBusinessSelection) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-surface-page px-6 py-12 text-white">
+        <section className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300/70">Select a business</p>
+          <h1 className="mt-3 text-2xl font-black">Your account belongs to more than one business</h1>
+          <p className="mt-3 text-sm text-white/45">Choose which workspace to open.</p>
+          <div className="mt-6 space-y-2">
+            {needsBusinessSelection.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={async () => {
+                  const response = await fetch("/api/businesses/select", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ businessId: option.id }),
+                  });
+                  if (response.ok) window.location.reload();
+                }}
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm font-semibold text-white/85 transition hover:border-cyan-300/30 hover:bg-white/[0.05]"
+              >
+                {option.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      </main>
+    );
   }
 
   if (loadFailed) {

@@ -54,6 +54,25 @@ export async function GET() {
     const business = selected?.business;
 
     if (!business) {
+      // Two genuinely different states were previously conflated into the
+      // same 404 + onboardingStatus: "new_user": a brand-new signup with
+      // zero memberships, and a multi-business account with no current
+      // selection (a real, live-proven case — a fresh session on a fresh
+      // preview host never carries over the superkuba_business_id cookie).
+      // The caller (app/dashboard/page.tsx) needs to tell these apart: the
+      // first genuinely has nothing to show; the second has real business
+      // data it should route the user to select, not silently render an
+      // empty "new user" dashboard for. Matches the established convention
+      // (app/api/auth/me, app/api/command-center/overview): this is a
+      // recoverable state, not an authorization failure, so it is 200 with
+      // a distinguishing `code`, never 403/404.
+      if (result.length > 1) {
+        return NextResponse.json({
+          success: true,
+          code: "AMBIGUOUS_BUSINESS_SELECTION",
+          businesses: result.map((row) => ({ ...row.business, role: row.role, branchId: row.branchId })),
+        });
+      }
       return NextResponse.json(
         {
           error: "No business is associated with this account.",

@@ -51,7 +51,19 @@ export default function BusinessHealthCards() {
 
         const data = await response.json();
 
-        setOverview(data);
+        // A 200 response is not always the full Overview shape: when the
+        // account has no resolved business (a brand-new signup, or — the
+        // live-proven case — a multi-business account with no selection
+        // yet) the API returns a stub `{ code, workforce: null }` instead
+        // of the real metrics, by design (see app/api/command-center/
+        // overview/route.ts). Only treat the response as real overview
+        // data when it actually has the shape this component renders;
+        // otherwise stay in the "..." loading/unavailable state rather
+        // than crashing on `overview.salesPipeline.total` with no
+        // `salesPipeline` present.
+        if (data && !data.code && data.salesPipeline && data.followUps) {
+          setOverview(data);
+        }
 
 
       } catch (error) {
