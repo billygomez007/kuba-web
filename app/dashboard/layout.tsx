@@ -11,11 +11,18 @@ import TrialBanner from "../components/dashboard/TrialBanner";
 
 type NavigationItem = {
   label: string;
-  href?: string;
+  // Required, not optional: the operational sidebar shows only features a
+  // customer can actually use right now. A feature that isn't implemented
+  // yet has no href and therefore cannot appear here at all — it belongs on
+  // the AI Workforce catalog / pricing page / upgrade screens instead, never
+  // as an unusable placeholder row in this sidebar. See canShowItem below:
+  // visibility is permission AND entitlement AND (by construction, since
+  // only implemented surfaces are ever listed here) implementation
+  // availability.
+  href: string;
   icon: string;
   ownerOnly?: boolean;
   permission?: string;
-  status?: "Coming Soon" | "Planned";
   children?: string[];
 };
 
@@ -44,9 +51,7 @@ const navigationGroups: NavigationGroup[] = [
     title: "Command Center",
     icon: "⌂",
     items: [
-      { label: "Organization Overview", icon: "◇", status: "Coming Soon" },
       { label: "Business Overview", href: "/dashboard", icon: "⌂" },
-      { label: "Branch Overview", icon: "⌖", status: "Coming Soon" },
     ],
   },
   {
@@ -57,13 +62,11 @@ const navigationGroups: NavigationGroup[] = [
       { label: "Outreach Campaigns", href: "/dashboard/outreach/campaigns", icon: "▶", permission: "outreach.view" },
       { label: "AI Employee Builder", href: "/dashboard/ai-employees/create", icon: "+", permission: "workforce.view" },
       { label: "AI Teams", href: "/dashboard/workforce/team", icon: "♙", permission: "workforce.view" },
-      { label: "Collections Agent", icon: "◫", status: "Coming Soon" },
       { label: "Deployment", href: "/dashboard/workforce/deployment", icon: "⇧", permission: "workforce.view" },
       { label: "Orchestration", href: "/dashboard/workforce/orchestration", icon: "⇄", permission: "workforce.view" },
       { label: "Monitoring", href: "/dashboard/workforce/monitoring", icon: "◉", permission: "workforce.view" },
       { label: "AI Workforce Performance", href: "/dashboard/ai-performance", icon: "▥", permission: "workforce.view" },
       { label: "Voice", href: "/dashboard/settings/voice-providers", icon: "◖", permission: "workforce.view" },
-      { label: "Skills", icon: "✣", status: "Planned" },
       { label: "Simulator", href: "/dashboard/workforce/simulator", icon: "◌", permission: "workforce.view" },
       { label: "Marketplace", href: "/dashboard/workforce-marketplace", icon: "◫", permission: "workforce.view" },
     ],
@@ -74,7 +77,7 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       { label: "Workforce Overview", href: "/dashboard/human-workforce", icon: "⌂", permission: "workforce.view" },
       { label: "Employees", href: "/dashboard/human-workforce/employees", icon: "◎", permission: "workforce.view" },
-      { label: "HR", href: "/dashboard/human-workforce/hr", icon: "▤", permission: "workforce.view", children: ["Employee Records", "Departments", "Positions", "Contracts", "Documents", "Attendance", "Leave", "Performance", "Recruitment"] },
+      { label: "HR", href: "/dashboard/human-workforce/hr", icon: "▤", permission: "workforce.view", children: ["Employee Records", "Departments", "Positions", "Contracts", "Documents", "Attendance", "Leave"] },
       { label: "Payroll", href: "/dashboard/human-workforce/payroll", icon: "$", permission: "workforce.view" },
       { label: "Operational Teams", href: "/dashboard/human-workforce/teams", icon: "♙", permission: "workforce.view" },
     ],
@@ -102,8 +105,6 @@ const navigationGroups: NavigationGroup[] = [
       { label: "Approvals", href: "/dashboard/approvals", icon: "✓", permission: "messaging.manage" },
       { label: "Automations", href: "/dashboard/automations", icon: "⚙", permission: "automations.view" },
       { label: "Workflows", href: "/dashboard/automations/templates", icon: "⇄", permission: "automations.view" },
-      { label: "Inventory", href: "/dashboard/business-operations/inventory", icon: "▦", permission: "dashboard.view" },
-      { label: "Documents", href: "/dashboard/business-operations/documents", icon: "▤", permission: "knowledge.view" },
       { label: "Operational Alerts", href: "/dashboard/business-operations/alerts", icon: "!", permission: "dashboard.view" },
     ],
   },
@@ -119,8 +120,6 @@ const navigationGroups: NavigationGroup[] = [
       { label: "AI Workforce Analytics", href: "/dashboard/intelligence/ai-workforce", icon: "◈", permission: "workforce.view" },
       { label: "Human Workforce Analytics", href: "/dashboard/intelligence/human-workforce", icon: "♙", permission: "workforce.view" },
       { label: "Operations Analytics", href: "/dashboard/intelligence/operations", icon: "▣", permission: "analytics.view" },
-      { label: "Inventory Analytics", href: "/dashboard/intelligence/inventory", icon: "▦", permission: "analytics.view" },
-      { label: "Reports", href: "/dashboard/intelligence/reports", icon: "▤", permission: "analytics.view" },
       { label: "Insights & Alerts", href: "/dashboard/intelligence/insights", icon: "!", permission: "analytics.view" },
     ],
   },
@@ -129,13 +128,6 @@ const navigationGroups: NavigationGroup[] = [
     icon: "⌘",
     items: [
       { label: "Communication Channels", href: "/dashboard/integrations", icon: "✉", permission: "integrations.view", children: ["WhatsApp", "Email", "SMS", "Voice", "Website Chat"] },
-      { label: "Social Channels", href: "/dashboard/integrations/meta", icon: "◎", permission: "integrations.view" },
-      { label: "Calendar", icon: "□", status: "Coming Soon" },
-      { label: "Payments", icon: "$", status: "Planned" },
-      { label: "Accounting", icon: "▥", status: "Coming Soon" },
-      { label: "CRM", icon: "◇", status: "Coming Soon" },
-      { label: "External Apps", icon: "⌘", status: "Planned" },
-      { label: "API / Developer Integrations", icon: "{ }", status: "Planned" },
     ],
   },
   {
@@ -155,12 +147,7 @@ const navigationGroups: NavigationGroup[] = [
     icon: "⚙",
     items: [
       { label: "Business Profile", href: "/dashboard/settings/profile", icon: "◎", permission: "settings.view" },
-      { label: "Organization / Business Group", icon: "◇", status: "Coming Soon" },
-      { label: "Branches & Locations", icon: "⌖", status: "Coming Soon" },
       { label: "Team Staff", href: "/dashboard/settings/team", icon: "♙", permission: "users.view" },
-      { label: "Roles & Permissions", icon: "▣", status: "Planned" },
-      { label: "Invitations", icon: "+", status: "Planned" },
-      { label: "Security", icon: "◆", status: "Planned" },
       { label: "Billing & Subscription", href: "/dashboard/billing", icon: "$", permission: "billing.view" },
       { label: "Preferences", href: "/dashboard/settings", icon: "⚙", permission: "settings.view" },
     ],
@@ -203,8 +190,6 @@ const navigationPermissions: Record<string, string> = {
   "/dashboard/intelligence/ai-workforce": "workforce.view",
   "/dashboard/intelligence/human-workforce": "workforce.view",
   "/dashboard/intelligence/operations": "analytics.view",
-  "/dashboard/intelligence/inventory": "analytics.view",
-  "/dashboard/intelligence/reports": "analytics.view",
   "/dashboard/intelligence/insights": "analytics.view",
 };
 
@@ -239,8 +224,6 @@ const navigationCapabilities: Record<string, string> = {
   "/dashboard/approvals": "business_ops.approvals",
   "/dashboard/automations": "business_ops.automations",
   "/dashboard/automations/templates": "business_ops.workflows",
-  "/dashboard/business-operations/inventory": "business_ops.inventory",
-  "/dashboard/business-operations/documents": "business_ops.documents",
   "/dashboard/business-operations/alerts": "business_ops.alerts",
   "/dashboard/analytics": "intelligence.basic",
   "/dashboard/intelligence/executive": "intelligence.advanced",
@@ -250,11 +233,8 @@ const navigationCapabilities: Record<string, string> = {
   "/dashboard/intelligence/ai-workforce": "intelligence.ai_workforce",
   "/dashboard/intelligence/human-workforce": "intelligence.human_workforce",
   "/dashboard/intelligence/operations": "intelligence.operations",
-  "/dashboard/intelligence/inventory": "intelligence.inventory",
-  "/dashboard/intelligence/reports": "intelligence.reports",
   "/dashboard/intelligence/insights": "intelligence.advanced",
   "/dashboard/integrations": "integrations.core",
-  "/dashboard/integrations/meta": "integrations.social",
   "/dashboard/integrations/calendar": "integrations.calendar",
   "/dashboard/integrations/payments": "integrations.payments",
   "/dashboard/integrations/accounting": "integrations.accounting",
@@ -271,24 +251,6 @@ const navigationCapabilities: Record<string, string> = {
   "/dashboard/settings/team": "admin.team_staff",
   "/dashboard/billing": "admin.billing",
   "/dashboard/settings": "admin.team_staff",
-};
-
-const navigationItemCapabilities: Record<string, string> = {
-  "Organization Overview": "command_center.advanced",
-  "Branch Overview": "enterprise.organization",
-  "Collections Agent": "ai_workforce.collections",
-  "Skills": "ai_workforce.builder",
-  "Appointments": "customer_ops.appointments",
-  "Support / Tickets": "customer_ops.tickets",
-  "Calendar": "integrations.calendar",
-  "Payments": "integrations.payments",
-  "Accounting": "integrations.accounting",
-  "CRM": "integrations.crm",
-  "External Apps": "integrations.external_apps",
-  "API / Developer Integrations": "integrations.developer_api",
-  "Organization / Business Group": "enterprise.organization",
-  "Branches & Locations": "admin.branches",
-  "Roles & Permissions": "admin.roles_permissions",
 };
 
 const planNameById = Object.fromEntries(
@@ -505,12 +467,20 @@ export default function DashboardLayout({
     }
   }
 
+  // visibleInSidebar = hasRequiredPermission AND hasRequiredEntitlement.
+  // Implementation availability is the third, unconditional gate: it's
+  // enforced structurally, not per-request — a feature with no working
+  // product surface simply has no entry in navigationGroups at all (see
+  // that array's own comment), so there is nothing left to check for it
+  // here. A feature discoverable-but-not-yet-usable (a locked AI employee,
+  // a higher-plan capability) belongs on the AI Workforce catalog / pricing
+  // page / upgrade screen, never in this list.
   function canShowItem(item: NavigationItem) {
     if (item.ownerOnly && role !== "owner") return false;
 
-    const required = item.permission || (item.href ? navigationPermissions[item.href] : undefined);
+    const required = item.permission || navigationPermissions[item.href];
     if (required && permissions !== null && !permissions.includes(required)) return false;
-    const capability = item.href ? navigationCapabilities[item.href] : navigationItemCapabilities[item.label];
+    const capability = navigationCapabilities[item.href];
     return !capability || entitlements === null || entitlements.capabilities.includes(capability);
   }
 
@@ -561,30 +531,6 @@ export default function DashboardLayout({
             <div className="ml-7 mt-1 border-l border-white/[0.08] pl-3">
             {items.map((item) => {
               const active = isRouteActive(pathname, item.href);
-
-              if (!item.href) {
-                return (
-                  <div key={item.label} className="py-1">
-                    <div
-                      aria-disabled="true"
-                      className="flex cursor-not-allowed items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-white/30"
-                    >
-                      <span className="w-4 text-center text-white/20">{item.icon}</span>
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white/25">
-                        {item.status}
-                      </span>
-                    </div>
-                    {item.children && (
-                      <div className="ml-7 border-l border-white/[0.06] py-1 pl-3 text-[10px] leading-5 text-white/20">
-                        {item.children.map((child) => (
-                          <div key={child}>{child}</div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
 
               return (
                 <div key={`${group.title}-${item.label}`}>
