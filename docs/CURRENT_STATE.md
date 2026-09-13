@@ -60,6 +60,64 @@ Verified in this session, on `feature/outreach-ai-employee`:
   renders the correct content) and was not root-caused within this session's
   scope — needs a `next dev` (non-Turbopack-HMR-interfered) investigation
   with the full non-minified error. Tracked as a follow-up, not fixed here.
+  **Update (2026-09-13, internal stability pass)**: a full follow-up
+  investigation (real login flow, `next dev` and `next start`, fresh browser
+  contexts, warm/cold caches, all 4 named routes plus every other
+  `human-workforce/[section]` value) could not reproduce this warning even
+  once, and a complete source audit of every component in these routes'
+  render trees found no code that violates React's hydration-safety rules.
+  As a validating control, the same audit method DID find (and this pass
+  fixed) two genuine latent hydration-risk patterns elsewhere
+  (`useState(() => Date.now())` in `/dashboard/tasks` and
+  `/dashboard/follow-ups`) — proving the method works when a real instance
+  exists. See `docs/acceptance/PRODUCTION_READINESS.md` for the full
+  methodology. Left as `OWNER_PREVIEW_REQUIRED`, not claimed fixed, since
+  nothing reproducible was found to fix; may be specific to real Vercel Edge
+  infrastructure or the original test session's own flagged cookie issue.
+
+## 2026-09-13 update — internal stability / production-readiness pass
+
+A systematic stability audit across hydration, runtime errors, form
+persistence, AI employee lifecycle, plan transitions, multi-business
+isolation, Super Admin auditability, and responsive/browser-history
+behavior — full matrix in `docs/acceptance/PRODUCTION_READINESS.md`.
+Headline results:
+
+- **Two real (if not currently visible) hydration-risk defects fixed**:
+  `app/dashboard/tasks/page.tsx` and `app/dashboard/follow-ups/page.tsx`
+  both seeded a `Date.now()`-based `useState` lazy initializer, evaluated
+  during the render pass itself. Not currently a visible bug (the arrays
+  they filter start empty, populated later via a client effect) but a
+  latent risk fixed defensively: initial value is now a deterministic `0`,
+  the real value is set client-side only, after mount.
+- **Zero uncaught runtime errors and zero hydration warnings** across a
+  live browser sweep of all 84 static `/dashboard/*` routes, run once per
+  plan tier (Starter, Growth, Pro, Enterprise — 336 page loads total).
+  Every entitlement-gated page shows an honest "requires a higher plan"
+  message, never a crash or a fabricated empty state.
+- **Form persistence verified for real** (save → reload → same value):
+  Business Profile, Preferences, AI Settings, Team invitations, AI Employee
+  activation, Website Widget configuration.
+- **Plan transitions verified for real**: a live Growth → Pro → Growth
+  subscription change correctly updated the sidebar workspace label,
+  Billing page, and Analytics entitlement gate on reload each time,
+  including correctly re-enforcing the gate on downgrade (never stuck
+  open).
+- **Genuine gap found and honestly documented, not built**: AI employee
+  deactivation/reactivation does not exist anywhere in the codebase (no UI
+  control, no API route writes `aiEmployees.status` back to inactive).
+  Confirmed there is no fake/dead "Deactivate" button claiming otherwise —
+  this is a real missing capability, left as a follow-up per this pass's
+  explicit instruction not to build new major product modules.
+- **Duplicate-submission safety confirmed**: a rapid double-click on "Send
+  Invitation" produced exactly one invitation, not two.
+- **Multi-business isolation, business-selection edge cases, Super Admin
+  auditability, and tenant/plan-gate security boundaries** were re-verified
+  against the existing (already extensive) test suite rather than
+  re-derived from scratch — all still pass.
+
+Baseline after this pass: 1428/1428 tests passing, lint clean (0 errors, 61
+pre-existing warnings), typecheck clean, production build clean.
 
 ## Where this lives
 

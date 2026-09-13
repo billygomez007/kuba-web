@@ -33,7 +33,11 @@ export default function FollowUpsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
-  const [now, setNow] = useState<number>(() => Date.now());
+  // Deterministic initial value (0, never "no follow-up is overdue yet" since
+  // items/leads also start empty) so server-rendered and first-hydrated
+  // markup match exactly; the real current time is set client-side only,
+  // right after mount, by the interval effect below.
+  const [now, setNow] = useState<number>(0);
 
   async function loadData() {
     try {
@@ -71,11 +75,17 @@ export default function FollowUpsPage() {
   }, []);
 
   useEffect(() => {
+    const initial = window.setTimeout(() => {
+      setNow(Date.now());
+    }, 0);
     const interval = window.setInterval(() => {
       setNow(Date.now());
     }, 60000);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
   }, []);
 
   const filteredItems = useMemo(() => {

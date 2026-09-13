@@ -64,7 +64,10 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [dueFilter, setDueFilter] = useState("all");
-  const [currentTime] = useState(() => Date.now());
+  // Deterministic initial value so server-rendered and first-hydrated markup
+  // match exactly (tasks also starts empty, so this filters nothing either
+  // way); the real current time is set client-side only, right after mount.
+  const [currentTime, setCurrentTime] = useState(0);
 
   async function loadTasks() {
     try {
@@ -99,6 +102,14 @@ export default function TasksPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadTasks();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCurrentTime(Date.now());
     }, 0);
 
     return () => window.clearTimeout(timer);
