@@ -8,9 +8,20 @@ import {
   verificationEmailTemplate,
 } from "@/lib/email/templates";
 import { computeTrustedOrigins } from "@/lib/auth/trusted-origins";
+import { isProductionDomain } from "@/lib/auth/production-domain";
 
 const PRODUCTION_URL = "https://superkuba.com";
 const isProduction = process.env.NODE_ENV === "production";
+
+// See lib/auth/production-domain.ts for why this is NOT the same question
+// as `isProduction` above — anything tied to the real production domain
+// (cross-subdomain cookies, the `.superkuba.com` cookie Domain attribute,
+// `sameSite: "none"`) must gate on this instead.
+const onProductionDomain = isProductionDomain({
+  nodeEnv: process.env.NODE_ENV,
+  vercelEnv: process.env.VERCEL_ENV,
+});
+
 const configuredAuthURL = process.env.BETTER_AUTH_URL || null;
 const configuredAppURL =
   process.env.NEXT_PUBLIC_APP_URL || process.env.PUBLIC_APP_URL || null;
@@ -21,7 +32,7 @@ const vercelPreviewURL =
 const baseURL =
   configuredAuthURL ||
   vercelPreviewURL ||
-  (isProduction ? PRODUCTION_URL : "http://localhost:3000");
+  (onProductionDomain ? PRODUCTION_URL : "http://localhost:3000");
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -31,7 +42,7 @@ export const auth = betterAuth({
   baseURL,
 
   trustedOrigins: computeTrustedOrigins({
-    isProduction,
+    isProduction: onProductionDomain,
     vercelEnv: process.env.VERCEL_ENV,
     vercelUrl: process.env.VERCEL_URL,
     vercelBranchUrl: process.env.VERCEL_BRANCH_URL,
@@ -40,13 +51,19 @@ export const auth = betterAuth({
   }),
 
   advanced: {
+    // Preview (and local dev) deliberately fall through to Better Auth's
+    // own default cookie behavior — a host-only cookie scoped to whatever
+    // hostname actually served the response — rather than any override
+    // here. That is the correct, safer mechanism for an environment whose
+    // hostname changes per-deployment; it is never appropriate to invent a
+    // shared cookie domain covering every generated preview hostname.
     crossSubDomainCookies: {
-      enabled: isProduction,
-      domain: isProduction
+      enabled: onProductionDomain,
+      domain: onProductionDomain
         ? ".superkuba.com"
         : undefined,
     },
-    defaultCookieAttributes: isProduction
+    defaultCookieAttributes: onProductionDomain
       ? {
           httpOnly: true,
           secure: true,
