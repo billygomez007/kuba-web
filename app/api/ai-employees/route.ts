@@ -21,6 +21,47 @@ import {
   canActivateEmployee,
 } from "@/lib/billing/ai-workforce-policy";
 
+// This route previously only exported POST, but multiple pages (Team &
+// Staff, the voice-testing console, the simulator, and campaign creation)
+// already did a plain GET here expecting { employees: [...] } for the
+// CURRENT selected business — with no GET handler, Next.js auto-generates a
+// 405 with a non-JSON body, and every one of those `response.json()` calls
+// throws, surfacing as a confusing generic load failure instead of a real
+// employees list.
+export async function GET() {
+  try {
+    const { user, membership, error } = await requireBusinessMembership();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: error || "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: error || "Business access denied." },
+        { status: 403 },
+      );
+    }
+
+    const employees = await db
+      .select()
+      .from(aiEmployees)
+      .where(eq(aiEmployees.businessId, membership.businessId));
+
+    return NextResponse.json({ success: true, employees });
+  } catch (error) {
+    console.error("Load AI employees error:", error);
+
+    return NextResponse.json(
+      { error: "Unable to load AI employees." },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(
   request: Request,
 ) {

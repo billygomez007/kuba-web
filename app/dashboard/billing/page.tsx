@@ -7,31 +7,48 @@ import type { PlanId } from "@/lib/billing/plan-definitions";
 
 type Metric = { used: number | null; limit: number | null };
 type Data = { plan: { id: PlanId; name: string; features: string[] }; provider: string; capabilities: { supportsHostedCheckout: boolean; supportsBillingPortal: boolean; supportsCancellation: boolean; supportsPlanChange: boolean }; subscription: { status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; trialEnd: string | null; paymentMethodSummary: string | null } | null; usage: { employees: Metric; automations: Metric; voiceMinutes: Metric; conversations: Metric } };
+type LoadFailure = { endpoint: string; status: number; message: string };
 const providerLabel: Record<string, string> = { paystack: "Paystack", stripe: "Stripe", internal: "Internal" };
 
 export default function BillingPage() {
   const [data, setData] = useState<Data | null>(null); const [message, setMessage] = useState(""); const [error, setError] = useState("");
+  const [loadFailure, setLoadFailure] = useState<LoadFailure | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   useEffect(() => {
     let active = true;
+    const endpoint = "/api/billing/usage";
     const timer = window.setTimeout(() => {
-      void fetch("/api/billing/usage", { cache: "no-store" })
-        .then(async (response) => {
-          const result = await response.json();
-          if (!active) return;
-          if (response.ok) setData(result);
-          else setError(result.error || "Unable to load billing.");
-        })
-        .catch(() => {
-          if (!active) return;
-          setError("Unable to load billing.");
-        });
+      void (async () => {
+        setLoadFailure(null);
+        let response: Response;
+        try {
+          response = await fetch(endpoint, { cache: "no-store" });
+        } catch {
+          if (active) setLoadFailure({ endpoint, status: 0, message: "Network error — the request could not be sent." });
+          return;
+        }
+        let result: { error?: string } & Partial<Data> = {};
+        try {
+          result = await response.json();
+        } catch {
+          // The server responded but not with JSON — most commonly an
+          // unhandled exception producing a framework error page rather
+          // than the route's own { error } shape. Still a real failure of
+          // this specific endpoint, so it's reported the same way.
+          if (active) setLoadFailure({ endpoint, status: response.status, message: `Server returned a non-JSON response (HTTP ${response.status}).` });
+          return;
+        }
+        if (!active) return;
+        if (response.ok) setData(result as Data);
+        else setLoadFailure({ endpoint, status: response.status, message: result.error || "Unable to load billing." });
+      })();
     }, 0);
     return () => {
       active = false;
       window.clearTimeout(timer);
     };
-  }, []);
-  if (!data) return <State message={error || "Loading billing center..."} error={Boolean(error)} />;
+  }, [retryToken]);
+  if (!data) return <State failure={loadFailure} onRetry={() => setRetryToken((token) => token + 1)} />;
   async function cancel() { const response = await fetch("/api/billing/subscription", { method: "POST" }); const result = await response.json(); if (response.ok) setMessage(data?.subscription?.status === "trialing" ? "Your trial will end on schedule and you will not be charged." : "Your subscription will end at the close of the current billing period. You will not be charged again."); else setError(result.error || "Unable to request cancellation."); }
   async function portal() { const response = await fetch("/api/billing/portal", { method: "POST" }); const result = await response.json(); if (response.ok && result.url) window.location.assign(result.url); else setError(result.error || "Billing portal unavailable."); }
   const isTrialing = data.subscription?.status === "trialing";
@@ -44,4 +61,20 @@ export default function BillingPage() {
 }
 function displayFeature(value: string) { return value.replace(/([A-Z])/g, " $1").replace(/^./, (character) => character.toUpperCase()); }
 function UsageCard({ label, metric }: { label: string; metric: Metric }) { const value = metric.used == null ? "Not currently tracked" : metric.limit == null ? String(metric.used) : `${metric.used} / ${metric.limit}`; const percent = metric.used != null && metric.limit ? Math.min(100, Math.round(metric.used / metric.limit * 100)) : 0; return <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5"><p className="text-sm text-white/40">{label}</p><p className="mt-3 text-2xl font-black">{value}</p>{metric.limit && <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-cyan-400" style={{ width: `${percent}%` }} /></div>}</div>; }
-function State({ message, error = false }: { message: string; error?: boolean }) { return <main className="flex min-h-screen items-center justify-center bg-[#050507] px-6 text-sm"><p className={error ? "text-red-200" : "text-white/40"}>{message}</p></main>; }
+function State({ failure, onRetry }: { failure: LoadFailure | null; onRetry: () => void }) {
+  if (!failure) {
+    return <main className="flex min-h-screen items-center justify-center bg-[#050507] px-6 text-sm"><p className="text-white/40">Loading billing center...</p></main>;
+  }
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#050507] px-6 text-center text-sm">
+      <p className="max-w-md text-red-200">
+        Unable to load Billing.
+        <br />
+        GET {failure.endpoint} returned {failure.status || "no response"}: {failure.message}
+      </p>
+      <button type="button" onClick={onRetry} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/5">
+        Retry
+      </button>
+    </main>
+  );
+}

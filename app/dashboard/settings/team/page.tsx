@@ -47,6 +47,35 @@ type AIEmployee = {
   status: string;
 };
 
+type LoadFailure = { endpoint: string; status: number; message: string };
+
+/**
+ * Fetches one endpoint and normalizes every way it can fail (network error,
+ * a non-2xx status, or a response body that isn't valid JSON — e.g. an
+ * unimplemented HTTP method's framework-generated 405) into a single safe
+ * result the caller can attribute to this specific endpoint, rather than
+ * letting a JSON.parse exception escape and collapse into a generic,
+ * unattributed error for the whole page.
+ */
+async function loadEndpoint<T>(endpoint: string): Promise<{ ok: boolean; status: number; data: T | null; failure: LoadFailure | null }> {
+  let response: Response;
+  try {
+    response = await fetch(endpoint);
+  } catch {
+    return { ok: false, status: 0, data: null, failure: { endpoint, status: 0, message: "Network error — the request could not be sent." } };
+  }
+  let data: (T & { error?: string }) | null = null;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, status: response.status, data: null, failure: { endpoint, status: response.status, message: `Server returned a non-JSON response (HTTP ${response.status}).` } };
+  }
+  if (!response.ok) {
+    return { ok: false, status: response.status, data, failure: { endpoint, status: response.status, message: data?.error || `Request failed (HTTP ${response.status}).` } };
+  }
+  return { ok: true, status: response.status, data, failure: null };
+}
+
 const roles = [
   "admin",
   "manager",
@@ -248,6 +277,7 @@ export default function TeamPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loadFailure, setLoadFailure] = useState<LoadFailure | null>(null);
 
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] =
@@ -263,118 +293,69 @@ export default function TeamPage() {
     useState(false);
 
   async function loadTeam() {
-    try {
-      setLoading(true);
-      setError("");
+    setLoading(true);
+    setError("");
+    setLoadFailure(null);
 
-      const [
-        membersResponse,
-        invitationsResponse,
-        teamsResponse,
-        teamMembersResponse,
-        teamAIResponse,
-      ] = await Promise.all([
-        fetch("/api/team/members"),
-        fetch("/api/team/invitations"),
-        fetch("/api/teams"),
-        fetch("/api/teams/members"),
-        fetch("/api/teams/ai-employees"),
-      ]);
+    const [
+      membersResult,
+      invitationsResult,
+      teamsResult,
+      teamMembersResult,
+      teamAIResult,
+      employeesResult,
+    ] = await Promise.all([
+      loadEndpoint<{ members: StaffMember[] }>("/api/team/members"),
+      loadEndpoint<{ invitations: Invitation[] }>("/api/team/invitations"),
+      loadEndpoint<{ teams: BusinessTeam[] }>("/api/teams"),
+      loadEndpoint<{ memberships: { teamId: string; businessUserId: string }[] }>("/api/teams/members"),
+      loadEndpoint<{ assignments: { teamId: string; aiEmployeeId: string }[] }>("/api/teams/ai-employees"),
+      loadEndpoint<{ employees: AIEmployee[] }>("/api/ai-employees"),
+    ]);
 
-      const membersData =
-        await membersResponse.json();
+    // Team members is the one hard dependency for this page — every other
+    // endpoint below is additive detail that degrades to an honest empty
+    // state (matching a genuinely empty account) rather than blocking the
+    // page. Surface whichever endpoint failed first so the browser user can
+    // report the exact dependency, instead of a generic "unable to load".
+    const firstFailure = [membersResult, teamsResult, teamMembersResult, teamAIResult, employeesResult, invitationsResult].find((result) => result.failure)?.failure || null;
 
-      const invitationsData =
-        await invitationsResponse.json();
-
-      if (!membersResponse.ok) {
-        throw new Error(
-          membersData.error ||
-          "Unable to load team.",
-        );
-      }
-
-      setMembers(
-        membersData.members || [],
-      );
-
-
-      const teamsData =
-        await teamsResponse.json();
-
-      if (teamsResponse.ok) {
-        setTeams(
-          teamsData.teams || [],
-        );
-      }
-
-      const teamMembersData =
-        await teamMembersResponse.json();
-
-      if (teamMembersResponse.ok) {
-        const groupedMembers: Record<string, string[]> = {};
-
-        for (const item of teamMembersData.memberships || []) {
-          if (!groupedMembers[item.teamId]) {
-            groupedMembers[item.teamId] = [];
-          }
-
-          groupedMembers[item.teamId].push(
-            item.businessUserId,
-          );
-        }
-
-        setTeamMembers(groupedMembers);
-      }
-
-      const teamAIData =
-        await teamAIResponse.json();
-
-      if (teamAIResponse.ok) {
-        const groupedAI: Record<string, string[]> = {};
-
-        for (const item of teamAIData.assignments || []) {
-          if (!groupedAI[item.teamId]) {
-            groupedAI[item.teamId] = [];
-          }
-
-          groupedAI[item.teamId].push(
-            item.aiEmployeeId,
-          );
-        }
-
-        setTeamAiEmployees(groupedAI);
-      }
-
-
-      const employeesResponse =
-        await fetch("/api/ai-employees");
-
-      const employeesData =
-        await employeesResponse.json();
-
-      if (employeesResponse.ok) {
-        setAiEmployees(
-          employeesData.employees || [],
-        );
-      }
-
-      if (invitationsResponse.ok) {
-        setInvitations(
-          invitationsData.invitations || [],
-        );
-      } else {
-        setInvitations([]);
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load team.",
-      );
-    } finally {
+    if (!membersResult.ok) {
+      setLoadFailure(membersResult.failure);
       setLoading(false);
+      return;
     }
+
+    setMembers(membersResult.data?.members || []);
+    setTeams(teamsResult.ok ? teamsResult.data?.teams || [] : []);
+
+    if (teamMembersResult.ok) {
+      const groupedMembers: Record<string, string[]> = {};
+      for (const item of teamMembersResult.data?.memberships || []) {
+        if (!groupedMembers[item.teamId]) groupedMembers[item.teamId] = [];
+        groupedMembers[item.teamId].push(item.businessUserId);
+      }
+      setTeamMembers(groupedMembers);
+    } else {
+      setTeamMembers({});
+    }
+
+    if (teamAIResult.ok) {
+      const groupedAI: Record<string, string[]> = {};
+      for (const item of teamAIResult.data?.assignments || []) {
+        if (!groupedAI[item.teamId]) groupedAI[item.teamId] = [];
+        groupedAI[item.teamId].push(item.aiEmployeeId);
+      }
+      setTeamAiEmployees(groupedAI);
+    } else {
+      setTeamAiEmployees({});
+    }
+
+    setAiEmployees(employeesResult.ok ? employeesResult.data?.employees || [] : []);
+    setInvitations(invitationsResult.ok ? invitationsResult.data?.invitations || [] : []);
+
+    setLoadFailure(firstFailure);
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -783,6 +764,24 @@ export default function TeamPage() {
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {loadFailure && (
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              Unable to load Team & Staff.
+              <br />
+              GET {loadFailure.endpoint} returned {loadFailure.status || "no response"}: {loadFailure.message}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => void loadTeam()}
+              className="shrink-0 rounded-lg border border-red-300 px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
           </div>
         )}
 
