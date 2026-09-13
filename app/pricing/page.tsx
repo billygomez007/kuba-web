@@ -133,7 +133,7 @@ export default function PricingPage() {
           <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-300/70">SuperKuba pricing</p>
           <h1 className="mt-5 text-4xl font-black tracking-[-0.045em] sm:text-6xl">Choose the operating level that fits your business.</h1>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/50">Four clear plans for building an AI workforce, running customer operations, and connecting the work that keeps your business moving.</p>
-          <p className="mt-4 text-xs text-white/35">Prices are placeholders until final commercial pricing is configured.</p>
+          <p className="mt-4 text-xs text-white/35">Prices shown in Ghanaian cedis (GHS). Enterprise pricing is custom — contact sales.</p>
         </header>
 
         <section className="mt-14 grid gap-4 lg:grid-cols-4">
