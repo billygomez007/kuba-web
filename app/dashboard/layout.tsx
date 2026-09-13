@@ -337,6 +337,9 @@ export default function DashboardLayout({
   const [businesses, setBusinesses] =
     useState<AccessibleBusiness[]>([]);
 
+  const [hasPortfolio, setHasPortfolio] =
+    useState(false);
+
   const [selectedBusinessId, setSelectedBusinessId] =
     useState("");
 
@@ -405,6 +408,10 @@ export default function DashboardLayout({
 
       setBusinesses(
         Array.isArray(data.businesses) ? data.businesses : [],
+      );
+
+      setHasPortfolio(
+        Array.isArray(data.organizations) && data.organizations.length > 0,
       );
 
       setSelectedBusinessId(
@@ -654,6 +661,14 @@ export default function DashboardLayout({
             >
               + Add business
             </Link>
+            {hasPortfolio && (
+              <Link
+                href="/dashboard/portfolio"
+                className="mt-1 block text-[11px] font-semibold text-white/40 hover:text-white/70"
+              >
+                View portfolio →
+              </Link>
+            )}
           </div>
         )}
 
@@ -662,9 +677,16 @@ export default function DashboardLayout({
           {/* This label previously said "Enterprise workspace" unconditionally
               for every plan — pure static copy, never derived from the
               business's actual plan, but misleading regardless. Now reflects
-              the real resolved plan name. */}
+              the real resolved business name and plan, so a user who
+              belongs to multiple businesses always knows which tenant
+              they're currently operating in (never just "Workspace"). */}
           <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/25">
-            {entitlements ? `${entitlements.planName} workspace` : "Workspace"}
+            {(() => {
+              const current = businesses.find((business) => business.id === selectedBusinessId);
+              if (current && entitlements) return `${current.name} — ${entitlements.planName} workspace`;
+              if (current) return current.name;
+              return entitlements ? `${entitlements.planName} workspace` : "Workspace";
+            })()}
           </p>
           {navigationLoadError ? (
             <div className="mx-1 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs text-amber-200">
@@ -776,6 +798,15 @@ export default function DashboardLayout({
                 >
                   + Add business
                 </Link>
+                {hasPortfolio && (
+                  <Link
+                    href="/dashboard/portfolio"
+                    onClick={() => setMobileNavigationOpen(false)}
+                    className="mt-1 block text-[11px] font-semibold text-white/40 hover:text-white/70"
+                  >
+                    View portfolio →
+                  </Link>
+                )}
               </div>
             )}
             <nav aria-label="Dashboard mobile navigation">

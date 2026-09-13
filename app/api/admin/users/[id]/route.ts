@@ -2,10 +2,45 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, businessUsers, businesses, organizationMembers, organizations } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { createAuditLog } from "@/lib/auth/audit";
+
+async function requireAdmin() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (!await isPlatformAdmin(session.user.id)) return { error: NextResponse.json({ error: "Platform admin access required." }, { status: 403 }) };
+  return { session };
+}
+
+/**
+ * Identity + both membership axes for one user — read-only, so a platform
+ * admin can see enough to make a promotion decision without guessing (which
+ * businesses they already belong to, which portfolios). Never used as an
+ * authorization signal itself; it's a display aggregation only.
+ */
+export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const access = await requireAdmin();
+  if (access.error) return access.error;
+  const { id } = await context.params;
+
+  const user = (await db.select({ id: users.id, name: users.name, email: users.email, platformRole: users.platformRole, status: users.status, createdAt: users.createdAt }).from(users).where(eq(users.id, id)).limit(1))[0];
+  if (!user) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  const [businessMemberships, organizationMemberships] = await Promise.all([
+    db.select({ businessId: businessUsers.businessId, businessName: businesses.name, role: businessUsers.role, plan: businesses.plan })
+      .from(businessUsers)
+      .innerJoin(businesses, eq(businessUsers.businessId, businesses.id))
+      .where(eq(businessUsers.userId, id)),
+    db.select({ organizationId: organizationMembers.organizationId, organizationName: organizations.name, role: organizationMembers.role })
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizationMembers.organizationId, organizations.id))
+      .where(eq(organizationMembers.userId, id)),
+  ]);
+
+  return NextResponse.json({ user, businessMemberships, organizationMemberships });
+}
 
 // The three roles lib/auth/platform-admin.ts's isPlatformAdmin() already
 // recognizes as full platform-admin access — no new role/hierarchy is
@@ -23,9 +58,9 @@ const GRANTABLE_PLATFORM_ROLES = ["user", "platform_admin", "super_admin", "syst
  * scripts/bootstrap-platform-admin.mjs for that one-time, non-HTTP case.
  */
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!await isPlatformAdmin(session.user.id)) return NextResponse.json({ error: "Platform admin access required." }, { status: 403 });
+  const access = await requireAdmin();
+  if (access.error) return access.error;
+  const session = access.session;
 
   const { id: targetUserId } = await context.params;
   const body = await request.json();

@@ -18,17 +18,25 @@ export async function GET() {
   const access = await requireAdmin();
   if (access.error) return access.error;
 
-  const [orgs, members, links] = await Promise.all([
+  const [orgs, memberRows, links] = await Promise.all([
     db.select().from(organizations),
-    db.select().from(organizationMembers),
+    db.select({ organizationId: organizationMembers.organizationId, role: organizationMembers.role, name: users.name, email: users.email })
+      .from(organizationMembers)
+      .innerJoin(users, eq(organizationMembers.userId, users.id)),
     db.select().from(organizationBusinesses),
   ]);
 
-  const rows = orgs.map((org) => ({
-    ...org,
-    memberCount: members.filter((member) => member.organizationId === org.id).length,
-    businessCount: links.filter((link) => link.organizationId === org.id).length,
-  }));
+  const rows = orgs.map((org) => {
+    const membersForOrg = memberRows.filter((member) => member.organizationId === org.id);
+    const owner = membersForOrg.find((member) => member.role === "owner");
+    return {
+      ...org,
+      memberCount: membersForOrg.length,
+      businessCount: links.filter((link) => link.organizationId === org.id).length,
+      ownerName: owner?.name || null,
+      ownerEmail: owner?.email || null,
+    };
+  });
 
   return NextResponse.json({ organizations: rows });
 }

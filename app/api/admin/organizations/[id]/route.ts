@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { isOrganizationRole } from "@/lib/auth/organizations";
 import { createAuditLog } from "@/lib/auth/audit";
+import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -28,13 +29,22 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       .from(organizationMembers)
       .innerJoin(users, eq(organizationMembers.userId, users.id))
       .where(eq(organizationMembers.organizationId, id)),
-    db.select({ id: organizationBusinesses.id, businessId: organizationBusinesses.businessId, name: businesses.name, plan: businesses.plan, status: businesses.status })
+    db.select({ id: organizationBusinesses.id, businessId: organizationBusinesses.businessId, name: businesses.name, status: businesses.status })
       .from(organizationBusinesses)
       .innerJoin(businesses, eq(organizationBusinesses.businessId, businesses.id))
       .where(eq(organizationBusinesses.organizationId, id)),
   ]);
 
-  return NextResponse.json({ organization, members: memberRows, businesses: businessLinks });
+  // businesses.plan is set once at creation and never updated by checkout/
+  // webhook/admin-grant paths — the same reason lib/billing/entitlements.ts
+  // never trusts it. The organization detail view must show each linked
+  // business's REAL resolved plan (e.g. a business created as "starter"
+  // that was later granted Enterprise Complimentary), not the stale column.
+  const businessesWithResolvedPlan = await Promise.all(
+    businessLinks.map(async (link) => ({ ...link, plan: (await getBusinessEntitlements(link.businessId)).plan })),
+  );
+
+  return NextResponse.json({ organization, members: memberRows, businesses: businessesWithResolvedPlan });
 }
 
 /**

@@ -11,6 +11,7 @@ import {
 import { getBusinessMembershipStatus } from "@/lib/auth/tenant";
 import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 import { getBusinessLocalization } from "@/lib/localization";
+import { getUserOrganizations } from "@/lib/auth/organizations";
 
 export async function GET() {
   try {
@@ -37,6 +38,13 @@ export async function GET() {
       .innerJoin(businesses, eq(businessUsers.businessId, businesses.id))
       .where(eq(businessUsers.userId, session.user.id));
 
+    // Portfolio membership is a display-only, additive signal here (which
+    // organizations to offer a "Portfolio" entry point for) — it never
+    // participates in the business-membership resolution above or in any
+    // entitlement decision; those remain governed entirely by businessUsers/
+    // subscriptions, unaffected by which portfolios this user belongs to.
+    const organizations = (await getUserOrganizations(session.user.id)).map((row) => ({ id: row.organization.id, name: row.organization.name, role: row.role }));
+
     const membershipStatus = await getBusinessMembershipStatus();
 
     // Neither of these is a genuine authorization failure — the user is
@@ -57,6 +65,7 @@ export async function GET() {
         user: { id: session.user.id, name: session.user.name, email: session.user.email },
         membership: null,
         businesses: businessesForUser,
+        organizations,
       });
     }
 
@@ -67,6 +76,7 @@ export async function GET() {
         user: { id: session.user.id, name: session.user.name, email: session.user.email },
         membership: null,
         businesses: businessesForUser,
+        organizations,
       });
     }
 
@@ -125,6 +135,7 @@ export async function GET() {
         localization: membership ? await getBusinessLocalization(membership.businessId) : null,
       },
       businesses: businessesForUser,
+      organizations,
     });
   } catch (error) {
     console.error(

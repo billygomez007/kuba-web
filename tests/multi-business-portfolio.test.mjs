@@ -138,10 +138,21 @@ test("PATCH /api/admin/users/[id] is platform-admin gated and audits the grant",
   assert.match(source, /if \(!reason\) return NextResponse\.json/);
 });
 
-test("platform role promotion never touches any business's subscription/entitlements table", async () => {
+test("platform role promotion (PATCH) never touches any business's subscription/entitlements table", async () => {
+  // Scoped to the PATCH handler specifically — the file's GET handler
+  // (added later, for the admin UI's user-detail page) legitimately reads
+  // businessUsers/businesses for display purposes only, never as part of
+  // the promotion action itself.
   const source = await readFile(path.join(REPO_ROOT, "app/api/admin/users/[id]/route.ts"), "utf8");
-  assert.doesNotMatch(source, /subscriptions/);
-  assert.doesNotMatch(source, /businessUsers/);
+  const patchHandler = source.slice(source.indexOf("export async function PATCH"));
+  assert.doesNotMatch(patchHandler, /subscriptions/);
+  assert.doesNotMatch(patchHandler, /businessUsers/);
+});
+
+test("the read-only GET handler (for the admin UI) never mutates anything — it only selects", async () => {
+  const source = await readFile(path.join(REPO_ROOT, "app/api/admin/users/[id]/route.ts"), "utf8");
+  const getHandler = source.slice(source.indexOf("export async function GET"), source.indexOf("export async function PATCH"));
+  assert.doesNotMatch(getHandler, /\.update\(|\.insert\(|\.delete\(/);
 });
 
 test("a platform Super Admin's own role does NOT force any business's entitlement resolution — plan is resolved purely from that business's own subscriptions row", async () => {
