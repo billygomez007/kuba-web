@@ -14,33 +14,8 @@ import {
 import { upsertBusinessLocalization } from "@/lib/localization/business";
 import { isSupportedCountry, isSupportedCurrency, isValidTimezone, SUPPORTED_COUNTRIES } from "@/lib/localization/registry";
 import { getBusinessEntitlements } from "@/lib/billing/entitlements";
-
-const onboardingIndustries = new Set([
-  "Travel",
-  "Healthcare",
-  "Real Estate",
-  "Education",
-  "Retail",
-  "Professional Services",
-  "Other",
-]);
-
-const onboardingBusinessSizes = new Set([
-  "Solo",
-  "2-10 employees",
-  "11-50 employees",
-  "51-200 employees",
-  "200+",
-]);
-
-const onboardingGoals = new Set([
-  "Get more customers",
-  "Automate customer support",
-  "Improve sales follow-up",
-  "Reduce repetitive work",
-  "Manage operations",
-  "Improve response time",
-]);
+import { isOnboardingBusinessSize, isOnboardingGoal, isOnboardingIndustry } from "@/lib/onboarding/registry";
+import { normalizeWebsiteUrl } from "@/lib/onboarding/website";
 
 export async function GET() {
   try {
@@ -137,7 +112,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const businessName = String(body.businessName || "").trim();
-    const website = String(body.website || "").trim();
+    const websiteInput = String(body.website || "").trim();
     const phone = String(body.phone || "").trim();
     const industry = String(body.industry || "").trim();
     const businessSize = String(body.businessSize || "").trim();
@@ -170,23 +145,35 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!businessName || !industry || !businessSize || goals.length === 0) {
+    // Structured, field-scoped validation — replaces a single generic
+    // "one or more onboarding selections are invalid" message with a
+    // specific reason per field, returned as both a top-level `error`
+    // (whichever field failed first, for callers that only read that) and
+    // a `fieldErrors` map (for a caller that wants to highlight the exact
+    // field). The industry/business-size/goal checks read from the SAME
+    // canonical registry the client's Step 2 form now renders its options
+    // from (lib/onboarding/registry.ts), so a value the UI offers can never
+    // fail here — this is the fix for the actual reported bug ("Software"
+    // was free-typed into a field the server's enum had no match for).
+    const websiteResult = normalizeWebsiteUrl(websiteInput);
+    const fieldErrors: Record<string, string> = {};
+    if (!businessName) fieldErrors.businessName = "Business name is required.";
+    if (!industry) fieldErrors.industry = "Please select a valid industry.";
+    else if (!isOnboardingIndustry(industry)) fieldErrors.industry = "Please select a valid industry.";
+    if (!businessSize) fieldErrors.businessSize = "Please select a valid business size.";
+    else if (!isOnboardingBusinessSize(businessSize)) fieldErrors.businessSize = "Please select a valid business size.";
+    if (goals.length === 0) fieldErrors.goals = "Select at least one goal.";
+    else if (goals.some((goal: string) => !isOnboardingGoal(goal))) fieldErrors.goals = "One or more goals are invalid.";
+    if (websiteResult.error) fieldErrors.website = websiteResult.error;
+
+    if (Object.keys(fieldErrors).length > 0) {
       return NextResponse.json(
-        { error: "Company name, industry, business size, and at least one goal are required." },
+        { error: Object.values(fieldErrors)[0], fieldErrors },
         { status: 400 },
       );
     }
 
-    if (
-      (industry && !onboardingIndustries.has(industry)) ||
-      (businessSize && !onboardingBusinessSizes.has(businessSize)) ||
-      goals.some((goal: string) => !onboardingGoals.has(goal))
-    ) {
-      return NextResponse.json(
-        { error: "One or more onboarding selections are invalid." },
-        { status: 400 },
-      );
-    }
+    const website = websiteResult.value;
 
     const slug =
       businessName
@@ -199,26 +186,46 @@ export async function POST(request: Request) {
     const businessId = crypto.randomUUID();
     const now = new Date();
 
-    await db.insert(businesses).values({
-      id: businessId,
-      name: businessName,
-      slug,
-      website: website || null,
-      industry: industry || null,
-      country: countryCode ? SUPPORTED_COUNTRIES[countryCode].name : null,
-      businessSize: businessSize || null,
-      plan: "starter",
-      status: "active",
-      createdAt: now,
-      updatedAt: now,
+    // A business with no owner membership (or vice versa) is an invalid,
+    // unrecoverable-by-the-user state — this is what leaves someone stuck
+    // in the exact onboarding loop this fix addresses. Both rows are
+    // created atomically; either both exist or neither does.
+    await db.transaction(async (tx) => {
+      await tx.insert(businesses).values({
+        id: businessId,
+        name: businessName,
+        slug,
+        website: website || null,
+        industry: industry || null,
+        country: countryCode ? SUPPORTED_COUNTRIES[countryCode].name : null,
+        businessSize: businessSize || null,
+        plan: "starter",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await tx.insert(businessUsers).values({
+        id: crypto.randomUUID(),
+        businessId,
+        userId: session.user.id,
+        role: "owner",
+        createdAt: now,
+      });
     });
 
-    await db.insert(businessUsers).values({
-      id: crypto.randomUUID(),
-      businessId,
-      userId: session.user.id,
-      role: "owner",
-      createdAt: now,
+    // Establishes selected-business context immediately — same convention
+    // as app/api/businesses/select/route.ts. Not strictly required for a
+    // user with exactly one membership (getCurrentMembership's fallback
+    // already resolves that case), but explicit is safer than relying only
+    // on the fallback, and this is the moment the selection is actually
+    // known with certainty.
+    (await cookies()).set("superkuba_business_id", businessId, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
     });
 
     if (countryCode && currencyCode && timezone) {

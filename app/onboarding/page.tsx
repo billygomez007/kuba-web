@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { COUNTRY_ORDER, CURRENCY_ORDER, SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, isValidTimezone, type CountryCode, type CurrencyCode } from "@/lib/localization/registry";
+import { ONBOARDING_INDUSTRIES } from "@/lib/onboarding/registry";
 import { formatDate } from "@/lib/localization/format";
 import { planDefinitions, planOrder, type PlanId } from "@/lib/billing/plan-definitions";
 import { cardFeatures, limitCopy, pricingCopy } from "@/lib/billing/pricing-presentation";
@@ -114,13 +115,22 @@ function OnboardingPageInner() {
             Back to SuperKuba
           </Link>
 
-          <button
-            type="button"
-            onClick={skip}
-            className="text-sm text-white/70 hover:text-white"
-          >
-            Skip for now
-          </button>
+          {/* The business-information step (2) is mandatory: skipping before
+              a business/owner membership exists would land the user back on
+              the dashboard with no workspace, which redirects them straight
+              back into onboarding — an unrecoverable-looking loop. Once
+              step 2 has actually succeeded (step > 2, since next() only
+              advances past it after createBusiness() succeeds), a real
+              workspace exists and later steps are genuinely optional. */}
+          {step > 2 && (
+            <button
+              type="button"
+              onClick={skip}
+              className="text-sm text-white/70 hover:text-white"
+            >
+              Skip for now
+            </button>
+          )}
         </div>
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
@@ -149,7 +159,7 @@ function OnboardingPageInner() {
           {step === 2 && (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <Field label="Business name" value={businessName} onChange={setBusinessName} />
-              <Field label="Industry" value={industry} onChange={setIndustry} />
+              <Select label="Industry" value={industry} onChange={setIndustry} options={ONBOARDING_INDUSTRIES.map((value) => ({ value, label: value }))} />
               <Select label="Country" value={countryCode} onChange={(value) => selectCountry(value as CountryCode)} options={COUNTRY_ORDER.map((code) => ({ value: code, label: SUPPORTED_COUNTRIES[code].name }))} />
               <Select label="Currency" value={currencyCode} onChange={(value) => setCurrencyCode(value as CurrencyCode)} options={CURRENCY_ORDER.map((code) => ({ value: code, label: `${SUPPORTED_CURRENCIES[code].name} (${code})` }))} />
               <Select label="Timezone" value={timezone} onChange={(value) => { setTimezone(value); setTimezoneTouched(true); }} options={Array.from(new Set([timezone, SUPPORTED_COUNTRIES[countryCode].defaultTimezone, detectedTimezone].filter(Boolean))).map((zone) => ({ value: zone, label: zone.replaceAll("_", " ") }))} />
