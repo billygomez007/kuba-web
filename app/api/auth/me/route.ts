@@ -8,7 +8,7 @@ import { businesses, businessUsers } from "@/db/schema";
 import {
   getRolePermissions,
 } from "@/lib/auth/permissions";
-import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessMembershipStatus } from "@/lib/auth/tenant";
 import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 import { getBusinessLocalization } from "@/lib/localization";
 
@@ -25,8 +25,6 @@ export async function GET() {
       );
     }
 
-    const membership = await getCurrentMembership();
-
     const businessesForUser = await db
       .select({
         id: businesses.id,
@@ -39,12 +37,46 @@ export async function GET() {
       .innerJoin(businesses, eq(businessUsers.businessId, businesses.id))
       .where(eq(businessUsers.userId, session.user.id));
 
-    if (!membership && businessesForUser.length === 0) {
-      return NextResponse.json(
-        { error: "Business access denied." },
-        { status: 403 },
-      );
+    const membershipStatus = await getBusinessMembershipStatus();
+
+    // Neither of these is a genuine authorization failure — the user is
+    // properly authenticated. "no_membership" is the normal state right
+    // after signup, before onboarding creates a business; "ambiguous"
+    // means they belong to more than one business with no current
+    // selection. Both resolve with a 200 and a distinct `code` so the
+    // client can route to onboarding or the existing business switcher
+    // (populated from `businesses` below either way) instead of being
+    // shown a confusing, unrecoverable-looking error. A stale/invalid
+    // superkuba_business_id cookie can never produce either of these on
+    // its own when the user has exactly one real membership — see
+    // selectBusinessMembership's fallback in lib/auth/business-context-policy.ts.
+    if (membershipStatus.status === "no_membership") {
+      return NextResponse.json({
+        success: true,
+        code: "NO_BUSINESS_MEMBERSHIP",
+        user: { id: session.user.id, name: session.user.name, email: session.user.email },
+        membership: null,
+        businesses: businessesForUser,
+      });
     }
+
+    if (membershipStatus.status === "ambiguous") {
+      return NextResponse.json({
+        success: true,
+        code: "AMBIGUOUS_BUSINESS_SELECTION",
+        user: { id: session.user.id, name: session.user.name, email: session.user.email },
+        membership: null,
+        businesses: businessesForUser,
+      });
+    }
+
+    if (membershipStatus.status === "unauthenticated") {
+      // Defense in depth only — session was already confirmed valid above;
+      // this guards the exotic case where it expired between the two calls.
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const membership = membershipStatus.membership;
 
     let permissions: string[];
 

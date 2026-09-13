@@ -19,67 +19,76 @@ export async function getCurrentUser() {
   return session.user;
 }
 
-export async function getCurrentMembership() {
-  const user =
-    await getCurrentUser();
+/**
+ * The full business-context resolution result — distinguishes the THREE
+ * genuinely different reasons getCurrentMembership() can come back empty,
+ * which a raw `null` cannot: no membership at all (route to onboarding),
+ * an unresolved choice among several real memberships (route to a business
+ * selector), or a resolved single membership (proceed). Callers that only
+ * need the existing null-or-membership shape should keep using
+ * getCurrentMembership(); this is for callers (like /api/auth/me and
+ * /api/command-center/overview) that need to tell an authenticated user
+ * with no workspace yet apart from a genuine authorization failure,
+ * instead of returning the same ambiguous "no membership" outcome for both.
+ */
+export type BusinessMembershipRow = {
+  id: string;
+  businessId: string;
+  userId: string;
+  role: string;
+  permissions: string | null;
+  branchId: string | null;
+};
+
+export type BusinessMembershipStatus =
+  | { status: "unauthenticated" }
+  | { status: "no_membership" }
+  | { status: "ambiguous"; membershipCount: number }
+  | { status: "resolved"; membership: BusinessMembershipRow };
+
+export async function getBusinessMembershipStatus(): Promise<BusinessMembershipStatus> {
+  const user = await getCurrentUser();
 
   if (!user) {
-    return null;
+    return { status: "unauthenticated" };
   }
 
   const selectedBusinessId =
     (await cookies()).get("superkuba_business_id")?.value;
 
-  const conditions = [
-    eq(
-      businessUsers.userId,
-      user.id,
-    ),
-  ];
+  // A single query, scoped only by userId — never by the (possibly stale/
+  // invalid/foreign) selectedBusinessId. Selection among these rows is
+  // decided entirely by selectBusinessMembership, so there is exactly one
+  // policy for "which business," not two queries that could disagree with
+  // each other about it.
+  const memberships = await db
+    .select({
+      id: businessUsers.id,
+      businessId: businessUsers.businessId,
+      userId: businessUsers.userId,
+      role: businessUsers.role,
+      permissions: businessUsers.permissions,
+      branchId: businessUsers.branchId,
+    })
+    .from(businessUsers)
+    .where(eq(businessUsers.userId, user.id));
 
-  if (selectedBusinessId) {
-    conditions.push(
-      eq(
-        businessUsers.businessId,
-        selectedBusinessId,
-      ),
-    );
+  if (memberships.length === 0) {
+    return { status: "no_membership" };
   }
 
-  const result =
-    await db
-      .select({
-        id: businessUsers.id,
-        businessId:
-          businessUsers.businessId,
-        userId:
-          businessUsers.userId,
-        role:
-          businessUsers.role,
-        permissions:
-          businessUsers.permissions,
-        branchId:
-          businessUsers.branchId,
-      })
-      .from(businessUsers)
-      .where(
-        and(...conditions),
-      )
-      .limit(1);
+  const selected = selectBusinessMembership(memberships, selectedBusinessId);
 
-  const memberships = await db
-      .select({
-        businessId: businessUsers.businessId,
-        role: businessUsers.role,
-        permissions: businessUsers.permissions,
-        branchId: businessUsers.branchId,
-      })
-      .from(businessUsers)
-      .where(eq(businessUsers.userId, user.id));
+  if (!selected) {
+    return { status: "ambiguous", membershipCount: memberships.length };
+  }
 
-  return selectBusinessMembership(memberships, selectedBusinessId)
-    ? result[0] ?? null
-    : null;
+  return { status: "resolved", membership: selected };
+}
+
+export async function getCurrentMembership() {
+  const result = await getBusinessMembershipStatus();
+  return result.status === "resolved" ? result.membership : null;
 }
 
 export async function requireBusinessMembership() {

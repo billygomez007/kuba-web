@@ -27,18 +27,23 @@ test("foreign selected business is denied", () => {
   assert.equal(selectBusinessMembership(memberships, "business-c"), null);
 });
 
-test("a selected business cannot grant access without membership", () => {
-  assert.equal(
-    selectBusinessMembership(
-      [{ businessId: "business-a", role: "owner", permissions: null, branchId: null }],
-      "business-b",
-    ),
-    null,
+test("a selected business the user isn't a member of is rejected, and never grants access to it — but does not leave them stranded when they have exactly one real membership", () => {
+  const result = selectBusinessMembership(
+    [{ businessId: "business-a", role: "owner", permissions: null, branchId: null }],
+    "business-b",
   );
+  // The security invariant: business-b (not a real membership) is NEVER
+  // selected, regardless of what the stale/foreign cookie asked for.
+  assert.notEqual(result?.businessId, "business-b");
+  // The recovery invariant: with exactly one real membership, a rejected
+  // selection safely falls back to it instead of returning null forever.
+  assert.equal(result?.businessId, "business-a");
 });
 
-test("a stale selected-business cookie is rejected after membership removal", () => {
-  assert.equal(selectBusinessMembership([memberships[1]], "business-a"), null);
+test("a stale selected-business cookie (pointing at a business the user no longer belongs to) is discarded and recovers to their one remaining real membership, not locked out", () => {
+  const result = selectBusinessMembership([memberships[1]], "business-a");
+  assert.notEqual(result?.businessId, "business-a");
+  assert.equal(result?.businessId, "business-b");
 });
 
 test("switching businesses switches role, permissions, and branch context", () => {

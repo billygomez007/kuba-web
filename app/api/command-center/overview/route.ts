@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessMembershipStatus } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
@@ -38,14 +38,27 @@ export async function GET() {
       );
     }
 
-    const business = await getCurrentMembership();
+    const membershipStatus = await getBusinessMembershipStatus();
 
-    if (!business) {
-      return NextResponse.json(
-        { error: "Business not found" },
-        { status: 404 },
-      );
+    // Distinguishes "authenticated but no workspace yet" (normal right
+    // after signup, before onboarding) and "belongs to more than one
+    // business with no current selection" from an actual missing/
+    // unauthorized resource — neither is a 404 in the sense of "this
+    // business doesn't exist," and neither should read as a fatal error.
+    // A stale/invalid superkuba_business_id cookie can never land here
+    // when the user has exactly one real membership — see
+    // selectBusinessMembership's fallback in lib/auth/business-context-policy.ts.
+    if (membershipStatus.status === "no_membership") {
+      return NextResponse.json({ code: "NO_BUSINESS_MEMBERSHIP", workforce: null });
     }
+    if (membershipStatus.status === "ambiguous") {
+      return NextResponse.json({ code: "AMBIGUOUS_BUSINESS_SELECTION", workforce: null });
+    }
+    if (membershipStatus.status === "unauthenticated") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const business = membershipStatus.membership;
 
     if (!hasPermission(business.role, business.permissions, PERMISSIONS.DASHBOARD_VIEW)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

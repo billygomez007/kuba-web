@@ -377,6 +377,18 @@ export default function DashboardLayout({
 
       const data = await response.json();
 
+      // Authenticated, but no workspace yet — the normal state right after
+      // signup, before onboarding creates a business. This is NOT a load
+      // failure (navigationLoadError stays clear) and NOT "this plan has
+      // no navigation" — it's a distinct third state that gets its own
+      // recovery: send them to onboarding rather than showing an empty,
+      // unexplained sidebar.
+      if (data.code === "NO_BUSINESS_MEMBERSHIP") {
+        setNavigationLoadError(null);
+        router.replace("/onboarding");
+        return;
+      }
+
       const userPermissions = Array.isArray(
         data.membership?.permissions,
       )
