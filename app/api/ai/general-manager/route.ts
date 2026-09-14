@@ -16,6 +16,9 @@ import {
 } from "@/db/schema";
 
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
+import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/model-config";
+import { classifyAIProviderError } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
 
 import {
   searchKnowledge,
@@ -368,7 +371,14 @@ GENERAL MANAGER RESPONSE RULES
 
 
     const result =
-      await kubaGeneralManagerAgent.generate(
+      await withAIUsageLogging(
+        {
+          feature: "general_manager",
+          businessId: business.id,
+          employeeId: employee.id,
+          model: DEFAULT_CHAT_MODEL_ID,
+        },
+        () => kubaGeneralManagerAgent.generate(
         prompt,
         {
           memory: {
@@ -380,6 +390,7 @@ GENERAL MANAGER RESPONSE RULES
           },
           requestContext: new RequestContext([["businessId", business.id], ["employeeId", employee.id]]),
         },
+        ),
       );
 
 
@@ -407,6 +418,7 @@ GENERAL MANAGER RESPONSE RULES
     console.error(
       "Kuba General Manager error:",
       error,
+      { category: classifyAIProviderError(error) },
     );
 
 

@@ -1,5 +1,6 @@
 import { openai } from "@ai-sdk/openai";
 import { Agent } from "@mastra/core/agent";
+import { defaultChatModel } from "@/lib/ai/model-config";
 import { safeOutreachWebFetchTool } from "@/mastra/tools/safe-outreach-web-fetch";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
@@ -742,7 +743,7 @@ be relevant, determine WHEN outreach makes sense, and help the business engage
 them intelligently and respectfully.
 `,
 
-  model: openai("gpt-4o"),
+  model: defaultChatModel(),
 
   tools: {
     getBusinessKnowledge: getBusinessKnowledgeTool,

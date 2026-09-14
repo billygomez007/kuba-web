@@ -29,6 +29,9 @@ import {
   parseWebsiteChatMetadata,
   normalizeDomain,
 } from "@/lib/integrations/website-chat-config";
+import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/model-config";
+import { classifyAIProviderError } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
 
 
 function classifyWebsiteChatError(
@@ -1478,11 +1481,19 @@ Answer naturally, helpfully and professionally.
     responseStage =
       "generate_response";
     const response =
-      await selectedAgent.generate(
+      await withAIUsageLogging(
+        {
+          feature: "website_chat",
+          businessId: business.id,
+          employeeId: selectedEmployeeId,
+          model: DEFAULT_CHAT_MODEL_ID,
+        },
+        () => selectedAgent.generate(
         businessContext,
         {
           requestContext: new RequestContext([["businessId", business.id], ["employeeId", selectedEmployeeId]]),
         },
+        ),
       );
 
     const responseText =
@@ -1616,6 +1627,19 @@ Answer naturally, helpfully and professionally.
       error,
     );
 
+    // AI-provider failures (missing/invalid key, rate limit, quota, timeout)
+    // are checked first since classifyWebsiteChatError's categories are all
+    // database-error patterns and would otherwise misreport a provider
+    // failure as the generic "database_or_provider_error" bucket. A real DB
+    // error still falls through unchanged — this never returns "unknown"
+    // instead of a genuine database failureType classifyWebsiteChatError
+    // would have found.
+    const aiFailureType = classifyAIProviderError(error);
+    const failureType =
+      aiFailureType !== "unknown"
+        ? aiFailureType
+        : classifyWebsiteChatError(error);
+
     return NextResponse.json(
       {
         error:
@@ -1624,10 +1648,7 @@ Answer naturally, helpfully and professionally.
           "WEBSITE_CHAT_RESPONSE_FAILED",
         stage:
           responseStage,
-        failureType:
-          classifyWebsiteChatError(
-            error,
-          ),
+        failureType,
         driverCode:
           getWebsiteChatDriverCode(
             error,

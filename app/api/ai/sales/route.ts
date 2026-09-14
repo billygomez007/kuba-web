@@ -13,6 +13,9 @@ import { searchKnowledge } from "@/lib/knowledge/search";
 import { businesses, messages, aiBusinessSettings, aiEmployees, leads, followUps } from "@/db/schema";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
 import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
+import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/model-config";
+import { classifyAIProviderError } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
 
 export async function POST(request: Request) {
   try {
@@ -317,13 +320,21 @@ USER REQUEST
 
 ${message}`;
 
- const result = await kubaSalesAgent.generate(prompt, {
+ const result = await withAIUsageLogging(
+   {
+     feature: "sales",
+     businessId: business.id,
+     employeeId: salesEmployee.id,
+     model: DEFAULT_CHAT_MODEL_ID,
+   },
+   () => kubaSalesAgent.generate(prompt, {
   memory: {
     resource: session.user.id,
     thread: `sales-${business.id}`,
   },
   requestContext: new RequestContext([["businessId", business.id], ["employeeId", salesEmployee.id]]),
-});
+}),
+ );
 
     const conversationId = `sales-${salesEmployee.id}`;
 
@@ -365,6 +376,7 @@ ${message}`;
   console.error(
     "Kuba Sales error details:",
     error instanceof Error ? error.message : error,
+    { category: classifyAIProviderError(error) },
   );
 
     return NextResponse.json(

@@ -4,6 +4,80 @@ Written from a full repository audit on 2026-09-12. This is a living document �
 update it as major features land or architecture changes, rather than adding
 another dated point-in-time report to the repo root.
 
+## 2026-09-14 update — OpenAI production configuration & AI runtime audit
+
+Full inventory and hardening pass over every OpenAI call site — see
+`docs/OPENAI_RUNTIME.md` for the complete architecture, model inventory,
+per-employee mapping, and production checklist. Headline results:
+
+- **No redesign** — the existing architecture (Vercel AI SDK's Responses
+  API via `@ai-sdk/openai`, Mastra Agents for the five employees, direct
+  `generateText()` for Executive Briefing/Command Center Q&A) was already
+  the current, non-deprecated approach. Confirmed, not changed.
+- **Centralized model configuration** (`lib/ai/model-config.ts`): the
+  eight scattered `openai("gpt-4o")`/`openai("gpt-4o-mini")` literals
+  across 6 Mastra agents + 2 routes now read from one source of truth, with
+  optional environment overrides. No model was changed — same values as
+  before.
+- **New shared hardening** (`lib/ai/provider-error.ts`, `retry.ts`,
+  `usage-logging.ts`), applied to all 5 direct AI-employee routes, the
+  Website Widget's public AI path, and Executive Briefing/Command Center
+  Q&A: safe provider-error classification (missing/invalid key, rate
+  limit vs. quota exhaustion, timeout, 5xx — never leaked to the client),
+  exactly-one bounded retry for genuinely transient failures only, a
+  20-second timeout on the previously-unbounded Executive Briefing call,
+  and minimal structured usage logging (businessId/employeeId/model/
+  duration/outcome, never prompt or response content).
+- **Real gap found and fixed**: `app/api/ai/receptionist/route.ts` was
+  logging the AI's full response text to the console on every request —
+  now logs only the length.
+- **Real gap found, deliberately not fixed in this pass**: the same file
+  also logs customer name/email/phone in plaintext at several points —
+  flagged in `docs/OPENAI_RUNTIME.md` as a distinct customer-data-logging-
+  hygiene item, out of this audit's OpenAI-specific scope.
+- **Environment configuration confirmed, metadata-only** (`vercel env
+  ls` — no values printed or retrieved): `OPENAI_API_KEY` is genuinely
+  present for both Preview and Production. **No Vercel configuration
+  change was needed.** The Executive-Briefing-degrades-gracefully
+  behavior observed in the prior stability-audit session was a **local
+  test-environment artifact** (`next start` production mode doesn't load
+  the developer's own `.env.development.local`), not a real gap in the
+  deployed environments.
+- **Live smoke test performed** (Phase 30, optional — only because a
+  valid non-production key was already present locally): reached OpenAI
+  successfully but that specific local key's account has zero credits
+  (`insufficient_quota`, a real external/account-level condition, not a
+  code or configuration problem). All 6 tested call sites (Receptionist,
+  Sales, Customer Support, General Manager, Outreach, Executive Briefing)
+  degraded safely with correctly-classified server-side logs and safe,
+  generic client-facing messages — this also caught one real consistency
+  gap (Outreach was initially missing the new usage-logging wrapper,
+  found via this live test and fixed to match its siblings).
+- **Statically verified, whole-app**: no `"use client"` file anywhere in
+  `app/` can transitively reach `@ai-sdk/openai`, `OPENAI_API_KEY`, or
+  `OPENAI_REALTIME_*` — new test with a positive control proving the
+  check isn't trivially passing (`tests/client-bundle-no-openai-key-exposure.test.mjs`).
+- **Re-confirmed, not rebuilt**: the pre-existing tenant/authority
+  architecture (`lib/ai/authority.ts`, `mastra/tools/business-context.ts`)
+  already enforces exactly what this audit asked for — businessId/
+  employeeId come only from a server-pinned, model-unwritable
+  `RequestContext` (tool schemas have no `businessId` field at all), every
+  write tool checks tenant ownership + active status + entitlement +
+  autonomy policy before running, and external communication has a hard
+  `requires_approval` floor no stored policy can bypass. Covered by 42
+  pre-existing, still-passing tests.
+- **No embeddings are used anywhere** in this codebase — Business Brain/
+  knowledge search is word/token-based, not vector-based.
+- **Realtime confirmed safe**: the OpenAI Realtime WebSocket is opened
+  server-to-OpenAI only (never from a browser); no dashboard page performs
+  real audio capture today (voice testing/simulator pages are text-only
+  simulations) — telephony connection remains untouched, per this pass's
+  explicit scope.
+
+Baseline after this pass: 1454/1454 tests passing (24 new), lint clean (0
+errors, 61 pre-existing warnings), typecheck clean, production build
+clean.
+
 ## 2026-09-13 update — live bug fixes, platform provisioning, full clickability audit
 
 Verified in this session, on `feature/outreach-ai-employee`:

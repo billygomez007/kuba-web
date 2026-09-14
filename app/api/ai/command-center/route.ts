@@ -13,8 +13,12 @@ import {
   aiBusinessSettings,
 } from "@/db/schema";
 
-import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+
+import { EXECUTIVE_MODEL_ID, executiveModel } from "@/lib/ai/model-config";
+import { classifyAIProviderError, safeAIErrorMessage } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
+import { withBoundedRetry } from "@/lib/ai/retry";
 
 import {
   searchKnowledge,
@@ -295,16 +299,21 @@ EXECUTIVE RESPONSE RULES
 `;
 
 
-    const result =
-      await generateText({
-
-        model:
-          openai("gpt-4o-mini"),
-
-        prompt:
-          context,
-
-      });
+    const result = await withAIUsageLogging(
+      {
+        feature: "command_center_qa",
+        businessId: business.businessId,
+        model: EXECUTIVE_MODEL_ID,
+      },
+      () =>
+        withBoundedRetry(() =>
+          generateText({
+            model: executiveModel(),
+            abortSignal: AbortSignal.timeout(20000),
+            prompt: context,
+          }),
+        ),
+    );
 
 
     return NextResponse.json({
@@ -320,16 +329,19 @@ EXECUTIVE RESPONSE RULES
 
   } catch (error) {
 
+    const errorCategory = classifyAIProviderError(error);
+
     console.error(
       "Command center AI error",
+      { errorCategory },
       error,
     );
 
 
     return NextResponse.json(
       {
-        error:
-          "Unable to process request",
+        error: safeAIErrorMessage(errorCategory),
+        code: errorCategory,
       },
       {
         status: 500,

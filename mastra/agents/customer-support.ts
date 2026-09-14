@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
 import { Agent } from "@mastra/core/agent";
+import { defaultChatModel } from "@/lib/ai/model-config";
 
 import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge";
 import {
@@ -140,7 +140,7 @@ Do not pretend that a human has been contacted unless the
 application actually performed that action.
 `,
 
-  model: openai("gpt-4o"),
+  model: defaultChatModel(),
 
   tools: {
     getBusinessKnowledge: getBusinessKnowledgeTool,

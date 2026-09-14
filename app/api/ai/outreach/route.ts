@@ -16,6 +16,9 @@ import {
   aiEmployees,
 } from "@/db/schema";
 import { kubaOutreachAgent } from "@/mastra/agents/outreach";
+import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/model-config";
+import { classifyAIProviderError } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
 import { runOutreachResearchPipeline } from "@/mastra/workflows/outreach-research-pipeline";
 import type { OutreachResearchPipelineResult } from "@/mastra/workflows/outreach-research-pipeline";
 import { enforcePersistenceTruth } from "@/mastra/lib/outreach-persistence-truth";
@@ -402,7 +405,14 @@ USER REQUEST
 
 ${message}`;
 
-    const result = await kubaOutreachAgent.generate(
+    const result = await withAIUsageLogging(
+      {
+        feature: "outreach",
+        businessId: business.id,
+        employeeId: outreachEmployee.id,
+        model: DEFAULT_CHAT_MODEL_ID,
+      },
+      () => kubaOutreachAgent.generate(
       prompt,
       {
         modelSettings: {
@@ -427,6 +437,7 @@ ${message}`;
           ["employeeId", outreachEmployee.id],
         ]),
       },
+      ),
     );
 
     /*
@@ -533,6 +544,7 @@ ${message}`;
       error instanceof Error
         ? error.message
         : error,
+      { category: classifyAIProviderError(error) },
     );
 
     return NextResponse.json(

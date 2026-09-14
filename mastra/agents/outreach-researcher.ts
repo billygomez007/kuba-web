@@ -1,5 +1,6 @@
 import { openai } from "@ai-sdk/openai";
 import { Agent } from "@mastra/core/agent";
+import { defaultChatModel } from "@/lib/ai/model-config";
 
 import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge";
 import { safeOutreachWebFetchTool } from "@/mastra/tools/safe-outreach-web-fetch";
@@ -191,7 +192,7 @@ SuperKuba's deterministic persistence workflow after you respond, not by
 you.
 `,
 
-  model: openai("gpt-4o"),
+  model: defaultChatModel(),
 
   tools: {
     getBusinessKnowledge: getBusinessKnowledgeTool,

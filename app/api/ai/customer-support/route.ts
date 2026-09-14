@@ -18,6 +18,9 @@ import {
 
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
+import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/model-config";
+import { classifyAIProviderError } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
 
 export async function POST(request: Request) {
   try {
@@ -217,7 +220,14 @@ ${message}
 `;
 
     const result =
-      await kubaCustomerSupportAgent.generate(
+      await withAIUsageLogging(
+        {
+          feature: "customer_support",
+          businessId: business.id,
+          employeeId: employee.id,
+          model: DEFAULT_CHAT_MODEL_ID,
+        },
+        () => kubaCustomerSupportAgent.generate(
         prompt,
         {
           memory: {
@@ -226,6 +236,7 @@ ${message}
           },
           requestContext: new RequestContext([["businessId", business.id], ["employeeId", employee.id]]),
         },
+        ),
       );
 
     return NextResponse.json({
@@ -241,6 +252,7 @@ ${message}
     console.error(
       "Kuba Customer Support error:",
       error,
+      { category: classifyAIProviderError(error) },
     );
 
     return NextResponse.json(

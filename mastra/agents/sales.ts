@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
 import { Agent } from "@mastra/core/agent";
+import { defaultChatModel } from "@/lib/ai/model-config";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
 import { getLeadsTool } from "@/mastra/tools/get-leads";
@@ -878,7 +878,7 @@ Never invent leads or lead information.
 
 Only report lead information returned by the getLeads tool.
 `,
-  model: openai("gpt-4o"),
+  model: defaultChatModel(),
 
 tools: {
   getLeads: getLeadsTool,

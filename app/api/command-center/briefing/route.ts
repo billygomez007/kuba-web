@@ -17,7 +17,11 @@ import {
 import { eq } from "drizzle-orm";
 
 import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
+
+import { EXECUTIVE_MODEL_ID, executiveModel } from "@/lib/ai/model-config";
+import { classifyAIProviderError, safeAIErrorMessage } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
+import { withBoundedRetry } from "@/lib/ai/retry";
 
 
 export async function GET() {
@@ -151,12 +155,18 @@ Rules:
 `;
 
 
-    const result =
-      await generateText({
-        model:
-          openai("gpt-4o-mini"),
-
-        prompt: `${prompt}
+    const result = await withAIUsageLogging(
+      {
+        feature: "executive_briefing",
+        businessId: business.businessId,
+        model: EXECUTIVE_MODEL_ID,
+      },
+      () =>
+        withBoundedRetry(() =>
+          generateText({
+            model: executiveModel(),
+            abortSignal: AbortSignal.timeout(20000),
+            prompt: `${prompt}
 
 Return ONLY valid JSON:
 
@@ -169,7 +179,9 @@ Return ONLY valid JSON:
     "specific CEO action three"
   ]
 }`,
-      });
+          }),
+        ),
+    );
 
     let aiInsight;
 
@@ -204,16 +216,19 @@ Return ONLY valid JSON:
 
   } catch(error) {
 
+    const errorCategory = classifyAIProviderError(error);
+
     console.error(
       "Executive briefing error",
+      { errorCategory },
       error,
     );
 
 
     return NextResponse.json(
       {
-        error:
-          "Unable to generate briefing",
+        error: safeAIErrorMessage(errorCategory),
+        code: errorCategory,
       },
       {
         status:500,

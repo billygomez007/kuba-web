@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
 import { Agent } from "@mastra/core/agent";
+import { defaultChatModel } from "@/lib/ai/model-config";
 import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge";
 import { createLeadTool } from "@/mastra/tools/create-lead";
 import {
@@ -95,7 +95,7 @@ When an action requires a tool, only perform that action when the application pr
 
 When no tool is available, explain what information or action is needed rather than pretending that you completed it.
 `,
-  model: openai("gpt-4o"),
+  model: defaultChatModel(),
 
   tools: {
     getBusinessKnowledge:

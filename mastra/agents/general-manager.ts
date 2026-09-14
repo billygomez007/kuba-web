@@ -1,5 +1,5 @@
-import { openai } from "@ai-sdk/openai";
 import { Agent } from "@mastra/core/agent";
+import { defaultChatModel } from "@/lib/ai/model-config";
 
 import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge";
 
@@ -165,7 +165,7 @@ When no tool is available, provide a recommendation instead of
 pretending that the action was completed.
 `,
 
-  model: openai("gpt-4o"),
+  model: defaultChatModel(),
 
   tools: {
     getBusinessKnowledge: getBusinessKnowledgeTool,

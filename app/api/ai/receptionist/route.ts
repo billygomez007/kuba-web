@@ -22,6 +22,9 @@ import {
 } from "@/db/schema";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
 import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
+import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/model-config";
+import { classifyAIProviderError } from "@/lib/ai/provider-error";
+import { withAIUsageLogging } from "@/lib/ai/usage-logging";
 
 export async function POST(request: Request) {
   try {
@@ -1201,18 +1204,25 @@ ${prompt}
     );
 
     const result =
-      await kubaReceptionistAgent.generate(
+      await withAIUsageLogging(
+        {
+          feature: "receptionist",
+          businessId: business.id,
+          employeeId: receptionist?.employee.id ?? null,
+          model: DEFAULT_CHAT_MODEL_ID,
+        },
+        () => kubaReceptionistAgent.generate(
         receptionistPrompt,
         {
           requestContext: new RequestContext([["businessId", business.id], ["employeeId", receptionist?.employee.id ?? ""]]),
         },
+        ),
       );
 
     console.log(
       "KUBA RECEPTIONIST AI RESPONSE GENERATED",
       {
         textLength: result.text.length,
-        text: result.text,
       },
     );
 
@@ -1261,6 +1271,7 @@ ${prompt}
               name: error.name,
               message: error.message,
               stack: error.stack,
+              category: classifyAIProviderError(error),
             }
           : error,
         null,
