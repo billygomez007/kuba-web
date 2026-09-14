@@ -37,6 +37,34 @@ The migration is `drizzle/0045_superkuba_widget_origins.sql`.
 - Unknown public keys and origin denials use the same generic 403 response so
   callers cannot enumerate integrations.
 
+### Serialized-origin grammar
+
+Configured origins and request Origins must first match `https://host` or
+`https://host:port`. The host is an ASCII URL hostname (IDNs use punycode), a
+canonical dotted IPv4 address, or a bracketed canonical IPv6 address. The
+optional port is an unpadded decimal integer from 0 through 65535. URL parsing
+then validates the host and port; it must not repair or rewrite the hostname
+other than changing its case. No implicit localhost or HTTP exception exists.
+
+Scheme/host casing is normalized, and explicit HTTPS port `443` is equivalent
+to an omitted port. Other ports remain distinct and must be configured exactly.
+A trailing slash is rejected, including `/` by itself. Paths, userinfo, empty
+or nonempty query/fragment delimiters, percent-encoded hostnames, whitespace,
+multiple origins, commas, wildcards, missing slashes, and opaque origins such
+as `null` are rejected before URL canonicalization. Non-HTTPS configuration
+fails closed. Any future local HTTP support requires a separate explicit policy.
+
+For example, `HTTPS://KoraAfric.COM:443` normalizes to
+`https://koraafric.com`; `https:koraafric.com`, `https:/koraafric.com`,
+`https://koraafric.com/`, `https://koraafric.com?`, and
+`https://koraafric.com#` are invalid. An otherwise well-formed foreign hostname
+still fails the configured origin comparison.
+
+The legacy null/empty database allowlist exception remains unchanged: it
+bypasses application-level origin enforcement but supplies no browser CORS
+headers. All active browser integrations must be explicitly configured before
+provider promotion.
+
 The approved Kora production configuration is exactly:
 
 ```json
@@ -65,6 +93,22 @@ Do not replay or reconcile unrelated migrations as part of this change. Apply
 the reviewed additive migration and configure every active browser integration's
 exact origins before deploying the provider; legacy null allowlists do not
 receive browser CORS headers.
+
+The release-specific dispositions and exact object inventory are recorded in
+[the migration reconciliation](WEBSITE_CHAT_MIGRATION_RECONCILIATION.md).
+The split `0040`/`0041` migrations are superseded. Both `0042` identities and
+the outreach/organization `0043`/`0044` migrations are excluded from this
+provider release. Their later rollout must use a newly reviewed migration
+plan with timestamps after the then-current production ledger; the historical
+files must not be assumed to run after `0045`. Fresh production schema checks
+remain an execution gate, not a test result inferred from this branch.
+
+Run `node --experimental-strip-types --test tests/website-chat-*.test.mjs`
+for the provider regression and migration-plan checks. The route tests use
+ephemeral local SQLite and actual Drizzle/schema lookups for OPTIONS and POST
+authorization. They verify query/body key mismatch isolation and zero handler
+writes. AI generation and a complete successful conversation are outside this
+focused harness; no production connection is used.
 
 ## Browser CORS contract
 

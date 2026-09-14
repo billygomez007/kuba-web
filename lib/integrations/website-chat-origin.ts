@@ -1,4 +1,7 @@
-const ORIGIN_PROTOCOLS = new Set(["http:", "https:"]);
+// Validate the serialized authority before URL can repair malformed input.
+// Browser hosts are ASCII (IDNs use punycode); IPv6 addresses are bracketed.
+const SERIALIZED_HTTPS_ORIGIN =
+  /^https:\/\/([a-z0-9._-]+|\[[0-9a-f:.]+\])(?::(0|[1-9][0-9]{0,4}))?$/i;
 
 /**
  * `null` means the integration predates origin enforcement and remains on the
@@ -28,17 +31,21 @@ export function parseAllowedOrigins(
   }
 }
 
-/** Normalize an origin without accepting paths, credentials, or wildcards. */
+/** Accept an HTTPS serialized origin, then normalize host case and port 443. */
 export function normalizeOrigin(value: string | null | undefined): string | null {
-  if (!value) return null;
+  if (typeof value !== "string" || value !== value.trim()) return null;
 
-  const input = value.trim();
-  if (!input || input.includes("*") || input.includes("\\")) return null;
+  const match = SERIALIZED_HTTPS_ORIGIN.exec(value);
+  if (!match) return null;
 
   try {
-    const parsed = new URL(input);
-    if (!ORIGIN_PROTOCOLS.has(parsed.protocol)) return null;
-    if (parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+    const parsed = new URL(value);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.hostname !== match[1].toLowerCase() ||
+      parsed.username || parsed.password ||
+      parsed.pathname !== "/" || parsed.search || parsed.hash
+    ) {
       return null;
     }
 
