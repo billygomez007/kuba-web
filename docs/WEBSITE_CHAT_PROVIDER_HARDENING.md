@@ -24,7 +24,7 @@ belong to that same integration and business.
 
 Active website-chat integrations now have an additive nullable
 `integrations.allowed_origins` field containing a JSON array of exact origins.
-The migration is `drizzle/0039_superkuba_widget_origins.sql`.
+The migration is `drizzle/0045_superkuba_widget_origins.sql`.
 
 - `null` or an empty database value keeps existing integrations on the
   documented legacy compatibility path while they are migrated.
@@ -42,6 +42,29 @@ The approved Kora production configuration is exactly:
 ```json
 ["https://koraafric.com", "https://www.koraafric.com"]
 ```
+
+## Migration deployment prerequisite
+
+The widget-origin migration was renamed to `0045_superkuba_widget_origins`
+to avoid existing migration-number collisions. Its SQL and snapshot contents
+are unchanged. The journal retains `idx: 38` and `when: 1789341443148`; the
+snapshot still links to the intended `0038` baseline. The filename prefix is
+not the journal ordinal.
+
+Drizzle decides which migrations are pending using journal timestamps and the
+production ledger. The reviewed production ledger's latest timestamp was
+`1788117804308`, earlier than this migration's `1789341443148`. However, the
+reviewed main branch ends at `0038`, while production already records later
+migrations through `0041`. Renaming this migration does not reconcile that
+history or solve future deployment of older-timestamp branch migrations,
+which the runner could skip after a newer timestamp is recorded.
+
+Before deployment, independently recheck the production ledger and effective
+pending migration set, and review the ordering of any other branch migrations.
+Do not replay or reconcile unrelated migrations as part of this change. Apply
+the reviewed additive migration and configure every active browser integration's
+exact origins before deploying the provider; legacy null allowlists do not
+receive browser CORS headers.
 
 ## Browser CORS contract
 
