@@ -9,7 +9,7 @@ import {
   outreachSequenceSteps,
 } from "@/db/schema";
 import { evaluateCampaignCompletion } from "@/lib/outreach/campaign-lifecycle";
-import { renderTemplate, sendCampaignEmail, withUnsubscribeFooter } from "@/lib/outreach/email-channel";
+import { buildCampaignReplyTo, renderTemplate, sendCampaignEmail, withUnsubscribeFooter } from "@/lib/outreach/email-channel";
 import { assertRecipientTransition, type RecipientStatus } from "@/lib/outreach/recipient-state";
 import {
   type FailureCode,
@@ -292,6 +292,12 @@ export async function processClaimedSend(sendId: string): Promise<ProcessSendRes
     to: recipient.destinationIdentity,
     subject: subject || "",
     html: htmlWithFooter,
+    replyTo: buildCampaignReplyTo({
+      businessId: recipient.businessId,
+      campaignId: campaign.id,
+      recipientId: recipient.id,
+      sendId,
+    }),
   });
 
   if (sendResult.success) {

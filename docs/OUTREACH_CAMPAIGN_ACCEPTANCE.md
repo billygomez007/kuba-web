@@ -122,9 +122,14 @@ prospect during this acceptance pass.
 
 ## Known blockers (unchanged by this pass, not solvable by this pass)
 
-- Live inbound reply correlation: blocked on a DNS/inbound-email-receiving
-  decision (production/business decision, explicitly not touched this
-  pass per instruction).
+- **Live inbound reply correlation is now CODE READY, not
+  PROVIDER/DNS ACTIVATED.** A later pass built and tested the full
+  inbound webhook, reply-token/alias tenant resolution, campaign reply
+  correlation, and a manual Sales-handoff trigger — see
+  `docs/EMAIL_RUNTIME.md` for the architecture and the exact
+  Resend/DNS/Vercel activation checklist. No DNS or Resend dashboard
+  configuration has been performed; nothing here is live until an
+  operator completes that checklist.
 - Production Turso migration state: must be verified read-only by an
   operator with real production DB access before any production
   migration — not touched this pass.

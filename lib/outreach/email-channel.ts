@@ -1,5 +1,8 @@
 import { getResend } from "@/lib/email/resend";
 import { createUnsubscribeToken } from "@/lib/outreach/unsubscribe-token";
+import { createReplyToken, buildReplyToAddress } from "@/lib/email/reply-token";
+import { getInboundDomain } from "@/lib/email/inbound-config";
+import { conversationIdForCampaignRecipient } from "@/lib/email/inbound-correlation";
 
 /**
  * Campaign email delivery. Reuses the existing centralized lazy
@@ -32,6 +35,7 @@ export interface SendCampaignEmailParams {
   html: string;
   text?: string;
   fromOverride?: string;
+  replyTo?: string;
 }
 
 export interface SendCampaignEmailResult {
@@ -63,6 +67,7 @@ export async function sendCampaignEmail(params: SendCampaignEmailParams): Promis
         subject: params.subject,
         html: params.html,
         text: params.text,
+        ...(params.replyTo ? { replyTo: params.replyTo } : {}),
       },
       // Same idempotencyKey across every retry of this exact send row.
       { idempotencyKey: params.sendId },
@@ -94,6 +99,33 @@ function isRetryableResendError(errorName: string): boolean {
     "application_error",
   ]);
   return retryableNames.has(errorName);
+}
+
+/**
+ * Builds the signed Reply-To address for a campaign send, or undefined if
+ * inbound email isn't configured (RESEND_INBOUND_DOMAIN unset) — never
+ * advertise a reply address that goes nowhere. The conversation id is
+ * deterministic from the recipient id (see conversationIdForCampaignRecipient),
+ * so every sequence-step email to the same recipient carries a Reply-To
+ * that resolves to the SAME conversation.
+ */
+export function buildCampaignReplyTo(params: {
+  businessId: string;
+  campaignId: string;
+  recipientId: string;
+  sendId: string;
+}): string | undefined {
+  const inboundDomain = getInboundDomain();
+  if (!inboundDomain) return undefined;
+
+  const token = createReplyToken({
+    businessId: params.businessId,
+    conversationId: conversationIdForCampaignRecipient(params.recipientId),
+    campaignId: params.campaignId,
+    recipientId: params.recipientId,
+    sendId: params.sendId,
+  });
+  return buildReplyToAddress(token, inboundDomain);
 }
 
 /**

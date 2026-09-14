@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -13,11 +13,13 @@ import {
   integrations,
   leads,
   messages,
+  outreachCampaignRecipients,
   tasks,
   tickets,
   users,
 } from "@/db/schema";
 import { requireBusinessMembership } from "@/lib/auth/tenant";
+import { campaignRecipientIdFromConversationId } from "@/lib/email/inbound-correlation";
 import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
 import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 import { capabilityMinimumPlan } from "@/lib/billing/plan-definitions";
@@ -86,6 +88,28 @@ export async function GET() {
 
     const routingByConversation = new Map(routingRows.map((routing) => [routing.conversationId, routing]));
     const handoffByConversation = new Map(handoffRows.map((handoff) => [handoff.conversationId, handoff]));
+
+    // Campaign-reply conversations use a deterministic id encoding their
+    // recipientId (see conversationIdForCampaignRecipient) — resolve those
+    // back to their outreach_campaign_recipients row so the Inbox can offer
+    // a manual "Hand off to Sales" action (Phase 8) without a second query
+    // per conversation.
+    const campaignRecipientIds = conversationRows
+      .map((conversation) => campaignRecipientIdFromConversationId(conversation.id))
+      .filter((id): id is string => Boolean(id));
+    const campaignRecipientRows = campaignRecipientIds.length
+      ? await db
+          .select({
+            id: outreachCampaignRecipients.id,
+            campaignId: outreachCampaignRecipients.campaignId,
+            status: outreachCampaignRecipients.status,
+            handoffLeadId: outreachCampaignRecipients.handoffLeadId,
+          })
+          .from(outreachCampaignRecipients)
+          .where(and(eq(outreachCampaignRecipients.businessId, membership.businessId), inArray(outreachCampaignRecipients.id, campaignRecipientIds)))
+      : [];
+    const campaignRecipientById = new Map(campaignRecipientRows.map((row) => [row.id, row]));
+
     const localization = await getBusinessLocalization(membership.businessId);
     const { start: today } = getBusinessDayBounds(localization.timezone);
 
@@ -106,8 +130,21 @@ export async function GET() {
       );
       const relatedLeadIds = new Set(relatedLeads.map((lead) => lead.id));
 
+      const campaignRecipientId = campaignRecipientIdFromConversationId(conversation.id);
+      const campaignRecipient = campaignRecipientId ? campaignRecipientById.get(campaignRecipientId) : undefined;
+      const salesHandoff = campaignRecipient
+        ? {
+            campaignId: campaignRecipient.campaignId,
+            recipientId: campaignRecipientId as string,
+            eligible: campaignRecipient.status === "replied" || campaignRecipient.status === "interested",
+            handedOff: campaignRecipient.status === "handed_off",
+            leadId: campaignRecipient.handoffLeadId,
+          }
+        : null;
+
       return {
         id: conversation.id,
+        salesHandoff,
         customerId: conversation.customerId,
         customerName: conversation.customerName || "Unknown customer",
         channel: (() => {

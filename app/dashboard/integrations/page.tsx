@@ -140,13 +140,12 @@ export default function IntegrationsPage() {
   const getIntegrationStatus = (provider: string) => {
     const integration = integrations.find((i) => i.provider === provider);
     const isActive = integration?.status === "active";
-    const isTransactionalEmail = provider === "email" && isActive;
     const isWebsiteConfigured = provider === "website_chat" && isActive;
     const isWhatsAppConfigured = provider === "whatsapp" && isActive;
+    const isEmailConfigured = provider === "email" && isActive;
 
     return {
-      connected: isWhatsAppConfigured || isWebsiteConfigured,
-      isTransactionalEmail,
+      connected: isWhatsAppConfigured || isWebsiteConfigured || isEmailConfigured,
       integration,
     };
   };
@@ -210,7 +209,7 @@ export default function IntegrationsPage() {
 
                 <div className="mt-5 flex items-center justify-between">
                   <span className="text-xs uppercase text-white/40">
-                    {item.provider === "email" && integration?.status === "active" ? "Transactional only" : item.provider === "email" ? "Not Configured" : connected ? "Connected" : isComingSoon ? "Coming Soon" : "Configuration Required"}
+                    {connected ? "Connected" : isComingSoon ? "Coming Soon" : "Configuration Required"}
                   </span>
 
                   {!isComingSoon && (

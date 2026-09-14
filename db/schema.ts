@@ -1036,6 +1036,14 @@ export const messages = sqliteTable("messages", {
     mode: "timestamp_ms",
   }),
 
+  // Generic, channel-specific JSON extension — same pattern already used by
+  // integrations.metadata. Introduced for email (from/to/subject, the raw
+  // Message-ID/In-Reply-To/References headers, reply correlation
+  // classification, campaign/recipient linkage, and safe attachment
+  // metadata) rather than adding a column per field; other channels may
+  // adopt it later instead of growing their own bespoke columns.
+  metadata: text("metadata"),
+
   createdAt: integer("created_at", {
     mode: "timestamp_ms",
   }).notNull(),

@@ -255,3 +255,46 @@ test("processing the same reply twice results in exactly one Sales promotion (id
   const matching = leadRows.filter((row) => row.id === first.lead.id);
   assert.equal(matching.length, 1);
 });
+
+// --- getLatestReplySummary (manual handoff route's evidence source) ---
+
+test("getLatestReplySummary reads the actual persisted inbound message content for the recipient's conversation", async () => {
+  const { recipientId } = await seedProspectWithCampaignRecipient();
+  const now = new Date();
+  const conversationId = `email-campaign-${recipientId}`;
+  const integrationId = id("integration");
+  await db.insert(schema.integrations).values({ id: integrationId, businessId: BIZ, provider: "email", status: "active", externalAccountId: `alias-${id("a")}@reply.test`, displayName: "Email", createdAt: now, updatedAt: now });
+  await db.insert(schema.conversations).values({ id: conversationId, businessId: BIZ, integrationId, customerEmail: "reply-target@example.com", status: "open", createdAt: now, updatedAt: now });
+  await db.insert(schema.messages).values({ id: id("msg"), businessId: BIZ, conversationId, integrationId, direction: "inbound", senderType: "customer", content: "I'm very interested, please call me.", createdAt: now });
+
+  const summary = await campaignReplyHandoff.getLatestReplySummary(BIZ, recipientId);
+  assert.equal(summary, "I'm very interested, please call me.");
+});
+
+test("getLatestReplySummary prefers the most recent inbound message when a recipient replied more than once", async () => {
+  const { recipientId } = await seedProspectWithCampaignRecipient();
+  const conversationId = `email-campaign-${recipientId}`;
+  const integrationId = id("integration");
+  const older = new Date(Date.now() - 60_000);
+  const newer = new Date();
+  await db.insert(schema.integrations).values({ id: integrationId, businessId: BIZ, provider: "email", status: "active", externalAccountId: `alias-${id("a")}@reply.test`, displayName: "Email", createdAt: older, updatedAt: older });
+  await db.insert(schema.conversations).values({ id: conversationId, businessId: BIZ, integrationId, customerEmail: "reply-target@example.com", status: "open", createdAt: older, updatedAt: newer });
+  await db.insert(schema.messages).values({ id: id("msg"), businessId: BIZ, conversationId, integrationId, direction: "inbound", senderType: "customer", content: "First reply.", createdAt: older });
+  await db.insert(schema.messages).values({ id: id("msg"), businessId: BIZ, conversationId, integrationId, direction: "inbound", senderType: "customer", content: "Second, more recent reply.", createdAt: newer });
+
+  const summary = await campaignReplyHandoff.getLatestReplySummary(BIZ, recipientId);
+  assert.equal(summary, "Second, more recent reply.");
+});
+
+test("getLatestReplySummary never trusts an outbound message as evidence and falls back honestly when no reply is on record", async () => {
+  const { recipientId } = await seedProspectWithCampaignRecipient();
+  const conversationId = `email-campaign-${recipientId}`;
+  const integrationId = id("integration");
+  const now = new Date();
+  await db.insert(schema.integrations).values({ id: integrationId, businessId: BIZ, provider: "email", status: "active", externalAccountId: `alias-${id("a")}@reply.test`, displayName: "Email", createdAt: now, updatedAt: now });
+  await db.insert(schema.conversations).values({ id: conversationId, businessId: BIZ, integrationId, customerEmail: "reply-target@example.com", status: "open", createdAt: now, updatedAt: now });
+  await db.insert(schema.messages).values({ id: id("msg"), businessId: BIZ, conversationId, integrationId, direction: "outbound", senderType: "ai_employee", content: "Our original campaign email.", createdAt: now });
+
+  const summary = await campaignReplyHandoff.getLatestReplySummary(BIZ, recipientId);
+  assert.equal(summary, "No reply text on record.");
+});

@@ -229,7 +229,8 @@ historical prototype unless proven otherwise.
   user model via `user: { modelName: "users" }`.
 - **AI**: Mastra (`@mastra/core`, `@mastra/memory`, `@mastra/libsql`) +
   Vercel AI SDK, OpenAI as the model provider.
-- **Email**: Resend. **Billing**: dual-provider, Stripe or Paystack via a
+- **Email**: Resend, outbound and inbound (inbound is CODE READY, pending
+  Resend/DNS activation — see `docs/EMAIL_RUNTIME.md`). **Billing**: dual-provider, Stripe or Paystack via a
   `BILLING_PROVIDER` switch (`lib/billing/provider.ts`).
 - **WhatsApp**: Meta Cloud API (Graph API), direct HTTPS, no SDK.
 - **Voice**: OpenAI Realtime API (WebSocket) for AI-side audio, Twilio for
@@ -325,11 +326,24 @@ and no browser-automation tool is available in this session either. See
 `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the full record and the manual
 checklist a human (or a future browser-capable agent/session) still needs
 to run before this branch can be called `READY FOR STAGING INTEGRATION`.
-Live inbound reply correlation also remains unbuilt: the deterministic
-destination (`lib/outreach/campaign-reply-handoff.ts`) exists and is
-tested, but nothing calls it yet — blocked on the DNS/inbound-receiving
-decision (production blocker #2 below), which is intentionally deferred,
-not forgotten.
+**Update: inbound email + reply correlation is now CODE READY** (see
+`docs/EMAIL_RUNTIME.md` for the full architecture). A canonical inbound
+webhook (`app/api/integrations/email/webhook/route.ts`) verifies Resend's
+Svix signature, resolves tenant via a signed reply-token or per-business
+inbound alias (never a client-supplied businessId), correlates campaign
+replies deterministically, persists inbound messages into the existing
+Inbox/Conversations model, and calls `markRecipientReplied()` — the
+sequence now genuinely halts on a real reply. A manual "Hand off to
+Sales" action
+(`POST /api/outreach/campaigns/[campaignId]/recipients/[recipientId]/handoff`,
+surfaced in Inbox) completes the reply → lead path, deliberately not
+automatic (a "not interested" reply must never silently become a lead —
+see `docs/EMAIL_RUNTIME.md`, "Automatic handoff policy"). **This is CODE
+READY, not PROVIDER/DNS ACTIVATED**: it will not receive any real mail
+until `RESEND_INBOUND_DOMAIN`/`RESEND_WEBHOOK_SECRET` are configured
+against a real Resend receiving domain (production blocker #2 below) —
+no DNS was changed, no Resend dashboard configuration was changed, by
+this work.
 
 ### Campaign Engine acceptance pass — two real defects found and fixed
 
@@ -544,7 +558,8 @@ VERCEL_ENV, VERCEL_URL, VERCEL_BRANCH_URL
 OPENAI_API_KEY, OPENAI_REALTIME_MODEL, OPENAI_REALTIME_VOICE
 
 # Email
-RESEND_API_KEY, EMAIL_FROM, EMAIL_REPLY_TO, SALES_CONTACT_EMAIL
+RESEND_API_KEY, EMAIL_FROM, EMAIL_REPLY_TO, SALES_CONTACT_EMAIL,
+RESEND_INBOUND_DOMAIN, RESEND_WEBHOOK_SECRET   # see docs/EMAIL_RUNTIME.md
 
 # Billing
 BILLING_PROVIDER, SUPERKUBA_BILLING_CURRENCY,
@@ -576,6 +591,32 @@ NEXT_PUBLIC_APP_ENV, NODE_ENV
   behind Vercel Deployment Protection/SSO — see
   `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the URL)
 
+## Baseline quality gate (`feature/outreach-ai-employee`, Email +
+Inbound Email + campaign reply handling, this pass)
+
+- `npm test`: **1532/1532 passing** (1524 baseline + 8 new: threading
+  header persistence, complaint event handling + idempotency, Email
+  Integration status classification)
+- `npm run lint`: **0 errors**, 60 pre-existing warnings — none introduced
+  by this work
+- `npx tsc --noEmit`: **clean**
+- `npm run build`: **clean** (Next.js 16, webpack build — both new routes,
+  `/api/integrations/email/webhook` and
+  `/api/outreach/campaigns/[campaignId]/recipients/[recipientId]/handoff`,
+  compile and appear in the route manifest)
+- Clean-bootstrap (`scripts/bootstrap-clean-database.mjs`) verified:
+  migration `0045_add_message_metadata.sql` applies with no errors on a
+  fresh database; `messages.metadata` column present afterward.
+- Migration numbering collision check: `0045` does not exist on
+  `origin/main` (behind at `0038`) or `origin/feature/outreach-ai-employee`
+  (behind at `0044`, and local HEAD matches remote exactly — no
+  divergence). `origin/staging` has its own, independently-numbered
+  migration lineage that diverged earlier — out of scope to reconcile
+  here, not a collision with this branch's own history.
+- See `docs/EMAIL_RUNTIME.md` for the full architecture this pass built
+  and verified, and the exact manual Resend/DNS/Vercel steps required
+  before inbound email is live in any environment.
+
 ## Production blockers (in rough priority order)
 
 1. **BLOCKED** — Production Turso schema/migration state must be verified
@@ -583,14 +624,18 @@ NEXT_PUBLIC_APP_ENV, NODE_ENV
    `0038`–`0042` are applied to production merely because they exist
    locally; do not reset, replay migrations against, or otherwise touch
    production until an operator confirms real Turso access.
-2. Campaign reply correlation needs a decision on inbound email receiving.
-   Resend (already the platform's email provider) supports inbound email
-   receiving (a "Receiving" DNS record + webhook events), which would
-   avoid a second external provider — but configuring a receiving
-   domain/subdomain is a real DNS/production change outside what this pass
-   can do autonomously. Until decided and configured, campaign replies
-   cannot be correlated back to a send/recipient/prospect and the existing
-   Outreach → Sales handoff tool cannot be triggered from a campaign reply.
+2. **Inbound email is CODE READY but PROVIDER/DNS NOT CONFIGURED.** The
+   implementation (webhook, signature verification, reply-token/alias
+   tenant resolution, campaign reply correlation, manual Sales handoff)
+   is built and tested — see `docs/EMAIL_RUNTIME.md`. What remains is
+   entirely manual, operator-performed configuration: choose a receiving
+   subdomain, configure it in the Resend dashboard, add the DNS records
+   Resend generates, create the webhook pointing at
+   `/api/integrations/email/webhook`, and set `RESEND_INBOUND_DOMAIN` +
+   `RESEND_WEBHOOK_SECRET` in Vercel. See `docs/EMAIL_RUNTIME.md`,
+   "Production activation checklist," for the exact steps — this pass
+   does not perform any of them (no DNS change, no Resend dashboard
+   change).
 3. Every campaign email currently sends from one platform-wide `EMAIL_FROM`
    address — no per-business verified sending identity yet (see
    `lib/outreach/email-channel.ts`).
@@ -624,9 +669,11 @@ NEXT_PUBLIC_APP_ENV, NODE_ENV
    `docs/OUTREACH_CAMPAIGN_ACCEPTANCE.md` for the preview URL (behind
    Vercel SSO — needs a logged-in Vercel session to open) and the exact
    manual checklist.
-2. Decide and configure inbound email receiving (Resend supports it) so
-   `lib/outreach/campaign-reply-handoff.ts` — already built and tested —
-   can actually be triggered by a real reply.
+2. Complete the manual Resend/DNS activation checklist in
+   `docs/EMAIL_RUNTIME.md` so the already-built, already-tested inbound
+   pipeline (`lib/outreach/campaign-reply-handoff.ts` and the rest of
+   `lib/email/*`) can receive real mail. No further code work is required
+   for this — it is CODE READY, pending provider/DNS activation.
 3. Per-business verified sending identity for campaign email (today: one
    platform-wide `EMAIL_FROM`).
 4. Independently audit Sales AI's conversation/CRM sync depth (not covered

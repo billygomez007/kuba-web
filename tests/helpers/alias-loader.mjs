@@ -28,5 +28,19 @@ export async function resolve(specifier, context, nextResolve) {
     const target = resolveExtensionless(path.join(parentPath, specifier));
     if (target) return nextResolve(pathToFileURL(target).href, context);
   }
+  // Next.js's own package has no "exports" map, so subpaths like
+  // "next/server" only resolve under the Next.js/webpack build pipeline's
+  // bundler-style extension inference, not plain Node ESM (Node's own
+  // resolver error literally suggests "next/server.js"). Route files
+  // importing NextResponse/NextRequest need this to be import-able at all
+  // under the raw `node --test` runner used by this test suite.
+  if (/^next\/[^./]+$/.test(specifier)) {
+    try {
+      return await nextResolve(specifier, context);
+    } catch (error) {
+      if (error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+      return nextResolve(`${specifier}.js`, context);
+    }
+  }
   return nextResolve(specifier, context);
 }
