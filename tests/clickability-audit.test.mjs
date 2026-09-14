@@ -55,10 +55,15 @@ test("REGRESSION: no <button> is inert (no onClick, not type=submit/reset, not d
   assert.equal(inertButtons.length, 0, `inert buttons found:\n${description}`);
 });
 
-test("REGRESSION: Help sidebar link (app/dashboard/layout.tsx) points at a page that actually exists — previously pointed at /help, which had no route at all", async () => {
-  const helpFindings = findings.filter((f) => f.file.endsWith("app/dashboard/layout.tsx") && f.raw === "/dashboard/help");
-  assert.ok(helpFindings.length > 0, "expected to find the Help link pointing at /dashboard/help in app/dashboard/layout.tsx");
+test("REGRESSION: Help & Support (moved from the sidebar footer into Settings > Account & Support) points at a page that actually exists", async () => {
+  const helpFindings = findings.filter((f) => f.file.endsWith("app/dashboard/settings/page.tsx") && f.raw === "/dashboard/help");
+  assert.ok(helpFindings.length > 0, "expected to find the Help & Support link pointing at /dashboard/help in app/dashboard/settings/page.tsx");
   assert.equal(helpFindings[0].matchesKnownRoute, true);
+});
+
+test("REGRESSION: the sidebar (app/dashboard/layout.tsx) no longer links to Help directly — it was relocated into Settings, not duplicated", async () => {
+  const helpFindings = findings.filter((f) => f.file.endsWith("app/dashboard/layout.tsx") && f.raw === "/dashboard/help");
+  assert.equal(helpFindings.length, 0, "the sidebar should no longer contain a direct Help link now that it lives in Settings > Account & Support");
 });
 
 test("REGRESSION: the dashboard home page's Help Center link also points at the real Help page", async () => {

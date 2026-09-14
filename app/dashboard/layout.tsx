@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { capabilityMinimumPlan, planDefinitions } from "@/lib/billing/plan-definitions";
 import { getCatalogEntry } from "@/lib/billing/ai-workforce-catalog";
-import LogoutControl from "../components/settings/LogoutControl";
 import TrialBanner from "../components/dashboard/TrialBanner";
 
 type NavigationItem = {
@@ -704,37 +703,6 @@ export default function DashboardLayout({
           )}
         </nav>
 
-        {/* Bottom Sidebar Section */}
-        <div className="border-t border-white/[0.07] p-4">
-
-          <Link
-            href="/dashboard/help"
-            className="mt-1.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white/70"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/[0.04] text-base text-white/40">
-              ?
-            </span>
-
-            <span>Help</span>
-          </Link>
-
-          <LogoutControl compact />
-
-          {/* AI Workforce Status */}
-          <div className="mt-4 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.06] p-3">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-
-              <span className="text-xs font-semibold text-emerald-300">
-                SuperKuba Active
-              </span>
-            </div>
-
-            <p className="mt-2 text-[11px] leading-4 text-white/35">
-              AI workforce ready
-            </p>
-          </div>
-        </div>
       </aside>
       {/* Mobile Header */}
       <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#050507]/90 backdrop-blur-lg lg:hidden">
@@ -825,7 +793,6 @@ export default function DashboardLayout({
                 navigationGroups.map((group) => renderNavigationGroup(group, true))
               )}
             </nav>
-            <LogoutControl compact />
           </div>
         )}
       </header>

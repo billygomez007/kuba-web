@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
@@ -206,6 +207,26 @@ export default async function SettingsPage() {
           name={session.user.name}
           email={session.user.email}
         />
+
+        <p className="mt-10 text-sm font-medium text-violet-400">
+          Account &amp; Support
+        </p>
+
+        <section className="mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-2xl">
+          <h2 className="text-lg font-semibold">Help &amp; Support</h2>
+
+          <p className="mt-1 text-sm text-white/45">
+            Get help using SuperKuba, AI employees, integrations and
+            your workspace.
+          </p>
+
+          <Link
+            href="/dashboard/help"
+            className="mt-4 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500"
+          >
+            Open Help Center
+          </Link>
+        </section>
 
         <LogoutControl />
       </div>
