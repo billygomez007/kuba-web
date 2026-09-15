@@ -1,5 +1,48 @@
 # SuperKuba — Current State Audit
 
+## 2026-09-15 update — enterprise tenancy and Kora production gate
+
+The approved `feature/outreach-ai-employee` source contains the canonical
+business-ID resolver, explicit `businessUsers` checks, portfolio/business
+linking, selected-business switching, and Website Widget scoping. The full
+suite passes with these controls in place; see
+`docs/ENTERPRISE_MULTI_BUSINESS_TENANCY.md` for the invariant.
+
+The production database was inspected read-only. Realtegic's existing Website
+Chat integration remains unchanged and has the approved `www` origin. No Kora
+business, membership, Website Chat integration, public key, or origins row
+exists in production. Production also lacks the organization, organization
+membership, and organization-business tables required to link a new Kora
+tenant to the Realtegic portfolio. This task therefore performs no production
+mutation.
+
+Two distinct Kora OS businesses were found in the non-production staging
+database. One is owned by `info@koraafric.com` and linked to the Realtegic
+portfolio but has no Website Chat integration; the other has the historical
+Website Chat/Business Brain configuration and complimentary Pro subscription
+but is owned by `info@realtegicworks.com` and is not linked to that portfolio.
+They are different immutable business IDs. This is an owner/product decision,
+not a reason to merge or copy rows. Production provisioning remains blocked
+until the canonical tenant and ownership are confirmed and the required
+schema/linking rollout is separately authorized.
+
+## 2026-09-15 update — production migration ledger reconciliation plan
+
+Production records the historical Website Widget origins migration as 0045
+(`7c0694aae092bf8427a4eef01499a77498dc91ce6c2977a1a2bb23ddd0bd56b9`) while
+the organization tables from the repository's 0044 are absent. The current
+branch also had a second, unrelated 0045 for message metadata. The migration
+history is normalized in the isolated feature worktree as:
+
+`0045_superkuba_widget_origins` → `0046_organization_portfolio_reconciliation`
+→ `0047_add_message_metadata`.
+
+0046 is forward-only and idempotent. It recreates only the missing organization
+tables/indexes and preserves existing rows. A production-like fixture and a
+fresh bootstrap both pass. Production must apply only 0046 through a dedicated
+migration folder; the normal runner would select both 0046 and the later 0047
+once 0046 is recorded. No production write has been performed.
+
 Written from a full repository audit on 2026-09-12. This is a living document —
 update it as major features land or architecture changes, rather than adding
 another dated point-in-time report to the repo root.
