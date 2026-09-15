@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireGatewayInternalAuth } from "@/lib/voice/internal-auth";
 import { getActiveEmployee } from "@/lib/voice/employee-lookup";
 import { findVoiceTool } from "@/lib/voice/voice-tools";
-import { checkAIEmployeeAuthority } from "@/lib/ai/authority";
+import { checkAIEmployeeAuthority, fileActionApproval } from "@/lib/ai/authority";
 
 /**
  * Internal-only (Phase 20-21): the ONLY place a Voice Gateway-forwarded
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const auth = requireGatewayInternalAuth(request, body.token);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { businessId, employeeId } = auth.claims;
+  const { businessId, employeeId, conversationId } = auth.claims;
   const employee = await getActiveEmployee(businessId, employeeId);
   if (!employee) return NextResponse.json({ ok: false, message: "This AI employee is not available." }, { status: 404 });
 
@@ -37,14 +37,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "This action is not available on a voice call." });
   }
 
+  const args = typeof body.arguments === "object" && body.arguments !== null ? body.arguments : {};
+
   const decision = await checkAIEmployeeAuthority({ businessId, employeeId, action: tool.action });
   if (!decision.ok) {
+    if (decision.reason === "requires_approval") {
+      // Files a real, later-actionable approval record — the same
+      // fileActionApproval() every text-channel tool already calls for
+      // this outcome, so a voice conversation's requires_approval result
+      // isn't just a spoken refusal with no trace a human can act on.
+      const approvalId = await fileActionApproval({ businessId, employeeId, action: tool.action, payload: args });
+      return NextResponse.json({ ok: false, message: `Approval requested. Approval ID: ${approvalId}`, reason: decision.reason });
+    }
     return NextResponse.json({ ok: false, message: decision.message, reason: decision.reason });
   }
 
-  const args = typeof body.arguments === "object" && body.arguments !== null ? body.arguments : {};
   try {
-    const result = await tool.execute(businessId, employeeId, args);
+    const result = await tool.execute(businessId, employeeId, args, conversationId);
     return NextResponse.json({ ok: true, result });
   } catch {
     return NextResponse.json({ ok: false, message: "Unable to complete this action right now." });

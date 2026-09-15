@@ -81,18 +81,33 @@ export async function POST(request: Request) {
   const direction = employeeIdParam ? "outbound" : "inbound";
   const customerPhoneNumber = direction === "outbound" ? toNumber : fromNumber;
 
+  // Awaited (not fire-and-forget) specifically to capture the real
+  // conversations.id persistEvent resolves/creates — needed so the
+  // session token can carry it for voice tools that act on the live
+  // conversation (e.g. request_handoff). A failure here is non-fatal:
+  // the call still proceeds, just without a conversationId in its token
+  // (those specific voice tools become honestly unavailable for it).
+  let resolvedConversationId = conversationIdParam || undefined;
   const secret = process.env.VOICE_WEBHOOK_SECRET;
   if (secret) {
-    await fetch(`${url.origin}/api/voice/calls`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-voice-webhook-secret": secret },
-      body: JSON.stringify({
-        provider: "plivo",
-        businessId,
-        employeeId,
-        event: { type: "call.ringing", providerCallId: callUuid || conversationIdParam, phoneNumber: customerPhoneNumber, direction },
-      }),
-    }).catch((error) => console.error("Plivo answer -> voice event forwarding failed:", error));
+    try {
+      const eventResponse = await fetch(`${url.origin}/api/voice/calls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-voice-webhook-secret": secret },
+        body: JSON.stringify({
+          provider: "plivo",
+          businessId,
+          employeeId,
+          event: { type: "call.ringing", providerCallId: callUuid || conversationIdParam, phoneNumber: customerPhoneNumber, direction },
+        }),
+      });
+      const eventBody = await eventResponse.json().catch(() => null);
+      if (typeof eventBody?.conversationId === "string") {
+        resolvedConversationId = eventBody.conversationId;
+      }
+    } catch (error) {
+      console.error("Plivo answer -> voice event forwarding failed:", error);
+    }
   }
 
   // The Voice Gateway session token carries only an opaque sessionId +
@@ -107,6 +122,7 @@ export async function POST(request: Request) {
     employeeId,
     provider: "plivo",
     direction,
+    conversationId: resolvedConversationId,
   });
 
   return new NextResponse(buildAnswerResponse(sessionToken, customerPhoneNumber || undefined), { headers: { "Content-Type": "text/xml" } });

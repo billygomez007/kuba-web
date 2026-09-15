@@ -27,6 +27,15 @@ export interface VoiceSessionClaims {
   direction: "inbound" | "outbound";
   exp: number;
   nonce: string;
+  /**
+   * The live call's `conversations` row id, when kuba-web resolved one
+   * before minting this token — optional (never required) because a cold
+   * inbound call's conversation is only created moments later by
+   * persistEvent, and that call is itself best-effort. Enables voice
+   * tool calls (e.g. request_handoff) that need to know which
+   * conversation to act on; a token without it simply can't use those.
+   */
+  conversationId?: string;
 }
 
 const DEFAULT_TTL_SECONDS = 5 * 60;
@@ -47,6 +56,7 @@ export function createVoiceSessionToken(params: {
   employeeId: string;
   provider: string;
   direction: "inbound" | "outbound";
+  conversationId?: string;
   ttlSeconds?: number;
 }): string {
   const claims: VoiceSessionClaims = {
@@ -57,6 +67,7 @@ export function createVoiceSessionToken(params: {
     direction: params.direction,
     exp: Math.floor(Date.now() / 1000) + (params.ttlSeconds ?? DEFAULT_TTL_SECONDS),
     nonce: crypto.randomBytes(12).toString("base64url"),
+    ...(params.conversationId ? { conversationId: params.conversationId } : {}),
   };
   const encoded = Buffer.from(JSON.stringify(claims), "utf8").toString("base64url");
   return `${encoded}.${sign(encoded)}`;
@@ -97,7 +108,8 @@ export function verifyVoiceSessionToken(token: string): VoiceSessionClaims | nul
       typeof payload?.provider !== "string" ||
       (payload?.direction !== "inbound" && payload?.direction !== "outbound") ||
       typeof payload?.exp !== "number" ||
-      typeof payload?.nonce !== "string"
+      typeof payload?.nonce !== "string" ||
+      (payload?.conversationId !== undefined && typeof payload.conversationId !== "string")
     ) {
       return null;
     }

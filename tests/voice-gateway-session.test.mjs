@@ -65,7 +65,18 @@ test.before(async () => {
 
   const now = new Date();
   await db.insert(schema.businesses).values({ id: BIZ, name: "Gateway Test Biz", slug: BIZ, status: "active", createdAt: now, updatedAt: now });
+  // A real Pro subscription — getBusinessEntitlements resolves the plan
+  // from this table, never businesses.plan; needed for the handoff tests
+  // below, which resolve Sales/Customer Support (Growth+) destinations.
+  await db.insert(schema.subscriptions).values({ id: id("sub"), businessId: BIZ, provider: "stripe", providerCustomerId: id("cus"), providerSubscriptionId: id("sub-provider"), providerEventId: id("evt"), plan: "pro", status: "active", currentPeriodStart: now, currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), cancelAtPeriodEnd: false, trialEnd: null, createdAt: now, updatedAt: now });
 });
+
+async function insertVoiceConversation(businessId, employeeId) {
+  const now = new Date();
+  const conversationId = id("conv");
+  await db.insert(schema.conversations).values({ id: conversationId, businessId, customerId: null, integrationId: "voice-runtime", externalConversationId: conversationId, customerName: null, customerPhone: "+15550009999", customerEmail: null, assignedEmployeeId: employeeId, aiMode: "active", status: "open", createdAt: now, updatedAt: now });
+  return conversationId;
+}
 
 test.after(async () => {
   await rm(tempDir, { recursive: true, force: true });
@@ -188,4 +199,95 @@ test("SECURITY: an inactive employee's tool call is refused even with a valid, u
   const token = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId, provider: "plivo", direction: "inbound" });
   const response = await postInternal(toolCallRoute.POST, { token, toolName: "get_business_knowledge", arguments: {} });
   assert.equal(response.status, 404);
+});
+
+// --- conversationId claim + request_handoff (orchestration wired into voice) ---
+
+test("createVoiceSessionToken/verifyVoiceSessionToken round-trip conversationId when provided, and omit it when not", () => {
+  const withConv = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId: "emp-1", provider: "plivo", direction: "inbound", conversationId: "conv-abc" });
+  const claimsWithConv = gatewaySession.verifyVoiceSessionToken(withConv);
+  assert.equal(claimsWithConv.conversationId, "conv-abc");
+
+  const withoutConv = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId: "emp-1", provider: "plivo", direction: "inbound" });
+  const claimsWithoutConv = gatewaySession.verifyVoiceSessionToken(withoutConv);
+  assert.equal(claimsWithoutConv.conversationId, undefined);
+});
+
+test("request_handoff hands a live voice call to a real active Sales employee, reassigning conversationRouting/conversations and recording a completed handoff", async () => {
+  const receptionistId = await seedVoiceEmployee(BIZ, "receptionist");
+  const now = new Date();
+  const salesId = id("emp-sales");
+  await db.insert(schema.aiEmployees).values({ id: salesId, businessId: BIZ, name: "Sales", type: "sales", status: "active", createdAt: now, updatedAt: now });
+
+  const conversationId = await insertVoiceConversation(BIZ, receptionistId);
+  const token = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId: receptionistId, provider: "plivo", direction: "inbound", conversationId });
+
+  const response = await postInternal(toolCallRoute.POST, { token, toolName: "request_handoff", arguments: { intent: "sales", reason: "Caller wants to buy." } });
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.result.success, true);
+  assert.equal(data.result.employee.id, salesId);
+
+  const routingRows = await db.select().from(schema.conversationRouting).where(eq(schema.conversationRouting.conversationId, conversationId));
+  assert.equal(routingRows[0].aiEmployeeId, salesId);
+  const handoffRows = await db.select().from(schema.handoffs).where(eq(schema.handoffs.conversationId, conversationId));
+  assert.equal(handoffRows[0].status, "completed");
+});
+
+test("request_handoff with intent human queues the call for a human, never a specific model-chosen person", async () => {
+  const receptionistId = await seedVoiceEmployee(BIZ, "receptionist");
+  const conversationId = await insertVoiceConversation(BIZ, receptionistId);
+  const token = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId: receptionistId, provider: "plivo", direction: "inbound", conversationId });
+
+  const response = await postInternal(toolCallRoute.POST, { token, toolName: "request_handoff", arguments: { intent: "human", reason: "Caller asked for a person." } });
+  const data = await response.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.result.success, true);
+
+  const routingRows = await db.select().from(schema.conversationRouting).where(eq(schema.conversationRouting.conversationId, conversationId));
+  assert.equal(routingRows[0].status, "waiting_for_human");
+  assert.equal(routingRows[0].assignedUserId, null);
+});
+
+test("request_handoff fails honestly when the token predates conversationId (older session with no trackable conversation)", async () => {
+  const receptionistId = await seedVoiceEmployee(BIZ, "receptionist");
+  const token = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId: receptionistId, provider: "plivo", direction: "inbound" });
+  const response = await postInternal(toolCallRoute.POST, { token, toolName: "request_handoff", arguments: { intent: "sales", reason: "test" } });
+  const data = await response.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.result.success, false);
+  assert.match(data.result.error, /no trackable conversation/i);
+});
+
+test("request_handoff is not offered to a voice employee type outside the allowlist (e.g. general-manager)", async () => {
+  const now = new Date();
+  const gmId = id("emp-gm");
+  await db.insert(schema.aiEmployees).values({ id: gmId, businessId: BIZ, name: "GM", type: "general-manager", status: "active", createdAt: now, updatedAt: now });
+  const conversationId = await insertVoiceConversation(BIZ, gmId);
+  const token = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId: gmId, provider: "plivo", direction: "inbound", conversationId });
+  const response = await postInternal(toolCallRoute.POST, { token, toolName: "request_handoff", arguments: { intent: "sales", reason: "test" } });
+  const data = await response.json();
+  assert.equal(data.ok, false);
+});
+
+test("request_handoff requires human approval for an Assistant-autonomy employee, and files a real, later-actionable approval record", async () => {
+  const now = new Date();
+  const assistantReceptionistId = id("emp-receptionist-assistant");
+  await db.insert(schema.aiEmployees).values({ id: assistantReceptionistId, businessId: BIZ, name: "Assistant Receptionist", type: "receptionist", supervisionMode: "assistant", status: "active", createdAt: now, updatedAt: now });
+  const authority = await import("@/lib/ai/authority");
+  await db.insert(schema.aiEmployeeActionPolicies).values({ id: id("policy"), businessId: BIZ, employeeId: assistantReceptionistId, autonomyLevel: "assistant", policy: JSON.stringify(authority.defaultPolicyForAutonomy("assistant")), createdAt: now, updatedAt: now });
+
+  const conversationId = await insertVoiceConversation(BIZ, assistantReceptionistId);
+  const token = gatewaySession.createVoiceSessionToken({ sessionId: id("call"), businessId: BIZ, employeeId: assistantReceptionistId, provider: "plivo", direction: "inbound", conversationId });
+  const response = await postInternal(toolCallRoute.POST, { token, toolName: "request_handoff", arguments: { intent: "sales", reason: "test" } });
+  const data = await response.json();
+  assert.equal(data.ok, false);
+  assert.equal(data.reason, "requires_approval");
+  assert.match(data.message, /Approval requested\. Approval ID: /);
+
+  const approvalId = data.message.split("Approval ID: ")[1];
+  const approvalRows = await db.select().from(schema.aiEmployeeActionApprovals).where(eq(schema.aiEmployeeActionApprovals.id, approvalId));
+  assert.equal(approvalRows.length, 1, "a real approval row must exist for a human to later act on");
+  assert.equal(approvalRows[0].action, "request_handoff");
 });

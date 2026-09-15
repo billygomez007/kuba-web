@@ -264,11 +264,65 @@ caveat, stated once rather than duplicated at length here).
 **Update**: the raw audio path now has Business Brain access too, not
 just the text-relay path. The Voice Gateway's `session.update` includes
 a `tools` array built from kuba-web's `/api/internal/voice/session-
-context` response (`lib/voice/voice-tools.ts`) — currently just
-`get_business_knowledge`, wrapping the exact same Mastra tool
+context` response (`lib/voice/voice-tools.ts`) — `get_business_knowledge`,
+wrapping the exact same Mastra tool
 (`mastra/tools/get-business-knowledge.ts`) the text-relay path's agents
-already use, unmodified. Both paths therefore share one tenant-scoped
-grounding mechanism, not two.
+already use, unmodified, plus (new) `request_handoff` for
+Receptionist/Sales/Customer Support/Appointment employees — see
+"Orchestration on voice calls" below. Both paths therefore share one
+tenant-scoped grounding mechanism, not two.
+
+## Orchestration on voice calls (connects to commit 46de021's text-channel orchestration)
+
+**New**: `request_handoff` is now a voice-allowlisted tool
+(`lib/voice/voice-tools.ts`), available only to Receptionist, Sales,
+Customer Support, and Appointment voice employees — the same four the
+canonical channel policy (`lib/communications/channel-policy.ts`) marks
+voice-eligible. It reuses the EXACT SAME resolution/persistence core the
+text-channel handoff tool uses (`lib/communications/handoff.ts`'s
+`performAiHandoff`/`performHumanEscalation`) — no parallel voice-specific
+handoff logic exists. The model supplies only `{intent, reason}`; the
+`conversationId` it acts on comes from the session token's own claims
+(see below), never from the model or the gateway.
+
+**`VoiceSessionClaims` gained an optional `conversationId` field** this
+pass (`lib/voice/gateway-session.ts`, mirrored for type parity in the
+gateway's own `src/session-token.ts` — the gateway does not read or act on
+it itself, it only ever forwards the raw token string back to kuba-web
+unchanged). `app/api/voice/plivo/answer/route.ts`'s previously
+fire-and-forget call to `/api/voice/calls` is now awaited so it can
+capture the real `conversations.id` `persistEvent` resolves/creates and
+include it when minting the session token. An outbound call already had
+its conversation id from the query string and uses that directly. A
+token minted before a conversation could be resolved simply omits the
+field — `request_handoff` then fails honestly ("no trackable
+conversation") rather than guessing one.
+
+**AI-role transfer within the same call**: since there is no live
+provider-level call transfer implemented (see "Human handoff" below —
+unchanged, still gateway-transfer-not-built), a "Receptionist → Sales"
+voice handoff does not move the caller to a different phone leg or
+gateway session. It reassigns `conversationRouting`/`conversations` to
+the new employee (exactly like the text-channel handoff), and the SAME
+live OpenAI Realtime session continues — the model's own next turn is
+expected to acknowledge the change in role via its own reasoning using
+the updated `session-context` the gateway can re-fetch, since this pass
+does not force a mid-call `session.update` re-configuration. Concretely:
+today's behavior is "the record of who owns this conversation changes
+correctly and immediately," not "the AI's voice/personality mid-call
+changes." Making the live Realtime session itself re-configure
+instructions/voice mid-call (a `session.update` from the gateway,
+triggered by the tool result) is a distinct, un-built future enhancement
+— documented here as a known gap, not silently assumed to work.
+
+**`request_handoff`'s `requires_approval` outcome now files a real
+approval** (`app/api/internal/voice/tool-call/route.ts`) — previously
+(and still, for any other tool this codebase gates the same way) a
+voice tool call blocked by `requires_approval` returned an honest refusal
+message but never called `fileActionApproval()`, so no record existed for
+a human to later act on. Fixed generically in the internal route (not
+special-cased to this one tool), matching every text-channel tool's own
+convention.
 
 The **text-relay** voice path (`app/api/voice/calls/route.ts`'s `"turn"`
 action — speech-to-text happens client-side today in Voice Testing,
@@ -514,11 +568,46 @@ international Plivo number works identically (Phase 45).
    media gateway exists — there is nothing on the other end of the
    `<Stream>` yet.
 
+## Production readiness audit (2026-09-15)
+
+Confirmed directly against the production Vercel project (`kuba-web`,
+env-var NAMES only, no values read or printed): `OPENAI_API_KEY` is
+already set. **None** of the following exist in production yet:
+`PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN`, `PLIVO_VOICE_NUMBER`,
+`VOICE_CREDENTIALS_KEY`, `VOICE_WEBHOOK_SECRET`, `VOICE_GATEWAY_URL`,
+`VOICE_GATEWAY_SESSION_SECRET`, `VOICE_GATEWAY_INTERNAL_SECRET`. Voice is
+therefore completely inactive in production today, exactly as this
+document's "Bottom line" already stated — this audit found no
+discrepancy between the documentation and the deployed reality.
+
+Attempted to deploy `billygomez007/kuba-voice-gateway` (prepared locally,
+now pushed to GitHub) to Railway as part of this pass. **Blocked**: no
+Railway CLI authentication is available in this environment (`railway
+whoami` → `Unauthorized`), no `RAILWAY_TOKEN` is configured, and no
+GitHub Actions Railway-deploy workflow or repo secret exists for either
+repository. Deploying requires the owner to either run `railway login`
+interactively and hand over project access, or provide a project-scoped
+`RAILWAY_TOKEN`, or perform the Railway deployment themselves using this
+document and the gateway's own `docs/VOICE_GATEWAY.md`.
+
+What WAS verified in this pass, without needing Railway or Plivo access:
+the gateway's own `npm test`/lint/typecheck all pass; a real
+`docker build .` succeeds; a container built from that image starts
+correctly, and both `/health` and `/ready` respond correctly from outside
+the container (verified with throwaway, non-production placeholder
+secrets — never real credentials). A real bug was found and fixed in the
+process: `package.json`'s `start` script (`node dist/index.js`) never
+matched TypeScript's actual `rootDir`-preserving output path
+(`dist/src/index.js`) — invisible until now because the Dockerfile
+already flattened `dist/src` into `./dist` for the runtime image,
+masking it. Fixed; `npm run build && npm start` now works as documented.
+
 ## Known limitations (deferred, not overlooked)
 
 - The media bridge is now built (see "Media bridge") but **not deployed
   anywhere** — this is the actual remaining blocker to any live AI phone
-  conversation.
+  conversation. See "Production readiness audit" above for exactly what
+  blocks deployment and what was verified without it.
 - `maxCallDurationMinutes` (per-employee, in Voice settings) is stored
   but not enforced by kuba-web; the gateway enforces its own separate,
   fixed technical safety ceiling (`VOICE_GATEWAY_MAX_CALL_DURATION_MS`,
