@@ -6,6 +6,7 @@ import { conversations } from "@/db/schema";
 import { verifyPlivoSignature } from "@/lib/voice/plivo-signature";
 import { resolveVoiceIntegrationByPhoneNumber } from "@/lib/voice/tenant";
 import { buildAnswerResponse, buildUnavailableResponse } from "@/lib/voice/plivo-xml";
+import { createVoiceSessionToken } from "@/lib/voice/gateway-session";
 
 /**
  * Canonical Plivo inbound-call answer webhook (Phase 8-10). Tenant is
@@ -94,5 +95,19 @@ export async function POST(request: Request) {
     }).catch((error) => console.error("Plivo answer -> voice event forwarding failed:", error));
   }
 
-  return new NextResponse(buildAnswerResponse(), { headers: { "Content-Type": "text/xml" } });
+  // The Voice Gateway session token carries only an opaque sessionId +
+  // businessId/employeeId already resolved above server-side — never
+  // built from anything Plivo or the caller supplied. callUuid may still
+  // be empty on a genuinely fresh cold-call answer hit before Plivo has
+  // assigned one; conversationIdParam is always present for an
+  // outbound-initiated call, so the session id is never empty either way.
+  const sessionToken = createVoiceSessionToken({
+    sessionId: callUuid || conversationIdParam || crypto.randomUUID(),
+    businessId,
+    employeeId,
+    provider: "plivo",
+    direction,
+  });
+
+  return new NextResponse(buildAnswerResponse(sessionToken, customerPhoneNumber || undefined), { headers: { "Content-Type": "text/xml" } });
 }

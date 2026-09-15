@@ -82,6 +82,7 @@ test.before(async () => {
   process.env.PLIVO_AUTH_TOKEN = PLIVO_AUTH_TOKEN;
   process.env.PUBLIC_APP_URL = PUBLIC_APP_URL;
   process.env.VOICE_WEBHOOK_SECRET = VOICE_WEBHOOK_SECRET;
+  process.env.VOICE_GATEWAY_SESSION_SECRET = "test-voice-gateway-session-secret";
 
   ({ db } = await import("@/db"));
   schema = await import("@/db/schema");

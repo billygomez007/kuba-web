@@ -69,3 +69,9 @@ export function serializeVoiceConfig(existingRoleInstructions: string | null | u
   const base = current.includes(marker) ? current.slice(0, current.indexOf(marker)) : current;
   return `${base}${marker}${JSON.stringify(config)}`;
 }
+
+/** The employee's real role instructions, with the appended VoiceConfig JSON marker/blob stripped — used when building a Realtime session's system prompt. */
+export function getBaseRoleInstructions(value: string | null | undefined): string {
+  const current = value || "";
+  return current.includes(marker) ? current.slice(0, current.indexOf(marker)).trim() : current.trim();
+}

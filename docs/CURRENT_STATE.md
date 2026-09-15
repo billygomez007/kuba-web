@@ -513,20 +513,41 @@ real calls when the actual adapter always used the platform's env vars
 regardless — both Twilio and Plivo are now honestly labeled
 platform-managed in the provider registry.
 
-**CODE READY, not GATEWAY BUILT**: call initiation and inbound routing
-work end-to-end in tests. The actual bidirectional AI audio conversation
-does not, and cannot, run inside this Vercel-deployed Next.js app —
-confirmed directly from this repo's own deployment config (no
-`functions`/`maxDuration` override in `vercel.json`, no custom server, no
-WebSocket server implementation anywhere; the existing `createOpenAI
-RealtimeTransport()`'s `Map<callId, WebSocket>` session cache is
-process-memory-scoped and cannot survive across separate serverless
-invocations). A real call today rings, resolves the correct business/
-employee, and hears an honest "unable to complete this call" message —
-never silence, never a fabricated connection. Fixing this requires a
-genuinely new, separate, always-on Voice Gateway service (architecture
-documented in `docs/VOICE_RUNTIME.md`, "Media bridge") — not built or
-deployed this pass, per instruction.
+**Update: the Voice Gateway is now built** — `billygomez007/
+superkuba-voice-gateway`, a separate Fastify/TypeScript service (prepared
+locally; not yet pushed to GitHub or deployed anywhere). It bridges a
+Plivo media WebSocket to OpenAI Realtime, with tenant identity arriving
+only via a short-lived signed session token kuba-web mints, three new
+internal API endpoints (`app/api/internal/voice/{session-context,
+call-events,tool-call}`) for the gateway to call back into, and 45
+passing tests against mocked Plivo/OpenAI/kuba-web boundaries covering
+full-duplex audio, barge-in, tool-call delegation (including an
+approval-required refusal passing through unmodified), transcript
+forwarding, and idempotent cleanup. Full architecture in the gateway's
+own `docs/VOICE_GATEWAY.md` and this repo's `docs/VOICE_RUNTIME.md`
+("Media bridge").
+
+**Two more real bugs found and fixed while wiring the internal API
+contract**: the receptionist chat route (`app/api/ai/receptionist/
+route.ts`) reads `aiEmployeeSettings.roleInstructions` raw, which would
+leak the appended VoiceConfig JSON blob into that route's system prompt
+for any business with Voice enabled on its receptionist — noted here but
+**not fixed** (out of scope for this pass, unrelated to the gateway
+contract itself, which correctly strips it via the new
+`getBaseRoleInstructions` helper). The Mastra `get-business-knowledge`
+tool needed a narrow type-compatibility cast to be called directly
+outside its normal agent-orchestrated path — a Mastra typing artifact,
+not a behavior change.
+
+**Still CODE READY, not DEPLOYED**: `VOICE_GATEWAY_URL` is unset in
+every kuba-web environment, so a real call still rings, resolves the
+correct business/employee, and hears an honest "unable to complete this
+call" message — deploying the gateway and setting three env vars
+(`VOICE_GATEWAY_URL`, `VOICE_GATEWAY_SESSION_SECRET`, `VOICE_GATEWAY_
+INTERNAL_SECRET`) is the remaining step before a real AI phone
+conversation can be attempted; the Plivo/OpenAI/DNS activation checklist
+from the previous pass is still separately required on top of that. Not
+performed this pass, per instruction.
 
 ### Onboarding / Billing — data-driven, actively being unified
 
@@ -597,11 +618,12 @@ STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PAYSTACK_SECRET_KEY
 WHATSAPP_ACCESS_TOKEN, WHATSAPP_APP_SECRET, WHATSAPP_GRAPH_API_VERSION,
 WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN
 
-# Voice / Twilio / Plivo
+# Voice / Twilio / Plivo / Voice Gateway
 TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VOICE_NUMBER,
 PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, PLIVO_VOICE_NUMBER,
 VOICE_CREDENTIALS_KEY, VOICE_WEBHOOK_SECRET,
-VOICE_GATEWAY_STREAM_URL   # unset everywhere today — see docs/VOICE_RUNTIME.md
+VOICE_GATEWAY_URL, VOICE_GATEWAY_SESSION_SECRET, VOICE_GATEWAY_INTERNAL_SECRET
+  # all three unset everywhere today — see docs/VOICE_RUNTIME.md
 
 # Ops
 AUTOMATION_PROCESS_SECRET, CRON_SECRET, ENCRYPTION_KEY,

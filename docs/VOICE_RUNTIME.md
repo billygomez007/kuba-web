@@ -133,7 +133,7 @@ caller
      SECRET-gated), which creates/reuses the conversation + persists a
      message, exactly like the existing Twilio path
   -> XML response returned to Plivo: <Stream> to the configured media
-     gateway if VOICE_GATEWAY_STREAM_URL is set (see "Media bridge"
+     gateway if VOICE_GATEWAY_URL is set (see "Media bridge"
      below), otherwise an honest spoken "can't complete this call" +
      hangup — NEVER a <Stream> pointed at a URL that doesn't work
   -> call ends -> Plivo POSTs to /api/voice/plivo/status (hangup_url)
@@ -175,7 +175,7 @@ responses, isolated from the route so it's unit-testable without an HTTP
 request:
 - `buildStreamResponse(url)` — `<Response><Stream bidirectional="true"
   audioTrack="both" contentType="audio/x-l16;rate=8000">wss://...
-  </Stream></Response>`, used only when `VOICE_GATEWAY_STREAM_URL` is
+  </Stream></Response>`, used only when `VOICE_GATEWAY_URL` is
   configured (true in zero environments today).
 - `buildUnavailableResponse(message)` — `<Response><Speak>...</Speak>
   <Hangup/></Response>`, the honest default. No XML verb here was
@@ -183,92 +183,115 @@ request:
   the `<Stream>` element's exact attribute set could not be verified
   against a live call in this environment (see "Provider" above).
 
-## Media bridge — the one real gap (Phase 42)
+## Media bridge — now built (a separate repo), not deployed
 
-**This Vercel-deployed Next.js app cannot hold a persistent, bidirectional
-WebSocket audio connection.** Confirmed directly from this repo's own
-deployment configuration, not assumed:
-- `vercel.json` only configures two daily cron jobs — no `functions`/
-  `maxDuration` override, no Edge Config, nothing relevant to long-lived
-  connections.
-- No custom server exists anywhere in the repo (no `server.ts`,
-  `Dockerfile`, `railway.json`, `fly.toml`, or equivalent).
-- No WebSocket **server** implementation exists in this codebase at all
-  — the only WebSocket usage anywhere is `lib/voice/adapters/
-  openai-realtime.ts` opening an outbound **client** connection to
-  `wss://api.openai.com`, itself only ever invoked from inside a normal
-  serverless API route handler — which by definition cannot outlive that
-  one request's execution window. Its module-level `Map<callId,
-  WebSocket>` session cache is process-memory-scoped and cannot reliably
-  survive between two separate serverless invocations in production.
-
-**What this means concretely**: even with Plivo fully configured (DNS
-✓, webhook ✓, number ✓), a real call today would ring, get answered by
-the honest fallback message, and hang up — never reach a live AI
-conversation. This is not a code bug to fix inside this repo; it is a
-missing piece of infrastructure.
-
-**The architecture this needs** (documented per Phase 42's instruction —
-**not built or deployed this pass**, by design):
+**Update**: the dedicated Voice Gateway this section used to describe as
+future work is now built — `billygomez007/superkuba-voice-gateway`
+(prepared locally at this time; not yet pushed to GitHub or deployed).
+This Next.js app still cannot hold a persistent, bidirectional WebSocket
+audio connection itself — that has not changed, and is still confirmed
+directly from this repo's own deployment configuration (`vercel.json`
+has no `functions`/`maxDuration` override; no custom server or WebSocket
+server implementation exists anywhere in this codebase). What changed is
+that the separate service which *can* now exists, is tested end-to-end
+against mocked Plivo/OpenAI/kuba-web boundaries, and is container-ready.
 
 ```
-Plivo <Stream> (bidirectional audio, PCM/µ-law over WebSocket)
+Plivo <Stream> (bidirectional audio, µ-law over WebSocket)
    ↕
-Dedicated SuperKuba Voice Gateway   <-- a new, separate, always-on service
-   ↕                                    (NOT part of this Next.js app —
-OpenAI Realtime (wss://api.openai.com/v1/realtime)   e.g. a small Node
-   ↕                                    process on Fly.io/Railway/a
-kuba-web APIs/database (over HTTPS)     long-running container)
+SuperKuba Voice Gateway (separate repo/service — see its docs/VOICE_GATEWAY.md)
+   ↕
+OpenAI Realtime (wss://api.openai.com/v1/realtime)
+
+Voice Gateway → kuba-web: app/api/internal/voice/{session-context,call-events,tool-call}
+  (shared-secret + signed-session-token authenticated, never public)
 ```
 
-The gateway's job: accept a Plivo `<Stream>` WebSocket per call, relay
-audio frames bidirectionally to/from an OpenAI Realtime WebSocket session
-it opens and holds open for the call's full duration, and call back into
-this app's existing HTTP APIs (`/api/voice/calls`) for persistence
-(transcripts, call state, Business Brain tool calls) rather than talking
-to the database directly. Reuses `lib/voice/adapters/openai-realtime.ts`'s
-session-configuration logic; does not require rebuilding it from
-scratch. Sizing, hosting choice, and exact protocol framing are a build
-task for when this is prioritized — not decided or built here.
+**What this app (kuba-web) now provides for the gateway, added this
+pass**:
+- `lib/voice/gateway-session.ts` — signs the short-lived session-
+  bootstrap token (`createVoiceSessionToken`) minted in
+  `app/api/voice/plivo/answer/route.ts` once business/employee are
+  resolved, and independently re-verifies it (`verifyVoiceSessionToken`)
+  when the gateway calls back in — defense in depth; the gateway already
+  verified the same token once to accept the WebSocket, but kuba-web
+  never trusts the gateway's word for whose session it is.
+- `app/api/internal/voice/session-context/route.ts` — returns the
+  business name, tenant-scoped system instructions (assembled from the
+  employee's real settings via `getBaseRoleInstructions`, never leaking
+  the VoiceConfig JSON blob appended to the same stored field), and a
+  deliberately minimal tool allowlist (`lib/voice/voice-tools.ts` —
+  currently just `get_business_knowledge`).
+- `app/api/internal/voice/call-events/route.ts` — delegates to the exact
+  same `persistEvent` (now extracted to `lib/voice/persist-event.ts`)
+  the Plivo/Twilio webhook routes already use, so there is one
+  persistence/idempotency path regardless of which surface reports an
+  event.
+- `app/api/internal/voice/tool-call/route.ts` — the only place a
+  gateway-forwarded tool call can execute anything, gated by the exact
+  same `checkAIEmployeeAuthority()` every other AI tool call in this
+  codebase uses (including its `requires_approval` outcome — a voice
+  conversation bypasses nothing).
+- `lib/voice/plivo-xml.ts`'s `buildAnswerResponse()` now takes the
+  signed session token and (for a real destination) the caller's
+  phone number, and embeds the phone number via Plivo's own
+  `<Parameter>` mechanism rather than the WebSocket URL/query string.
 
-`buildAnswerResponse()`/`getVoiceGatewayStreamUrl()`
-(`lib/voice/plivo-xml.ts`) are already wired to switch to real `<Stream>`
-XML the moment `VOICE_GATEWAY_STREAM_URL` is set — no further code
-change would be needed in the answer webhook itself once a gateway
-exists.
+**What still hasn't happened**: the gateway service has not been pushed
+to a remote repository, has not been deployed anywhere, and no real
+Plivo/OpenAI credentials have touched it. `VOICE_GATEWAY_URL` is unset
+in every kuba-web environment today, so `buildAnswerResponse()` still
+returns the honest fallback message — nothing about a real call's
+behavior changes until an operator deploys the gateway and sets that
+variable.
 
 ## Audio format (Phase 13)
 
-`lib/voice/adapters/openai-realtime.ts` already configures OpenAI
-Realtime sessions for `g711_ulaw` input/output — the same codec Plivo
-(and Twilio) natively stream, so **no transcoding should be necessary**
-once the gateway exists, assuming Plivo's `<Stream>` is configured for
-μ-law (the `buildStreamResponse` XML above currently requests
-`audio/x-l16;rate=8000`, 16-bit linear PCM at 8kHz — this MUST be
-reconciled with whichever format the eventual gateway actually expects
-from Plivo before going live; flagged here rather than guessed further,
-since the actual wire format depends on gateway implementation choices
-not yet made).
+`lib/voice/adapters/openai-realtime.ts` configures OpenAI Realtime
+sessions for `g711_ulaw` input/output — the same codec Plivo (and
+Twilio) natively stream. `lib/voice/plivo-xml.ts`'s `buildStreamResponse`
+now requests `audio/x-mulaw;rate=8000` from Plivo (reconciled from an
+earlier version of this file, which requested L16 PCM and would have
+needed a real transcoder) — matching this exactly, so the gateway's own
+`src/audio-codec.ts` is pass-through by design rather than a real
+transcoder. This reconciliation is implemented from Plivo's documented
+behavior, not verified against a live account — confirm it before going
+live (see the gateway's own `docs/VOICE_GATEWAY.md` for the same
+caveat, stated once rather than duplicated at length here).
 
 ## Business Brain grounding
 
+**Update**: the raw audio path now has Business Brain access too, not
+just the text-relay path. The Voice Gateway's `session.update` includes
+a `tools` array built from kuba-web's `/api/internal/voice/session-
+context` response (`lib/voice/voice-tools.ts`) — currently just
+`get_business_knowledge`, wrapping the exact same Mastra tool
+(`mastra/tools/get-business-knowledge.ts`) the text-relay path's agents
+already use, unmodified. Both paths therefore share one tenant-scoped
+grounding mechanism, not two.
+
 The **text-relay** voice path (`app/api/voice/calls/route.ts`'s `"turn"`
 action — speech-to-text happens client-side today in Voice Testing,
-server-side in a future real integration) already calls the real Mastra
-agent (`agent.generate()`), which has the `getBusinessKnowledgeTool` —
-tenant-scoped Business Brain grounding is proven here. The **raw audio**
-OpenAI Realtime session's `session.update` payload has no `tools` array
-today — a live audio-only session has no Business Brain access yet. This
-is a design choice to make when the gateway is built: keep the
-proven-safe text-relay pattern, or add Realtime's own function-calling
-tools to the audio session (more natural, unverified in this codebase).
+server-side in a future real integration) calls the real Mastra agent
+(`agent.generate()`) directly, which has a richer tool set than the
+gateway's deliberately minimal allowlist. Widening the raw-audio path's
+allowlist to match is a distinct future decision requiring a safety
+review per additional tool, not something this pass defaults to.
 
 ## AI tool safety (Phase 25)
 
 Every Mastra tool independently re-verifies business/employee/permission/
 plan/autonomy from its own `RequestContext` — a voice conversation
 grants no additional trust. This was already true before this pass and
-is unchanged by it.
+is unchanged by it. **New this pass**: `app/api/internal/voice/
+tool-call/route.ts` is the only place a gateway-forwarded Realtime tool
+call can reach that machinery — it re-checks the caller is the gateway
+(shared secret), re-verifies the session token, confirms the requested
+tool is in the allowlist for this employee's type, and only then calls
+`checkAIEmployeeAuthority()` before executing. The Voice Gateway itself
+holds zero authority — it forwards whatever kuba-web decides, unmodified,
+back to OpenAI as the tool's output, including a `requires_approval`
+refusal.
 
 ## Sales / Support call architecture (Phases 15-16)
 
@@ -426,7 +449,9 @@ pre-existing, unchanged behavior, now also exercised by Plivo's flow.
 | `VOICE_CREDENTIALS_KEY` | CORE_REQUIRED | AES-256-GCM key encrypting any business-managed provider secret (pre-existing) |
 | `VOICE_WEBHOOK_SECRET` | CORE_REQUIRED | Shared secret gating the internal `/api/voice/calls` endpoint |
 | `PUBLIC_APP_URL` | CORE_REQUIRED | Base URL used to build Plivo/Twilio callback URLs |
-| `VOICE_GATEWAY_STREAM_URL` | OPTIONAL (unset in every environment today) | The dedicated media-gateway WebSocket URL — see "Media bridge" |
+| `VOICE_GATEWAY_URL` | OPTIONAL (unset in every environment today) | The dedicated media-gateway's base URL (kuba-web converts to wss:// itself) — see "Media bridge" |
+| `VOICE_GATEWAY_SESSION_SECRET` | REQUIRED once the gateway is deployed | Signs the short-lived session-bootstrap token; must exactly match the gateway's copy |
+| `VOICE_GATEWAY_INTERNAL_SECRET` | REQUIRED once the gateway is deployed | Authenticates the gateway's calls into `/api/internal/voice/*`; must exactly match the gateway's copy |
 
 No values were printed or read for reporting purposes by this pass.
 
@@ -457,10 +482,19 @@ real calls happen.
 6. In SuperKuba, under Phone Numbers, assign that number to a
    Receptionist/Sales/Support AI employee that already has Voice enabled
    under its own Voice settings.
-7. **Do not expect a real AI conversation yet** — until the media
-   gateway (see "Media bridge") is built and `VOICE_GATEWAY_STREAM_URL`
-   is set, a call will ring, connect, hear an honest "can't complete
-   this call" message, and hang up. This is expected, not a bug.
+7. **Separately**, deploy the Voice Gateway (`billygomez007/
+   superkuba-voice-gateway` — prepared locally, not yet pushed/deployed;
+   see its own `docs/VOICE_GATEWAY.md`) somewhere that supports long-
+   lived WebSockets, then set `VOICE_GATEWAY_URL` (the gateway's public
+   HTTPS URL), `VOICE_GATEWAY_SESSION_SECRET`, and `VOICE_GATEWAY_
+   INTERNAL_SECRET` in Vercel — the two secrets must exactly match the
+   values set on the gateway itself. Redeploy kuba-web again after
+   setting these.
+8. **Until step 7 is done**, a call will ring, connect, hear an honest
+   "can't complete this call" message, and hang up. This is expected,
+   not a bug — completing steps 1-6 alone (without a deployed gateway)
+   is a deliberately safe intermediate state to verify Plivo routing
+   works before any AI audio is involved.
 
 Country/number choice is entirely provider-driven — nothing in this
 codebase assumes a Ghanaian number; an existing US or other
@@ -475,24 +509,33 @@ international Plivo number works identically (Phase 45).
    not an error tone, not an indefinite ring).
 4. In `/dashboard/integrations/voice`, confirm the number shows the
    correct provider, assigned employee, and "Not ready" for
-   inbound/outbound until `VOICE_GATEWAY_STREAM_URL` exists.
+   inbound/outbound until `VOICE_GATEWAY_URL` exists.
 5. Do **not** attempt a real end-to-end AI conversation test until the
    media gateway exists — there is nothing on the other end of the
    `<Stream>` yet.
 
 ## Known limitations (deferred, not overlooked)
 
-- The media bridge itself (the actual blocker to any live AI phone
-  conversation) — see "Media bridge."
-- `maxCallDurationMinutes` is stored but not enforced (needs the
-  gateway to have anything to enforce it on).
+- The media bridge is now built (see "Media bridge") but **not deployed
+  anywhere** — this is the actual remaining blocker to any live AI phone
+  conversation.
+- `maxCallDurationMinutes` (per-employee, in Voice settings) is stored
+  but not enforced by kuba-web; the gateway enforces its own separate,
+  fixed technical safety ceiling (`VOICE_GATEWAY_MAX_CALL_DURATION_MS`,
+  default 30 min) — the two are not currently reconciled into one limit.
 - No concurrent-call limit.
 - Recording (off by default, deferred pending consent/legal policy).
-- Live mid-call transfer to a human phone line (deferred pending the
-  gateway).
-- Realtime audio sessions have no Business Brain tool access yet (the
-  text-relay path does).
-- Plivo's exact inbound webhook payload shape, V2 signature scheme, and
-  `<Stream>` XML attributes were implemented from documentation, not
-  verified against a live account — confirm before full production
-  reliance.
+- Live mid-call transfer to a human phone line (deferred — the gateway
+  exists now, but this specific feature was not built this pass).
+- The raw-audio path's Business Brain access is a deliberately minimal
+  allowlist (currently just `get_business_knowledge`) — narrower than
+  the text-relay path's full tool set; widening it is future work
+  requiring a safety review per tool.
+- Plivo's exact inbound webhook payload shape, V2 signature scheme,
+  Audio Streaming protocol event names, and `<Stream>` XML attributes
+  were implemented from documentation, not verified against a live
+  account — confirm before full production reliance (see the gateway's
+  own `docs/VOICE_GATEWAY.md` for the same caveat on its side).
+- The Voice Gateway's own Docker build could not be verified in this
+  environment (Docker CLI present, daemon not running) — confirm
+  `docker build .` succeeds in the gateway repo before deploying.
