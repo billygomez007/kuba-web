@@ -18,8 +18,9 @@ const { voiceProviders, getVoiceProvider, getVoiceTransport } = await import(
   "../lib/voice/providers.ts"
 );
 
-const WORKING_TRANSPORT_PROVIDERS = ["openai-realtime", "twilio"];
+const WORKING_TRANSPORT_PROVIDERS = ["openai-realtime", "twilio", "plivo"];
 const NOT_YET_IMPLEMENTED_PROVIDERS = ["retell", "vapi", "sip"];
+const PLATFORM_MANAGED_PROVIDERS = ["openai-realtime", "twilio", "plivo"];
 
 test("only providers with a real transport implementation are marked available", () => {
   for (const id of WORKING_TRANSPORT_PROVIDERS) {
@@ -59,6 +60,25 @@ test("a planned provider's transport is the explicit not-configured stub, matchi
       /credentials are not configured for live calls/,
     );
   }
+});
+
+test("platform-managed providers are labeled correctly — never implying a business can paste its own credential for one", () => {
+  for (const id of PLATFORM_MANAGED_PROVIDERS) {
+    assert.equal(getVoiceProvider(id)?.credentialModel, "platform", `${id} should be platform-managed (see lib/voice/adapters/${id === "openai-realtime" ? "openai-realtime" : id}.ts, which reads server env vars, never a per-business saved secret)`);
+  }
+});
+
+test("the voice-providers connect route rejects a platform-managed provider before writing any credential", async () => {
+  const routePath = new URL("../app/api/settings/voice-providers/route.ts", import.meta.url).pathname;
+  const source = await readFile(routePath, "utf8");
+  assert.match(source, /providerDefinition\.credentialModel !== "business"/, "POST must check credentialModel before accepting a connection");
+  const guardIndex = source.indexOf('providerDefinition.credentialModel !== "business"');
+  const persistIndex = Math.min(
+    ...["encryptVoiceSecret(secret)", "db.insert(integrations)", "db.update(integrations)"]
+      .map((needle) => source.indexOf(needle))
+      .filter((index) => index !== -1),
+  );
+  assert.ok(guardIndex !== -1 && persistIndex !== -1 && guardIndex < persistIndex, "the credentialModel guard must run before any credential is persisted");
 });
 
 test("the voice-providers connect route rejects a non-available provider before writing any credential", async () => {

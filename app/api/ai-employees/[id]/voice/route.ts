@@ -10,59 +10,7 @@ import { getCurrentMembership } from "@/lib/auth/tenant";
 import { getVoiceProvider, voiceProviders } from "@/lib/voice/providers";
 import { createAuditLog } from "@/lib/auth/audit";
 import { canUseFeature, getBusinessPlan, getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
-
-const marker = "\n\nVoice capability configuration:\n";
-
-type VoiceConfig = {
-  enabled: boolean;
-  phoneNumber: string;
-  callDirection: "inbound" | "outbound" | "both";
-  provider: string;
-  voiceModel: string;
-  language: string;
-  accent: string;
-  speakingStyle: string;
-  tone: string;
-  speed: number;
-  workingHours: string;
-  maxDailyCalls: number;
-  maxCallDurationMinutes: number;
-  allowedCallTypes: string[];
-  callPermissions: string[];
-  humanTransferRules: string[];
-  transferDestination: string;
-  automationEvents: string[];
-};
-
-const defaultConfig: VoiceConfig = {
-  enabled: false,
-  phoneNumber: "",
-  callDirection: "both",
-  provider: "",
-  voiceModel: "",
-  language: "English",
-  accent: "Neutral",
-  speakingStyle: "Professional",
-  tone: "Warm and clear",
-  speed: 1,
-  workingHours: "Business hours",
-  maxDailyCalls: 100,
-  maxCallDurationMinutes: 30,
-  allowedCallTypes: ["Customer enquiries", "Appointments", "Support callbacks"],
-  callPermissions: ["Answer calls", "Provide information"],
-  humanTransferRules: ["Customer requests a human", "Complaint detected"],
-  transferDestination: "Business owner",
-  automationEvents: ["call.started", "call.completed", "call.missed", "customer.requested_callback", "call.escalated"],
-};
-
-function parseConfig(value: string | null): VoiceConfig {
-  if (!value || !value.includes(marker)) return defaultConfig;
-  try {
-    return { ...defaultConfig, ...JSON.parse(value.slice(value.indexOf(marker) + marker.length)) };
-  } catch {
-    return defaultConfig;
-  }
-}
+import { type VoiceConfig, parseVoiceConfig as parseConfig, serializeVoiceConfig } from "@/lib/voice/employee-config";
 
 async function getEmployee(employeeId: string) {
   const membership = await getCurrentMembership();
@@ -123,11 +71,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const plan = await getBusinessPlan(data.employee.businessId);
     if (config.enabled && !canUseFeature(plan, "voice")) return NextResponse.json({ error: "Voice is available as a paid add-on on this plan.", upgradeRequired: true }, { status: 403 });
-    if (config.enabled && (!config.provider || !getVoiceProvider(config.provider))) return NextResponse.json({ error: "Choose a supported voice provider before enabling Voice." }, { status: 400 });
+    if (config.enabled && (!config.provider || getVoiceProvider(config.provider)?.status !== "available")) return NextResponse.json({ error: "Choose a supported voice provider before enabling Voice." }, { status: 400 });
     const existing = await db.select({ id: aiEmployeeSettings.id, roleInstructions: aiEmployeeSettings.roleInstructions }).from(aiEmployeeSettings).where(eq(aiEmployeeSettings.employeeId, id)).limit(1);
-    const current = existing[0]?.roleInstructions || "";
-    const base = current.includes(marker) ? current.slice(0, current.indexOf(marker)) : current;
-    const roleInstructions = `${base}${marker}${JSON.stringify(config)}`;
+    const roleInstructions = serializeVoiceConfig(existing[0]?.roleInstructions, config);
     const now = new Date();
     if (existing[0]) await db.update(aiEmployeeSettings).set({ roleInstructions, updatedAt: now }).where(eq(aiEmployeeSettings.id, existing[0].id));
     else await db.insert(aiEmployeeSettings).values({ id: crypto.randomUUID(), employeeId: id, roleInstructions, createdAt: now, updatedAt: now });

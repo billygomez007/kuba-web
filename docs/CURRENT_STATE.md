@@ -233,8 +233,10 @@ historical prototype unless proven otherwise.
   Resend/DNS activation — see `docs/EMAIL_RUNTIME.md`). **Billing**: dual-provider, Stripe or Paystack via a
   `BILLING_PROVIDER` switch (`lib/billing/provider.ts`).
 - **WhatsApp**: Meta Cloud API (Graph API), direct HTTPS, no SDK.
-- **Voice**: OpenAI Realtime API (WebSocket) for AI-side audio, Twilio for
-  telephony (inbound/outbound PSTN calls, Media Streams).
+- **Voice**: OpenAI Realtime API (WebSocket) for AI-side audio; Plivo and
+  Twilio for telephony call control (inbound/outbound PSTN calls). The
+  actual audio bridge between either provider and OpenAI Realtime has no
+  runtime to execute in yet — see `docs/VOICE_RUNTIME.md`, "Media bridge."
 - **Testing**: `node --experimental-strip-types --test tests/*.test.mjs` —
   no Jest/Vitest. A `tests/helpers/alias-loader.mjs` registers a Node ESM
   loader so tests can `import` real `@/`-aliased modules directly instead of
@@ -483,22 +485,48 @@ Agent + tools exist and are wired to `leads`/`salesActivities`/`followUps`.
 Not independently deep-audited in this pass — worth its own focused review
 before claiming readiness (see Next steps).
 
-### Voice/Realtime — two real adapters, one label bug (now fixed)
+### Voice/Realtime — Plivo added; the media bridge is the real remaining gap
 
-OpenAI Realtime (browser/AI-side audio, real WebSocket to `wss://api.openai.com/v1/realtime`)
-and Twilio (real PSTN call initiation + Media Streams webhook, HMAC-signed)
-are genuinely implemented. Retell/Vapi/SIP were listed as `"available"` in
-`lib/voice/providers.ts` with **no actual transport** (every method just
-threw "not configured") — a business could save real credentials for one and
-get a false "active" badge. **Fixed in this session** (see Changes below).
+**Update: Plivo is now a fully-implemented second call-control provider,
+alongside Twilio**, behind the same `VoiceTransport` interface (see
+`docs/VOICE_RUNTIME.md` for the complete architecture). OpenAI Realtime
+(server-side WebSocket to `wss://api.openai.com/v1/realtime`), Twilio,
+and Plivo (call initiation, signature-verified inbound/status webhooks,
+number→business→employee resolution, XML call-control generation) are
+all genuinely implemented and tested. Retell/Vapi/SIP remain correctly
+`status: "planned"` (unchanged).
 
-Separately unresolved: `createOpenAIRealtimeTransport()` keeps its
-`Map<callId, WebSocket>` in module-level memory — this will not survive
-across separate serverless invocations/instances on Vercel. Fine for a
-single always-warm dev/test session; not fine for real production
-concurrency. Needs a durable session store or a different hosting model
-(a long-running Node process, Vercel Fluid compute with sticky routing, or
-similar) before real customers use voice at scale.
+**This pass also found and fixed two real, pre-existing bugs** while
+building Plivo's equivalent of the existing Twilio flow: (1) Twilio's
+status webhook read `BusinessId`/`EmployeeId` form fields Twilio never
+actually sends, so its tenant resolution was silently non-functional —
+fixed using the same phone-number-based resolver Plivo's route uses; (2)
+an outbound call's conversation row kept a placeholder external id that
+was never reconciled to the provider's real call id, so the later status
+webhook would create a second, orphaned conversation for every outbound
+call (both providers) — fixed by reconciling immediately after
+`startCall()`. Also fixed: webhook event redelivery could duplicate
+messages (idempotency now keyed on `providerCallId:eventType`, not
+`providerCallId` alone), and Twilio's own per-business "Connect" flow in
+Settings previously implied a business's saved credentials were used for
+real calls when the actual adapter always used the platform's env vars
+regardless — both Twilio and Plivo are now honestly labeled
+platform-managed in the provider registry.
+
+**CODE READY, not GATEWAY BUILT**: call initiation and inbound routing
+work end-to-end in tests. The actual bidirectional AI audio conversation
+does not, and cannot, run inside this Vercel-deployed Next.js app —
+confirmed directly from this repo's own deployment config (no
+`functions`/`maxDuration` override in `vercel.json`, no custom server, no
+WebSocket server implementation anywhere; the existing `createOpenAI
+RealtimeTransport()`'s `Map<callId, WebSocket>` session cache is
+process-memory-scoped and cannot survive across separate serverless
+invocations). A real call today rings, resolves the correct business/
+employee, and hears an honest "unable to complete this call" message —
+never silence, never a fabricated connection. Fixing this requires a
+genuinely new, separate, always-on Voice Gateway service (architecture
+documented in `docs/VOICE_RUNTIME.md`, "Media bridge") — not built or
+deployed this pass, per instruction.
 
 ### Onboarding / Billing — data-driven, actively being unified
 
@@ -569,9 +597,11 @@ STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PAYSTACK_SECRET_KEY
 WHATSAPP_ACCESS_TOKEN, WHATSAPP_APP_SECRET, WHATSAPP_GRAPH_API_VERSION,
 WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN
 
-# Voice / Twilio
+# Voice / Twilio / Plivo
 TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VOICE_NUMBER,
-VOICE_CREDENTIALS_KEY, VOICE_WEBHOOK_SECRET
+PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, PLIVO_VOICE_NUMBER,
+VOICE_CREDENTIALS_KEY, VOICE_WEBHOOK_SECRET,
+VOICE_GATEWAY_STREAM_URL   # unset everywhere today — see docs/VOICE_RUNTIME.md
 
 # Ops
 AUTOMATION_PROCESS_SECRET, CRON_SECRET, ENCRYPTION_KEY,
@@ -642,9 +672,12 @@ Inbound Email + campaign reply handling, this pass)
 4. Decide whether WhatsApp Embedded Signup/OAuth for self-serve onboarding
    (today: manual token paste only) ships before or alongside the Outreach
    Campaign Engine.
-5. Voice: durable session state for OpenAI Realtime calls across serverless
-   instances, before relying on it for real concurrent traffic — explicitly
-   deprioritized until the campaign foundation is stable.
+5. Voice: the dedicated Voice Gateway service (see `docs/VOICE_RUNTIME.md`,
+   "Media bridge") — call initiation/routing/webhooks are code-ready for
+   both Plivo and Twilio, but no real AI phone conversation can happen
+   until this genuinely new, separate always-on service exists; this
+   Vercel-deployed app cannot hold a persistent WebSocket audio stream.
+   Explicitly not built or deployed as part of this pass, per instruction.
 6. No `.env.example` — onboarding a new environment currently relies on
    grepping the codebase.
 7. Unify the four tenant-resolution helpers, at least fixing the

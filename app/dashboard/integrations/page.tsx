@@ -98,7 +98,7 @@ export default function IntegrationsPage() {
       provider: "voice",
       category: "Communication Channels",
       description:
-        "Connect phone calls via Twilio.",
+        "Connect phone calls via Plivo or Twilio.",
       icon: <FaGlobe size={40} />,
       status: "coming-soon",
     },

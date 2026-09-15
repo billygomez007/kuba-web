@@ -12,7 +12,9 @@ import { safeCompareSecret } from "@/lib/auth/security";
 import { createAuditLog } from "@/lib/auth/audit";
 import { getVoiceTransport } from "@/lib/voice/providers";
 import { retryVoiceOperation, updateVoiceSession } from "@/lib/voice/session-manager";
+import { parseVoiceConfig } from "@/lib/voice/employee-config";
 import { roundBillableMinutes } from "@/lib/billing/usage";
+import { countTodaysOutboundCalls } from "@/lib/voice/rate-limits";
 import { getBusinessEntitlements, getBusinessPlan } from "@/lib/billing/entitlements";
 import { isEmployeeImplementationAvailable, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
 import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
@@ -20,20 +22,11 @@ import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
 
-const voiceMarker = "\n\nVoice capability configuration:\n";
-type VoiceConfig = { enabled: boolean; phoneNumber: string; provider: string; callDirection: "inbound" | "outbound" | "both" };
-
-function parseVoiceConfig(value: string | null): VoiceConfig {
-  const empty = { enabled: false, phoneNumber: "", provider: "", callDirection: "both" as const };
-  if (!value?.includes(voiceMarker)) return empty;
-  try { return { ...empty, ...JSON.parse(value.slice(value.indexOf(voiceMarker) + voiceMarker.length)) }; } catch { return empty; }
-}
-
 async function getEmployee(businessId: string, employeeId: string) {
   return (await db.select({ employee: aiEmployees, settings: aiEmployeeSettings }).from(aiEmployees).leftJoin(aiEmployeeSettings, eq(aiEmployeeSettings.employeeId, aiEmployees.id)).where(and(eq(aiEmployees.id, employeeId), eq(aiEmployees.businessId, businessId), eq(aiEmployees.status, "active"))).limit(1))[0];
 }
 
-async function persistEvent(businessId: string, employeeId: string, event: { type: string; providerCallId: string; phoneNumber: string; direction: string; transcript?: string; durationSeconds?: number; recordingUrl?: string }) {
+async function persistEvent(businessId: string, employeeId: string, event: { type: string; providerCallId: string; phoneNumber: string; direction: string; transcript?: string; durationSeconds?: number; recordingUrl?: string; failureCategory?: string }) {
   const now = new Date();
   const customer = (await db.select({ id: customers.id }).from(customers).where(and(eq(customers.businessId, businessId), eq(customers.phone, event.phoneNumber))).limit(1))[0];
   const existing = (await db.select({ id: conversations.id }).from(conversations).where(and(eq(conversations.businessId, businessId), eq(conversations.externalConversationId, event.providerCallId))).limit(1))[0];
@@ -41,7 +34,22 @@ async function persistEvent(businessId: string, employeeId: string, event: { typ
   if (!existing) await db.insert(conversations).values({ id: conversationId, businessId, customerId: customer?.id || null, integrationId: "voice-runtime", externalConversationId: event.providerCallId, customerPhone: event.phoneNumber, assignedEmployeeId: employeeId, aiMode: "active", status: event.type === "call.escalated" ? "escalated" : "open", createdAt: now, updatedAt: now });
   else await db.update(conversations).set({ assignedEmployeeId: employeeId, status: event.type === "call.escalated" ? "escalated" : "open", updatedAt: now }).where(eq(conversations.id, conversationId));
   const content = event.transcript || `${event.type} (${event.direction})${event.durationSeconds ? `, ${event.durationSeconds}s` : ""}${event.recordingUrl ? `, recording: ${event.recordingUrl}` : ""}`;
-  await db.insert(messages).values({ id: crypto.randomUUID(), businessId, conversationId, integrationId: "voice-runtime", externalMessageId: event.providerCallId, direction: event.direction === "inbound" ? "inbound" : "outbound", senderType: "voice", senderId: employeeId, content, messageType: "voice", createdAt: now });
+  // Idempotency (Phase 37): a provider webhook can be redelivered for the
+  // exact same lifecycle event (e.g. the same "call.completed" hangup
+  // fired twice) — that must never insert a second message row. Distinct
+  // FROM providerCallId alone, since every event for the same call
+  // (ringing, then completed) legitimately shares one providerCallId;
+  // only a duplicate of the SAME event type for the SAME call is a dup.
+  const eventKey = `${event.providerCallId}:${event.type}`;
+  const alreadyRecorded = (await db.select({ id: messages.id }).from(messages).where(and(eq(messages.conversationId, conversationId), eq(messages.externalMessageId, eventKey))).limit(1))[0];
+  if (alreadyRecorded) return conversationId;
+
+  // failureCategory is a safe, fixed-vocabulary classification only
+  // (lib/voice/failure-classification.ts) — never the raw provider
+  // response (Phase 28/38), stored in the same generic metadata JSON
+  // column email inbound messages already use rather than a new column.
+  const metadata = event.failureCategory ? JSON.stringify({ channel: "voice", failureCategory: event.failureCategory }) : null;
+  await db.insert(messages).values({ id: crypto.randomUUID(), businessId, conversationId, integrationId: "voice-runtime", externalMessageId: eventKey, direction: event.direction === "inbound" ? "inbound" : "outbound", senderType: "voice", senderId: employeeId, content, messageType: "voice", metadata, createdAt: now });
   await db.insert(aiEmployeeActivities).values({ id: crypto.randomUUID(), businessId, employeeId, type: `voice_${event.type}`, title: `Voice ${event.type.replace(".", " ")}`, description: content, status: event.type === "call.escalated" ? "escalated" : "completed", createdAt: now });
   const sessionState: "completed" | "failed" | "active" | "ringing" = event.type === "call.completed" ? "completed" : event.type === "call.failed" ? "failed" : event.type === "call.connected" ? "active" : "ringing";
   await updateVoiceSession(conversationId, businessId, sessionState);
@@ -75,7 +83,7 @@ export async function POST(request: Request) {
     const transport = getVoiceTransport(provider);
     if (!transport) return NextResponse.json({ error: "Unsupported voice provider." }, { status: 400 });
     if (body.action === "audio" || body.action === "end") {
-      const requestHeaders = await headers();
+      const requestHeaders = request.headers;
       if (!safeCompareSecret(requestHeaders.get("x-voice-webhook-secret"), process.env.VOICE_WEBHOOK_SECRET)) return NextResponse.json({ error: "Unauthorized voice session" }, { status: 401 });
       const conversationId = typeof body.conversationId === "string" ? body.conversationId : "";
       const businessId = typeof body.businessId === "string" ? body.businessId : "";
@@ -93,7 +101,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
     if (body.action === "turn") {
-      const requestHeaders = await headers();
+      const requestHeaders = request.headers;
       if (!safeCompareSecret(requestHeaders.get("x-voice-webhook-secret"), process.env.VOICE_WEBHOOK_SECRET)) return NextResponse.json({ error: "Unauthorized voice session" }, { status: 401 });
       const businessId = typeof body.businessId === "string" ? body.businessId : "";
       const employeeId = typeof body.employeeId === "string" ? body.employeeId : "";
@@ -125,12 +133,25 @@ export async function POST(request: Request) {
       if (!employee || !config.enabled || config.provider !== provider || !phoneNumber || config.callDirection === "inbound") return NextResponse.json({ error: "Voice is not enabled for outbound calls for this employee." }, { status: 400 });
       const plan = await getBusinessPlan(membership.businessId);
       if (!plan.features.includes("voice")) return NextResponse.json({ error: "Voice is not included in this plan.", upgradeRequired: true }, { status: 403 });
+      // Technical safety limit, not a commercial quota (Phase 39) — this
+      // employee's own configured maxDailyCalls, already stored but never
+      // enforced anywhere until now.
+      if ((await countTodaysOutboundCalls(membership.businessId, employeeId)) >= config.maxDailyCalls) {
+        return NextResponse.json({ error: "This employee has reached its configured daily call limit.", code: "DAILY_CALL_LIMIT_REACHED" }, { status: 429 });
+      }
       const conversationId = await persistEvent(membership.businessId, employeeId, { type: "call.started", providerCallId: `pending-${crypto.randomUUID()}`, phoneNumber, direction: "outbound" });
       const call = await transport.startCall({ employeeId, conversationId, direction: "outbound", phoneNumber });
+      // Reconcile the placeholder providerCallId used above to the
+      // provider's real call id immediately — otherwise the later status
+      // webhook's persistEvent lookup (by externalConversationId) never
+      // matches this row and silently creates a second, orphaned
+      // conversation for the same call (a real, pre-existing bug this
+      // fixes for every provider, not just the one being added here).
+      await db.update(conversations).set({ externalConversationId: call.providerCallId, updatedAt: new Date() }).where(eq(conversations.id, conversationId));
       await createAuditLog({ businessId: membership.businessId, userId: session.user.id, action: "voice.call.started", resource: "conversation", resourceId: conversationId, metadata: { provider, direction: "outbound" } });
       return NextResponse.json({ success: true, conversationId, call });
     }
-    const requestHeaders = await headers();
+    const requestHeaders = request.headers;
     if (!safeCompareSecret(requestHeaders.get("x-voice-webhook-secret"), process.env.VOICE_WEBHOOK_SECRET)) return NextResponse.json({ error: "Unauthorized webhook" }, { status: 401 });
     const event = body.event;
     const businessId = typeof body.businessId === "string" ? body.businessId : "";
