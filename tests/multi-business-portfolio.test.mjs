@@ -29,6 +29,7 @@ let db, schema, eq, and;
 let getBusinessEntitlements, isPlatformAdmin;
 let getOrganizationMembership, getUserOrganizations, getOrganizationBusinesses, getOrganizationForBusiness;
 let selectBusinessMembership;
+let authorizeOrganizationLinkForUser, linkBusinessToOrganization;
 
 test.before(async () => {
   tempDir = await mkdtemp(path.join(os.tmpdir(), "kuba-portfolio-"));
@@ -48,6 +49,7 @@ test.before(async () => {
   ({ isPlatformAdmin } = await import("@/lib/auth/platform-admin"));
   ({ getOrganizationMembership, getUserOrganizations, getOrganizationBusinesses, getOrganizationForBusiness } = await import("@/lib/auth/organizations"));
   ({ selectBusinessMembership } = await import("@/lib/auth/business-context-policy"));
+  ({ authorizeOrganizationLinkForUser, linkBusinessToOrganization } = await import("@/lib/onboarding/organization-link"));
 });
 
 test.after(async () => {
@@ -102,8 +104,9 @@ const NEW_FILES = [
   "app/api/businesses/additional/route.ts",
   "lib/auth/organizations.ts",
   "lib/onboarding/create-business.ts",
-  "scripts/bootstrap-platform-admin.mjs",
+  "lib/onboarding/organization-link.ts",
   "app/dashboard/businesses/new/page.tsx",
+  "scripts/bootstrap-platform-admin.mjs",
 ];
 
 for (const file of NEW_FILES) {
@@ -473,4 +476,242 @@ test("getOrganizationForBusiness returns null for a business never linked to any
   const businessId = await createBusiness("Unlinked Co");
   const link = await getOrganizationForBusiness(businessId);
   assert.equal(link, null);
+});
+
+// ==================================================
+// 10. SELF-SERVE ORGANIZATION LINK DURING ADDITIONAL-BUSINESS CREATION
+//
+// (app/api/businesses/additional/route.ts's optional organizationId,
+// authorized by lib/onboarding/organization-link.ts's
+// authorizeOrganizationLinkForUser/linkBusinessToOrganization.) Previously
+// linking a business into a portfolio was platform-admin-only
+// (app/api/admin/organizations/[id]'s link_business); this is the new,
+// separately-authorized self-serve path for a portfolio owner/admin
+// creating their OWN additional business.
+// ==================================================
+
+test("authorizeOrganizationLinkForUser rejects a nonexistent organization with 404, before checking membership", async () => {
+  const userId = await createUser("linker-1@example.com");
+  const result = await authorizeOrganizationLinkForUser(userId, crypto.randomUUID());
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+  assert.match(result.error, /not found/i);
+});
+
+test("authorizeOrganizationLinkForUser denies a user who does not belong to the organization at all", async () => {
+  const userId = await createUser("linker-2@example.com");
+  const orgId = await createOrganization("Outsider Portfolio");
+  const result = await authorizeOrganizationLinkForUser(userId, orgId);
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.match(result.error, /access denied/i);
+});
+
+test("authorizeOrganizationLinkForUser denies a plain 'member' — only owner/admin may link a new business", async () => {
+  const userId = await createUser("linker-member@example.com");
+  const orgId = await createOrganization("Member-Only Portfolio");
+  await db.insert(schema.organizationMembers).values({ id: crypto.randomUUID(), organizationId: orgId, userId, role: "member", createdAt: new Date() });
+  const result = await authorizeOrganizationLinkForUser(userId, orgId);
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.match(result.error, /owner or admin/i);
+});
+
+for (const role of ["owner", "admin"]) {
+  test(`authorizeOrganizationLinkForUser allows an organization ${role} to link a new business`, async () => {
+    const userId = await createUser(`linker-${role}@example.com`);
+    const orgId = await createOrganization(`${role}-authorized Portfolio`);
+    await db.insert(schema.organizationMembers).values({ id: crypto.randomUUID(), organizationId: orgId, userId, role, createdAt: new Date() });
+    const result = await authorizeOrganizationLinkForUser(userId, orgId);
+    assert.equal(result.ok, true);
+    assert.equal(result.organizationId, orgId);
+    assert.equal(result.role, role);
+  });
+}
+
+test("linkBusinessToOrganization inserts the join row and an audit log distinguished from the admin-forced action", async () => {
+  const userId = await createUser("linker-writer@example.com");
+  const orgId = await createOrganization("Writer Portfolio");
+  const businessId = await createBusiness("Linked Child Co");
+
+  await linkBusinessToOrganization({ businessId, organizationId: orgId, actorUserId: userId, actorOrganizationRole: "owner" });
+
+  const link = await getOrganizationForBusiness(businessId);
+  assert.equal(link.organizationId, orgId);
+
+  const logs = await db.select().from(schema.auditLogs).where(eq(schema.auditLogs.resourceId, orgId));
+  const entry = logs.find((row) => row.businessId === businessId);
+  assert.ok(entry, "expected an audit log entry for the self-serve link");
+  assert.equal(entry.action, "organization.business_linked");
+  assert.notEqual(entry.action, "admin.organization.business_linked", "must be distinguishable from the platform-admin action");
+  assert.equal(entry.userId, userId);
+  const metadata = JSON.parse(entry.metadata);
+  assert.equal(metadata.businessId, businessId);
+  assert.equal(metadata.organizationRole, "owner");
+});
+
+test("the additional-business route authorizes an organization link BEFORE creating the business — an invalid link never leaves an orphaned business", async () => {
+  const source = await readFile(path.join(REPO_ROOT, "app/api/businesses/additional/route.ts"), "utf8");
+  const authorizeIndex = source.indexOf("authorizeOrganizationLinkForUser(");
+  const createIndex = source.indexOf("createBusinessForUser(");
+  assert.ok(authorizeIndex > -1 && createIndex > -1);
+  assert.ok(authorizeIndex < createIndex, "organization authorization must run before business creation");
+});
+
+test("the additional-business route reuses the shared organization-link module rather than reimplementing the authorization check inline", async () => {
+  const source = await readFile(path.join(REPO_ROOT, "app/api/businesses/additional/route.ts"), "utf8");
+  assert.match(source, /from ["']@\/lib\/onboarding\/organization-link["']/);
+  assert.doesNotMatch(source, /ORGANIZATION_LINK_ROLES/, "the role set now lives only in lib/onboarding/organization-link.ts");
+});
+
+// ==================================================
+// 11. KORA TARGET ACCEPTANCE — Realtegic -> Add Business -> Kora OS
+//
+// Reproduces, against the disposable database this file already sets up,
+// the exact acceptance scenario: an existing organization (Realtegic) with
+// an existing business (Realtegic Works) and owner, adding a new,
+// independently-owned business (Kora OS) linked into the same portfolio,
+// without disturbing Realtegic Works. Also covers duplicate-name safety:
+// a second, unrelated "Kora OS" business must stay fully isolated by ID.
+// ==================================================
+
+test("Kora target acceptance: Add Business creates an independent, owner-membered, organization-linked workspace without touching the existing business", async () => {
+  const ownerId = await createUser("realtegic-owner@example.com");
+  const realtegicOrgId = await createOrganization("Realtegic");
+  await db.insert(schema.organizationMembers).values({ id: crypto.randomUUID(), organizationId: realtegicOrgId, userId: ownerId, role: "owner", createdAt: new Date() });
+
+  const realtegicWorksId = await createBusiness("Realtegic Works", "enterprise");
+  await addBusinessMember(realtegicWorksId, ownerId, "owner");
+  await grantPlan(realtegicWorksId, "enterprise", true);
+
+  // --- Add business: Kora OS ---
+  const authorization = await authorizeOrganizationLinkForUser(ownerId, realtegicOrgId);
+  assert.equal(authorization.ok, true);
+
+  const koraId = await createBusiness("Kora OS", "starter");
+  await addBusinessMember(koraId, ownerId, "owner");
+  await linkBusinessToOrganization({ businessId: koraId, organizationId: realtegicOrgId, actorUserId: ownerId, actorOrganizationRole: authorization.role });
+
+  // 1. Different business ID.
+  assert.notEqual(koraId, realtegicWorksId);
+
+  // 2. Same user has explicit owner membership on Kora.
+  const koraMembership = (await db.select().from(schema.businessUsers).where(and(eq(schema.businessUsers.businessId, koraId), eq(schema.businessUsers.userId, ownerId))))[0];
+  assert.ok(koraMembership);
+  assert.equal(koraMembership.role, "owner");
+
+  // 3. Kora linked to Realtegic organization.
+  const koraLink = await getOrganizationForBusiness(koraId);
+  assert.equal(koraLink.organizationId, realtegicOrgId);
+
+  // 4. Realtegic Works untouched: still exists, still enterprise/complimentary, still owned by the same user, no second membership row created.
+  const realtegicMemberships = await db.select().from(schema.businessUsers).where(eq(schema.businessUsers.businessId, realtegicWorksId));
+  assert.equal(realtegicMemberships.length, 1);
+  assert.equal(realtegicMemberships[0].userId, ownerId);
+  assert.equal(realtegicMemberships[0].role, "owner");
+  const [realtegicSubscription] = await db.select().from(schema.subscriptions).where(eq(schema.subscriptions.businessId, realtegicWorksId));
+  assert.equal(realtegicSubscription.plan, "enterprise");
+  assert.equal(realtegicSubscription.status, "complimentary");
+
+  // 5. Kora plan can be changed to Pro Complimentary Lifetime, independent of Realtegic's plan (no inheritance).
+  await grantPlan(koraId, "pro", true);
+  const [koraSubscription] = await db.select().from(schema.subscriptions).where(eq(schema.subscriptions.businessId, koraId));
+  assert.equal(koraSubscription.plan, "pro");
+  assert.equal(koraSubscription.status, "complimentary");
+  assert.equal(koraSubscription.provider, "internal");
+  assert.equal(koraSubscription.providerCustomerId, null);
+  assert.equal(koraSubscription.providerSubscriptionId, null);
+  assert.equal(koraSubscription.currentPeriodEnd, null);
+  assert.equal(koraSubscription.trialEnd, null);
+  const koraEntitlements = await getBusinessEntitlements(koraId);
+  assert.equal(koraEntitlements.plan, "pro");
+  const realtegicEntitlements = await getBusinessEntitlements(realtegicWorksId);
+  assert.equal(realtegicEntitlements.plan, "enterprise", "Realtegic's plan must remain independent of Kora's");
+
+  // 6. Website Widget can be independently activated for Kora, with its own
+  // unique public key and independent allowed-origin (domain) metadata —
+  // mirroring the real row shape/id convention app/api/integrations/
+  // website-chat/route.ts's PUT handler writes.
+  const now = new Date();
+  await db.insert(schema.integrations).values({
+    id: `website_chat:${koraId}`,
+    businessId: koraId,
+    provider: "website_chat",
+    status: "active",
+    publicKey: `kuba_pk_${crypto.randomUUID().replace(/-/g, "")}`,
+    metadata: JSON.stringify({ domain: "kora-os.example" }),
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.insert(schema.integrations).values({
+    id: `website_chat:${realtegicWorksId}`,
+    businessId: realtegicWorksId,
+    provider: "website_chat",
+    status: "active",
+    publicKey: `kuba_pk_${crypto.randomUUID().replace(/-/g, "")}`,
+    metadata: JSON.stringify({ domain: "realtegicworks.example" }),
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const koraWidget = (await db.select().from(schema.integrations).where(eq(schema.integrations.businessId, koraId)))[0];
+  const realtegicWidget = (await db.select().from(schema.integrations).where(eq(schema.integrations.businessId, realtegicWorksId)))[0];
+  assert.notEqual(koraWidget.publicKey, realtegicWidget.publicKey, "each business must get its own independent public key");
+  assert.notEqual(JSON.parse(koraWidget.metadata).domain, JSON.parse(realtegicWidget.metadata).domain, "each business must have independent allowed origins");
+});
+
+test("Website Widget public keys are enforced unique at the schema level across businesses", async () => {
+  const businessA = await createBusiness("Widget Co A");
+  const businessB = await createBusiness("Widget Co B");
+  const sharedKey = `kuba_pk_${crypto.randomUUID().replace(/-/g, "")}`;
+  const now = new Date();
+  await db.insert(schema.integrations).values({ id: `website_chat:${businessA}`, businessId: businessA, provider: "website_chat", status: "active", publicKey: sharedKey, metadata: null, createdAt: now, updatedAt: now });
+  await assert.rejects(
+    db.insert(schema.integrations).values({ id: `website_chat:${businessB}`, businessId: businessB, provider: "website_chat", status: "active", publicKey: sharedKey, metadata: null, createdAt: now, updatedAt: now }),
+    "a second business must never be able to reuse another business's public key",
+  );
+});
+
+test("duplicate-name safety: two unrelated businesses can both be named 'Kora OS' and remain fully isolated by ID", async () => {
+  const firstOwner = await createUser("kora-a-owner@example.com");
+  const secondOwner = await createUser("kora-b-owner@example.com");
+  const koraA = await createBusiness("Kora OS", "starter");
+  const koraB = await createBusiness("Kora OS", "starter");
+  await addBusinessMember(koraA, firstOwner, "owner");
+  await addBusinessMember(koraB, secondOwner, "owner");
+
+  assert.notEqual(koraA, koraB, "distinct IDs even though the names collide");
+
+  const [rowA] = await db.select().from(schema.businesses).where(eq(schema.businesses.id, koraA));
+  const [rowB] = await db.select().from(schema.businesses).where(eq(schema.businesses.id, koraB));
+  assert.notEqual(rowA.slug, rowB.slug, "slugs must never collide even for identical names");
+  assert.equal(rowA.name, rowB.name, "the collision is real, not avoided by renaming");
+
+  // Every real business-scoped query in this codebase filters by id, never
+  // by name (lib/auth/tenant.ts, app/api/businesses/route.ts) — confirm the
+  // membership rows resolve to the correct distinct owner despite the
+  // shared name.
+  const membershipA = (await db.select().from(schema.businessUsers).where(eq(schema.businessUsers.businessId, koraA)))[0];
+  const membershipB = (await db.select().from(schema.businessUsers).where(eq(schema.businessUsers.businessId, koraB)))[0];
+  assert.equal(membershipA.userId, firstOwner);
+  assert.equal(membershipB.userId, secondOwner);
+});
+
+test("the business switcher's data source (businessUsers joined to businesses, keyed by userId) includes a newly created additional business immediately", async () => {
+  const userId = await createUser("switcher-user@example.com");
+  const firstBusiness = await createBusiness("First Workspace");
+  await addBusinessMember(firstBusiness, userId, "owner");
+
+  // Simulates the exact join app/api/businesses/route.ts's GET and
+  // app/api/auth/me use to build the switcher list — no separate,
+  // drifting query exists for "the list of my businesses".
+  const before = await db.select({ businessId: schema.businessUsers.businessId }).from(schema.businessUsers).where(eq(schema.businessUsers.userId, userId));
+  assert.equal(before.length, 1);
+
+  const secondBusiness = await createBusiness("Second Workspace (Added)");
+  await addBusinessMember(secondBusiness, userId, "owner");
+
+  const after = await db.select({ businessId: schema.businessUsers.businessId }).from(schema.businessUsers).where(eq(schema.businessUsers.userId, userId));
+  assert.equal(after.length, 2);
+  assert.ok(after.some((row) => row.businessId === secondBusiness), "the switcher's own data source must include the just-created business with no separate cache/registration step");
 });

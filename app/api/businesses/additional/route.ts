@@ -6,6 +6,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { businessUsers } from "@/db/schema";
 import { createBusinessForUser } from "@/lib/onboarding/create-business";
+import { authorizeOrganizationLinkForUser, linkBusinessToOrganization } from "@/lib/onboarding/organization-link";
+import type { OrganizationRole } from "@/lib/auth/organizations";
 
 /**
  * "+ Add business" — for a user who ALREADY has at least one business
@@ -19,6 +21,16 @@ import { createBusinessForUser } from "@/lib/onboarding/create-business";
  * always has — it is never automatically granted a higher plan than
  * Starter; a Realtegic-owned business's complimentary plan remains a
  * separate, later platform-admin action (see app/api/admin/businesses/[id]).
+ *
+ * An optional `organizationId` links the new business into a portfolio the
+ * caller already belongs to as owner/admin (lib/onboarding/organization-link.ts).
+ * This is validated BEFORE the business is created, so a denied or invalid
+ * link never leaves an orphaned, unlinked business behind — unlike the
+ * platform-admin `link_business` action
+ * (app/api/admin/organizations/[id]/route.ts), which links an
+ * already-existing business after the fact. Organization membership never
+ * substitutes for the businessUsers.role="owner" row createBusinessForUser
+ * always creates; it is purely additive grouping metadata.
  */
 export async function POST(request: Request) {
   try {
@@ -41,12 +53,41 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+
+    const organizationIdInput =
+      typeof body.organizationId === "string" ? body.organizationId.trim() : "";
+    let authorizedLink: { organizationId: string; role: OrganizationRole } | null = null;
+
+    if (organizationIdInput) {
+      const authorization = await authorizeOrganizationLinkForUser(session.user.id, organizationIdInput);
+      if (!authorization.ok) {
+        return NextResponse.json({ error: authorization.error }, { status: authorization.status });
+      }
+      authorizedLink = { organizationId: authorization.organizationId, role: authorization.role };
+    }
+
     const result = await createBusinessForUser(session.user.id, body);
     if (!result.ok) {
       return NextResponse.json({ error: result.error, fieldErrors: result.fieldErrors }, { status: result.status });
     }
 
-    return NextResponse.json({ success: true, businessId: result.businessId }, { status: 201 });
+    if (authorizedLink) {
+      await linkBusinessToOrganization({
+        businessId: result.businessId,
+        organizationId: authorizedLink.organizationId,
+        actorUserId: session.user.id,
+        actorOrganizationRole: authorizedLink.role,
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        businessId: result.businessId,
+        organizationId: authorizedLink?.organizationId ?? null,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Additional business creation error:", error);
     return NextResponse.json({ error: "Unable to create your business." }, { status: 500 });

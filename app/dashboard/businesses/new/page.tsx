@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ONBOARDING_INDUSTRIES, ONBOARDING_BUSINESS_SIZES, ONBOARDING_GOALS } from "@/lib/onboarding/registry";
+
+type LinkableOrganization = { id: string; name: string };
 
 /**
  * "+ Add business" — for an authenticated user who already owns at least
@@ -23,6 +25,36 @@ export default function AddBusinessPage() {
   const [goals, setGoals] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [linkableOrganizations, setLinkableOrganizations] = useState<LinkableOrganization[]>([]);
+  const [organizationId, setOrganizationId] = useState<string>("");
+
+  // Only organizations where the caller is owner/admin are offered — a
+  // "member" can see the portfolio but must not be able to expand it
+  // (enforced again, authoritatively, server-side in
+  // POST /api/businesses/additional). An empty/failed result just means no
+  // optional link is offered; it never blocks creating the business itself.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLinkableOrganizations() {
+      try {
+        const response = await fetch("/api/portfolio");
+        if (!response.ok) return;
+        const data = await response.json();
+        type Portfolio = { organization: { id: string; name: string }; myOrganizationRole: string };
+        const portfolios: Portfolio[] = Array.isArray(data.portfolios) ? data.portfolios : [];
+        const eligible = portfolios
+          .filter((portfolio) => portfolio.myOrganizationRole === "owner" || portfolio.myOrganizationRole === "admin")
+          .map((portfolio) => ({ id: portfolio.organization.id, name: portfolio.organization.name }));
+        if (!cancelled) setLinkableOrganizations(eligible);
+      } catch {
+        // Non-fatal: the organization link is optional.
+      }
+    }
+    void loadLinkableOrganizations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function toggleGoal(goal: string) {
     setGoals((current) => (current.includes(goal) ? current.filter((item) => item !== goal) : [...current, goal]));
@@ -43,7 +75,14 @@ export default function AddBusinessPage() {
       const response = await fetch("/api/businesses/additional", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessName, website, industry, businessSize, goals }),
+        body: JSON.stringify({
+          businessName,
+          website,
+          industry,
+          businessSize,
+          goals,
+          ...(organizationId ? { organizationId } : {}),
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -102,6 +141,23 @@ export default function AddBusinessPage() {
               ))}
             </div>
           </div>
+
+          {linkableOrganizations.length > 0 && (
+            <label className="block">
+              <span className="text-sm font-semibold text-white/70">Link to organization (optional)</span>
+              <select
+                value={organizationId}
+                onChange={(event) => setOrganizationId(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-cyan-300/40"
+              >
+                <option value="">Don&apos;t link — independent business</option>
+                {linkableOrganizations.map((organization) => (
+                  <option key={organization.id} value={organization.id}>{organization.name}</option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-white/40">Grouping only — ownership and plan stay independent.</span>
+            </label>
+          )}
 
           {error && <p className="rounded-xl border border-red-400/20 bg-red-400/[0.05] p-3 text-sm text-red-200">{error}</p>}
 
