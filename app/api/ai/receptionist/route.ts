@@ -22,6 +22,7 @@ import {
 } from "@/db/schema";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
 import { formatDateTime, getBusinessLocalization } from "@/lib/localization";
+import { getBaseRoleInstructions } from "@/lib/voice/employee-config";
 import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/model-config";
 import { classifyAIProviderError } from "@/lib/ai/provider-error";
 import { withAIUsageLogging } from "@/lib/ai/usage-logging";
@@ -328,7 +329,7 @@ ${
 ROLE INSTRUCTIONS
 
 ${
-  employeeSettings?.roleInstructions ||
+  getBaseRoleInstructions(employeeSettings?.roleInstructions) ||
   "Welcome customers, understand their needs, answer common questions, and route requests appropriately."
 }
 
