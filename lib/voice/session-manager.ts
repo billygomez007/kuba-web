@@ -5,9 +5,9 @@ import { conversations, messages } from "@/db/schema";
 export type VoiceSessionState = "ringing" | "connecting" | "active" | "waiting" | "transferred" | "completed" | "failed";
 
 export async function updateVoiceSession(conversationId: string, businessId: string, state: VoiceSessionState) {
-  const status = state === "transferred" ? "escalated" : state === "completed" ? "resolved" : "open";
+  const status = state === "transferred" ? "escalated" : state === "completed" ? "resolved" : state === "failed" ? "failed" : "open";
   const now = new Date();
-  const values = { status, aiMode: state === "transferred" || state === "completed" ? "paused" : "active", updatedAt: now, ...(state === "ringing" ? { voiceStartedAt: now } : {}), ...(state === "active" ? { voiceConnectedAt: now } : {}), ...(state === "completed" || state === "failed" ? { voiceEndedAt: now } : {}) };
+  const values = { status, aiMode: state === "transferred" || state === "completed" || state === "failed" ? "paused" : "active", updatedAt: now, ...(state === "ringing" ? { voiceStartedAt: now } : {}), ...(state === "active" ? { voiceConnectedAt: now } : {}), ...(state === "completed" || state === "failed" ? { voiceEndedAt: now } : {}) };
   await db.update(conversations).set(values).where(and(eq(conversations.id, conversationId), eq(conversations.businessId, businessId), eq(conversations.integrationId, "voice-runtime")));
   if (state === "completed" || state === "failed") {
     const row = (await db.select({ startedAt: conversations.voiceConnectedAt, endedAt: conversations.voiceEndedAt }).from(conversations).where(and(eq(conversations.id, conversationId), eq(conversations.businessId, businessId))).limit(1))[0];

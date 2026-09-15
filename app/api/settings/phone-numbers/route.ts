@@ -7,6 +7,8 @@ import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { getVoiceProvider } from "@/lib/voice/providers";
+import { listPlivoNumbers } from "@/lib/voice/adapters/plivo";
+import { isEmployeeEligibleForChannel } from "@/lib/communications/channel-policy";
 import { parseVoiceConfig } from "@/lib/voice/employee-config";
 import { isPhoneNumberAlreadyRegistered } from "@/lib/voice/tenant";
 import { normalizePhoneNumber } from "@/lib/voice/phone";
@@ -45,6 +47,16 @@ export async function POST(request: Request) {
   if (!providerDefinition || providerDefinition.status !== "available") {
     return NextResponse.json({ error: "This voice provider is not available yet." }, { status: 400 });
   }
+  if (provider === "plivo") {
+    let owned = false;
+    try {
+      const inventory = await listPlivoNumbers();
+      owned = inventory.some((entry) => entry.voiceEnabled && normalizePhoneNumber(entry.number) === number);
+    } catch {
+      return NextResponse.json({ error: "Plivo ownership could not be verified." }, { status: 503 });
+    }
+    if (!owned) return NextResponse.json({ error: "This Plivo number is not owned by the platform or is not voice-enabled." }, { status: 403 });
+  }
   if (await isPhoneNumberAlreadyRegistered(provider, number, value.membership.businessId)) {
     return NextResponse.json({ error: "This number is already registered to another business." }, { status: 409 });
   }
@@ -53,6 +65,10 @@ export async function POST(request: Request) {
     const employee = employeeRows[0];
     if (!employee) return NextResponse.json({ error: "Employee does not belong to this business." }, { status: 400 });
     if (employee.status !== "active") return NextResponse.json({ error: "This employee is not active." }, { status: 400 });
+    const employeeRecord = (await db.select({ id: aiEmployees.id, type: aiEmployees.type }).from(aiEmployees).where(eq(aiEmployees.id, employeeId)).limit(1))[0];
+    if (!employeeRecord || !(await isEmployeeEligibleForChannel(value.membership.businessId, employeeRecord, "voice"))) {
+      return NextResponse.json({ error: "This employee is not eligible for Voice." }, { status: 400 });
+    }
     const settingsRows = await db.select({ roleInstructions: aiEmployeeSettings.roleInstructions }).from(aiEmployeeSettings).where(eq(aiEmployeeSettings.employeeId, employeeId)).limit(1);
     const voiceConfig = parseVoiceConfig(settingsRows[0]?.roleInstructions);
     if (!voiceConfig.enabled) return NextResponse.json({ error: "Voice is not enabled for this employee yet — configure it under the employee's Voice settings first." }, { status: 400 });

@@ -60,7 +60,7 @@ export function createPlivoTransport(): VoiceTransport {
         method: "POST",
         headers: { Authorization: authHeader(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          from,
+          from: input.callerId || from,
           to: input.phoneNumber,
           answer_url: answerUrl,
           answer_method: "POST",
@@ -105,14 +105,18 @@ export async function listPlivoNumbers(): Promise<PlivoOwnedNumber[]> {
   const authToken = process.env.PLIVO_AUTH_TOKEN;
   if (!authId || !authToken) throw new Error("Plivo credentials are not configured on this platform.");
 
-  const response = await fetch(`https://api.plivo.com/v1/Account/${authId}/Number/`, {
-    headers: { Authorization: `Basic ${Buffer.from(`${authId}:${authToken}`).toString("base64")}` },
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Unable to read Plivo phone numbers.");
-
-  const objects: unknown[] = Array.isArray(data.objects) ? data.objects : [];
-  return objects.map((entry) => {
+  const numbers: PlivoOwnedNumber[] = [];
+  const authorization = `Basic ${Buffer.from(`${authId}:${authToken}`).toString("base64")}`;
+  let offset = 0;
+  const limit = 20;
+  for (let page = 0; page < 100; page += 1) {
+    const response = await fetch(`https://api.plivo.com/v1/Account/${authId}/Number/?limit=${limit}&offset=${offset}`, {
+      headers: { Authorization: authorization },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to read Plivo phone numbers.");
+    const objects: unknown[] = Array.isArray(data.objects) ? data.objects : [];
+    numbers.push(...objects.map((entry) => {
     const record = entry as Record<string, unknown>;
     return {
       number: typeof record.number === "string" ? record.number : "",
@@ -120,5 +124,10 @@ export async function listPlivoNumbers(): Promise<PlivoOwnedNumber[]> {
       voiceEnabled: record.voice_enabled === true || record.voice_enabled === "true",
       application: typeof record.application === "string" && record.application ? record.application : null,
     };
-  }).filter((entry) => entry.number);
+    }).filter((entry) => entry.number));
+    const next = typeof data.meta?.next === "string" ? data.meta.next : "";
+    if (objects.length < limit && !next) break;
+    offset += objects.length || limit;
+  }
+  return numbers;
 }

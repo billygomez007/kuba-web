@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { RequestContext } from "@mastra/core/request-context";
 
 import { db } from "@/db";
-import { conversations, messages } from "@/db/schema";
+import { conversations, messages, integrations } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
@@ -22,6 +22,8 @@ import { kubaCustomerSupportAgent } from "@/mastra/agents/customer-support";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
 import { kubaSalesAgent } from "@/mastra/agents/sales";
 import { kubaGeneralManagerAgent } from "@/mastra/agents/general-manager";
+import { isEmployeeEligibleForChannel } from "@/lib/communications/channel-policy";
+import { normalizePhoneNumber } from "@/lib/voice/phone";
 
 const employeeAgents = {
   receptionist: kubaReceptionistAgent,
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
       const phoneNumber = typeof body.phoneNumber === "string" ? body.phoneNumber.trim() : "";
       const employee = await getEmployee(membership.businessId, employeeId);
       const config = parseVoiceConfig(employee?.settings?.roleInstructions || null);
-      if (!employee || !config.enabled || config.provider !== provider || !phoneNumber || config.callDirection === "inbound") return NextResponse.json({ error: "Voice is not enabled for outbound calls for this employee." }, { status: 400 });
+      if (!employee || !config.enabled || config.provider !== provider || !phoneNumber || config.callDirection === "inbound" || !(await isEmployeeEligibleForChannel(membership.businessId, employee.employee, "voice"))) return NextResponse.json({ error: "Voice is not enabled for outbound calls for this employee." }, { status: 400 });
       const plan = await getBusinessPlan(membership.businessId);
       if (!plan.features.includes("voice")) return NextResponse.json({ error: "Voice is not included in this plan.", upgradeRequired: true }, { status: 403 });
       // Technical safety limit, not a commercial quota (Phase 39) — this
@@ -105,8 +107,11 @@ export async function POST(request: Request) {
       if ((await countTodaysOutboundCalls(membership.businessId, employeeId)) >= config.maxDailyCalls) {
         return NextResponse.json({ error: "This employee has reached its configured daily call limit.", code: "DAILY_CALL_LIMIT_REACHED" }, { status: 429 });
       }
+      const assignedRows = await db.select({ number: integrations.externalPhoneNumberId, metadata: integrations.metadata }).from(integrations).where(and(eq(integrations.businessId, membership.businessId), eq(integrations.provider, provider), eq(integrations.status, "active")));
+      const callerId = assignedRows.map((row) => ({ number: normalizePhoneNumber(row.number || ""), metadata: row.metadata })).find((row) => { try { return JSON.parse(row.metadata || "{}").kind === "voice_phone" && JSON.parse(row.metadata || "{}").employeeId === employeeId; } catch { return false; } })?.number;
+      if (!callerId) return NextResponse.json({ error: "Assign an eligible business number before placing an outbound call." }, { status: 400 });
       const conversationId = await persistEvent(membership.businessId, employeeId, { type: "call.started", providerCallId: `pending-${crypto.randomUUID()}`, phoneNumber, direction: "outbound" });
-      const call = await transport.startCall({ employeeId, conversationId, direction: "outbound", phoneNumber });
+      const call = await transport.startCall({ employeeId, conversationId, direction: "outbound", phoneNumber, callerId });
       // Reconcile the placeholder providerCallId used above to the
       // provider's real call id immediately — otherwise the later status
       // webhook's persistEvent lookup (by externalConversationId) never
@@ -126,7 +131,7 @@ export async function POST(request: Request) {
     const employee = await getEmployee(businessId, employeeId);
     const config = parseVoiceConfig(employee?.settings?.roleInstructions || null);
     if (!employee || !config.enabled || config.provider !== provider) return NextResponse.json({ error: "Voice employee is not configured for this provider." }, { status: 404 });
-    return NextResponse.json({ success: true, conversationId: await persistEvent(businessId, employeeId, event) });
+    return NextResponse.json({ success: true, conversationId: await persistEvent(businessId, employeeId, { ...event, provider }) });
   } catch (error) {
     console.error("Voice runtime error:", error);
     return NextResponse.json({ error: "Unable to process voice call." }, { status: 500 });

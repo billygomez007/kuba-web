@@ -61,6 +61,7 @@ export type VoiceTransport = {
     conversationId: string;
     direction: "inbound" | "outbound";
     phoneNumber?: string;
+    callerId?: string;
   }) => Promise<{ providerCallId: string; status: "queued" | "ringing" | "connecting" | "connected" | "active" }>;
   endCall: (input: { providerCallId: string }) => Promise<void>;
 };

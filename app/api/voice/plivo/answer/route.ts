@@ -7,6 +7,10 @@ import { verifyPlivoSignature } from "@/lib/voice/plivo-signature";
 import { resolveVoiceIntegrationByPhoneNumber } from "@/lib/voice/tenant";
 import { buildAnswerResponse, buildUnavailableResponse } from "@/lib/voice/plivo-xml";
 import { createVoiceSessionToken } from "@/lib/voice/gateway-session";
+import { getActiveEmployee } from "@/lib/voice/employee-lookup";
+import { parseVoiceConfig } from "@/lib/voice/employee-config";
+import { isEmployeeEligibleForChannel } from "@/lib/communications/channel-policy";
+import { getBusinessEntitlements, hasCapability } from "@/lib/billing/entitlements";
 
 /**
  * Canonical Plivo inbound-call answer webhook (Phase 8-10). Tenant is
@@ -78,7 +82,17 @@ export async function POST(request: Request) {
     return new NextResponse(buildUnavailableResponse("This number is not yet configured to receive calls."), { headers: { "Content-Type": "text/xml" } });
   }
 
+  // Admission is fail-closed: resolving a number is only tenant identity,
+  // never proof that the assigned employee may answer this call.
   const direction = employeeIdParam ? "outbound" : "inbound";
+  const employee = await getActiveEmployee(businessId, employeeId);
+  const config = parseVoiceConfig(employee?.settings?.roleInstructions || null);
+  const entitlements = await getBusinessEntitlements(businessId);
+  const directionAllowed = config.callDirection === "both" || config.callDirection === direction;
+  if (!employee || !config.enabled || config.provider !== "plivo" || !directionAllowed || !(await isEmployeeEligibleForChannel(businessId, employee.employee, "voice")) || !hasCapability(entitlements, "ai_workforce.voice")) {
+    return new NextResponse(buildUnavailableResponse("Voice is not available for this business."), { headers: { "Content-Type": "text/xml" }, status: 403 });
+  }
+
   const customerPhoneNumber = direction === "outbound" ? toNumber : fromNumber;
 
   // Awaited (not fire-and-forget) specifically to capture the real

@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { listPlivoNumbers } from "@/lib/voice/adapters/plivo";
+import { isPhoneNumberAlreadyRegistered } from "@/lib/voice/tenant";
+import { normalizePhoneNumber } from "@/lib/voice/phone";
 
 /**
  * Reads the numbers already purchased in the platform's Plivo account
@@ -20,7 +22,13 @@ export async function GET() {
   if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_VIEW)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    const numbers = await listPlivoNumbers();
+    const owned = await listPlivoNumbers();
+    const numbers = [];
+    for (const number of owned) {
+      if (!number.voiceEnabled) continue;
+      if (await isPhoneNumberAlreadyRegistered("plivo", normalizePhoneNumber(number.number), membership.businessId)) continue;
+      numbers.push(number);
+    }
     return NextResponse.json({ numbers });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to read Plivo phone numbers.", numbers: [] }, { status: 503 });

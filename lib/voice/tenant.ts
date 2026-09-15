@@ -50,17 +50,16 @@ export async function resolveVoiceIntegrationByPhoneNumber(
   if (!normalized) return null;
 
   const rows = await db
-    .select({ id: integrations.id, businessId: integrations.businessId, metadata: integrations.metadata })
+    .select({ id: integrations.id, businessId: integrations.businessId, metadata: integrations.metadata, phoneNumber: integrations.externalPhoneNumberId })
     .from(integrations)
     .where(
       and(
         eq(integrations.provider, provider),
-        eq(integrations.externalPhoneNumberId, normalized),
         eq(integrations.status, "active"),
       ),
     );
 
-  const match = rows.find((row) => isVoicePhoneRow(row.metadata));
+  const match = rows.find((row) => isVoicePhoneRow(row.metadata) && normalizePhoneNumber(row.phoneNumber || "") === normalized);
   if (!match) return null;
 
   return {
@@ -85,9 +84,9 @@ export async function isPhoneNumberAlreadyRegistered(
   if (!normalized) return false;
 
   const rows = await db
-    .select({ businessId: integrations.businessId, metadata: integrations.metadata })
+    .select({ businessId: integrations.businessId, metadata: integrations.metadata, phoneNumber: integrations.externalPhoneNumberId })
     .from(integrations)
-    .where(and(eq(integrations.provider, provider), eq(integrations.externalPhoneNumberId, normalized)));
+    .where(eq(integrations.provider, provider));
 
-  return rows.some((row) => isVoicePhoneRow(row.metadata) && row.businessId !== excludingBusinessId);
+  return rows.some((row) => isVoicePhoneRow(row.metadata) && row.businessId !== excludingBusinessId && normalizePhoneNumber(row.phoneNumber || "") === normalized);
 }
