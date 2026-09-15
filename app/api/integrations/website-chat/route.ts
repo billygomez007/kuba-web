@@ -19,6 +19,7 @@ import { routeConversationToTeam } from "@/lib/communications/team-router";
 import { type ConversationDepartment } from "@/lib/communications/routing";
 import { routeConversation } from "@/lib/communications/router";
 import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
+import { resolveEmployeeForDepartment } from "@/lib/communications/handoff";
 import { searchKnowledge } from "@/lib/knowledge/search";
 import { runAutomationTrigger } from "@/lib/automations/engine";
 import { createAuditLog } from "@/lib/auth/audit";
@@ -1038,11 +1039,12 @@ async function handleWebsiteChatPost(request: Request): Promise<NextResponse> {
      */
     responseStage =
       "save_inbound_message";
+    const inboundMessageId = crypto.randomUUID();
     await db
       .insert(messages)
       .values({
         id:
-          crypto.randomUUID(),
+          inboundMessageId,
 
         businessId:
           business.id,
@@ -1370,6 +1372,44 @@ async function handleWebsiteChatPost(request: Request): Promise<NextResponse> {
       }
     }
 
+    /*
+     * No team-based AI employee was resolved (this business hasn't set up
+     * Teams/aiEmployeeTeams, or none is assigned to this department) — the
+     * conversation would otherwise always fall back to Receptionist
+     * regardless of detected intent. Try a direct, type-based match instead:
+     * does this business have its own active Sales/Customer Support/
+     * Appointment employee for the detected department? Channel eligibility,
+     * plan entitlement, and implementation availability are all enforced by
+     * resolveEmployeeForDepartment, so an internal-only type (e.g. Finance,
+     * Marketing) can never be selected here.
+     */
+    if (
+      selectedEmployeeId === receptionist.id &&
+      routingDecision.department
+    ) {
+      try {
+        const directResolution = await resolveEmployeeForDepartment({
+          businessId: business.id,
+          department: routingDecision.department,
+          channel: "website_chat",
+        });
+
+        if (directResolution.ok && directResolution.employee.id !== receptionist.id) {
+          selectedEmployeeId = directResolution.employee.id;
+          selectedAgent = getKubaAgent(directResolution.employee.type);
+
+          if (enhancedRoutingAvailable) {
+            await db
+              .update(conversationRouting)
+              .set({ aiEmployeeId: directResolution.employee.id, updatedAt: new Date() })
+              .where(eq(conversationRouting.conversationId, conversationId));
+          }
+        }
+      } catch (directRoutingError) {
+        console.error("Website Chat direct-type routing error:", directRoutingError);
+      }
+    }
+
     /**
      * Retrieve relevant uploaded business knowledge.
      *
@@ -1404,6 +1444,47 @@ ${item.content}
         "Website Chat knowledge search error:",
         knowledgeError,
       );
+    }
+
+    /**
+     * Recent conversation history, so the customer never has to repeat
+     * themselves — this matters most right after an AI-to-AI handoff, where
+     * a different employee (with no memory of prior turns) picks up the
+     * SAME conversation. Excludes the message just saved above (it's already
+     * shown as CUSTOMER MESSAGE below).
+     */
+    responseStage = "load_conversation_history";
+    let conversationHistory = "No earlier messages in this conversation.";
+    try {
+      const historyRows = await db
+        .select({
+          direction: messages.direction,
+          senderType: messages.senderType,
+          content: messages.content,
+          createdAt: messages.createdAt,
+        })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.conversationId, conversationId),
+            eq(messages.businessId, business.id),
+          ),
+        )
+        .orderBy(sql`${messages.createdAt} desc`)
+        .limit(11);
+
+      const priorMessages = historyRows
+        .filter((row) => row.content)
+        .reverse()
+        .slice(0, -1); // drop the just-saved current message, appended below
+
+      if (priorMessages.length > 0) {
+        conversationHistory = priorMessages
+          .map((row) => `${row.direction === "inbound" ? "Customer" : "Kuba"}: ${row.content}`)
+          .join("\n");
+      }
+    } catch (historyError) {
+      console.error("Website Chat history load error:", historyError);
     }
 
     /**
@@ -1462,6 +1543,11 @@ ${selectedEmployeeId}
 ROUTING REASON:
 ${routingDecision.reason}
 
+CONVERSATION HISTORY (oldest first — this conversation may have just been
+handed to you from another employee; do not ask the customer to repeat
+anything already shown here):
+${conversationHistory}
+
 CUSTOMER MESSAGE:
 ${message}
 
@@ -1491,7 +1577,12 @@ Answer naturally, helpfully and professionally.
         () => selectedAgent.generate(
         businessContext,
         {
-          requestContext: new RequestContext([["businessId", business.id], ["employeeId", selectedEmployeeId]]),
+          requestContext: new RequestContext([
+            ["businessId", business.id],
+            ["employeeId", selectedEmployeeId],
+            ["conversationId", conversationId],
+            ["channel", "website_chat"],
+          ]),
         },
         ),
       );

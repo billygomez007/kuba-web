@@ -17,6 +17,7 @@ import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge"
 import { salesWorkPlanTool } from "@/mastra/tools/sales-work-plan";
 import { salesExternalActionTool } from "@/mastra/tools/sales-external-action";
 import { createAppointmentTool } from "@/mastra/tools/appointment-tools";
+import { requestHandoffTool } from "@/mastra/tools/request-handoff";
 
 const salesMemory = new Memory({
   storage: new LibSQLStore({
@@ -876,6 +877,19 @@ When using the getLeads tool, use the Business ID provided in the business conte
 
 Never invent leads or lead information.
 
+HANDOFFS
+
+If you are talking with a live customer conversation (not a dashboard
+review) and the customer actually has an existing-account support issue
+rather than a sales opportunity, or explicitly asks for a human, use
+requestHandoff with the matching intent ("support" or "human") and a short
+honest reason. The platform resolves the real destination — never choose
+who receives it yourself. If requestHandoff reports no eligible
+destination, say so plainly rather than claiming a transfer that did not
+happen. Booking a meeting/demo yourself uses createAppointment directly;
+only use requestHandoff when the conversation itself needs to move to a
+different employee.
+
 Only report lead information returned by the getLeads tool.
 `,
   model: defaultChatModel(),
@@ -896,5 +910,6 @@ tools: {
   salesWorkPlan: salesWorkPlanTool,
   salesExternalAction: salesExternalActionTool,
   createAppointment: createAppointmentTool,
+  requestHandoff: requestHandoffTool,
 },
 });

@@ -7,6 +7,7 @@ import {
   createCustomerTool,
 } from "@/lib/ai/tools/receptionist-tools";
 import { createSupportTicketTool, getTicketsTool, requestTicketEscalationTool } from "@/mastra/tools/ticket-tools";
+import { requestHandoffTool } from "@/mastra/tools/request-handoff";
 
 export const kubaCustomerSupportAgent = new Agent({
   id: "kuba-customer-support",
@@ -138,6 +139,20 @@ and identify the appropriate next step.
 
 Do not pretend that a human has been contacted unless the
 application actually performed that action.
+
+HANDOFFS
+
+If this customer's request is actually a sales opportunity (they want to
+buy something new, not resolve an existing issue), or needs appointment
+booking, or genuinely needs a human (a complaint you cannot resolve, a
+sensitive dispute, repeated misunderstanding, or the customer explicitly
+asks for a person), use requestHandoff with the matching intent
+("sales", "appointment", or "human") and a short honest reason. The
+platform resolves the real destination — you never choose who receives it.
+If requestHandoff reports no eligible destination, say so plainly and keep
+helping with what you can do yourself rather than claiming a transfer that
+did not happen. Do not hand off a request you can already resolve yourself
+with your own tools.
 `,
 
   model: defaultChatModel(),
@@ -151,5 +166,6 @@ application actually performed that action.
     getSupportTickets: getTicketsTool,
     createSupportTicket: createSupportTicketTool,
     requestTicketEscalation: requestTicketEscalationTool,
+    requestHandoff: requestHandoffTool,
   },
 });

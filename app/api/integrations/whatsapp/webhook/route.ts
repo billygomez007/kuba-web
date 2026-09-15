@@ -26,9 +26,10 @@ import {
 } from "@/lib/communications/team-router";
 import type { ConversationDepartment } from "@/lib/communications/routing";
 import { kubaReceptionistAgent } from "@/mastra/agents/receptionist";
-import { getKubaAgent } from "@/lib/communications/ai-agent-registry";
+import { getKubaAgent, type KubaAgentLike } from "@/lib/communications/ai-agent-registry";
 import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 import { isEmployeeImplementationAvailable, isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
+import { resolveEmployeeForDepartment } from "@/lib/communications/handoff";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -439,14 +440,10 @@ export async function POST(request: Request) {
      * a type with no implementation, can never have a conversation silently
      * handled by an employee it should not have access to.
      */
-    let selectedAgent: {
-      generate: (
-        input: string,
-        options?: { requestContext?: RequestContext },
-      ) => Promise<{ text?: string }>;
-    } = kubaReceptionistAgent;
+    let selectedAgent: KubaAgentLike = kubaReceptionistAgent;
 
     let selectedEmployeeId = receptionist.id;
+    let selectedEmployeeType: string = receptionist.type;
 
     if (routingDecision.aiEmployeeId) {
       const workforceEntitlements = await getBusinessEntitlements(businessId);
@@ -471,6 +468,7 @@ export async function POST(request: Request) {
         isEmployeeImplementationAvailable(routedEmployee.type)
       ) {
         selectedEmployeeId = routedEmployee.id;
+        selectedEmployeeType = routedEmployee.type;
         selectedAgent = getKubaAgent(routedEmployee.type);
 
         console.log("Kuba routed conversation:", {
@@ -480,6 +478,36 @@ export async function POST(request: Request) {
           aiEmployeeId: routedEmployee.id,
           aiEmployeeType: routedEmployee.type,
         });
+      }
+    }
+
+    /*
+     * No team-based AI employee was resolved — try a direct, type-based
+     * match for the detected department (mirrors the same fallback in
+     * app/api/integrations/website-chat/route.ts), so a business without
+     * Teams/aiEmployeeTeams configured still gets real department-aware
+     * routing on WhatsApp instead of always defaulting to Receptionist.
+     */
+    if (selectedEmployeeId === receptionist.id && routingDecision.department) {
+      try {
+        const directResolution = await resolveEmployeeForDepartment({
+          businessId,
+          department: routingDecision.department,
+          channel: "whatsapp",
+        });
+
+        if (directResolution.ok && directResolution.employee.id !== receptionist.id) {
+          selectedEmployeeId = directResolution.employee.id;
+          selectedEmployeeType = directResolution.employee.type;
+          selectedAgent = getKubaAgent(directResolution.employee.type);
+
+          await db
+            .update(conversationRouting)
+            .set({ aiEmployeeId: directResolution.employee.id, updatedAt: new Date() })
+            .where(eq(conversationRouting.conversationId, conversation.id));
+        }
+      } catch (directRoutingError) {
+        console.error("WhatsApp direct-type routing error:", directRoutingError);
       }
     }
 
@@ -512,7 +540,35 @@ export async function POST(request: Request) {
     }
 
     /**
-     * Build the business context for Kuba Receptionist.
+     * Recent conversation history, so the customer never has to repeat
+     * themselves — this matters most right after an AI-to-AI handoff, where
+     * a different employee (with no memory of prior turns) picks up the
+     * SAME conversation.
+     */
+    let conversationHistory = "No earlier messages in this conversation.";
+    try {
+      const historyRows = await db
+        .select({ direction: messages.direction, content: messages.content, createdAt: messages.createdAt })
+        .from(messages)
+        .where(and(eq(messages.conversationId, conversation.id), eq(messages.businessId, businessId)));
+      const priorMessages = historyRows
+        .filter((row) => row.content)
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .slice(0, -1); // drop the just-saved current customer message, shown separately below
+      if (priorMessages.length > 0) {
+        conversationHistory = priorMessages
+          .slice(-10)
+          .map((row) => `${row.direction === "inbound" ? "Customer" : "Kuba"}: ${row.content}`)
+          .join("\n");
+      }
+    } catch (historyError) {
+      console.error("WhatsApp history load error:", historyError);
+    }
+
+    /**
+     * Build the business context for the SELECTED employee — never
+     * hardcoded to Receptionist, since routing above may have selected
+     * Sales, Customer Support, or Appointment instead.
      */
     const businessContext = `
 BUSINESS CONTEXT
@@ -525,11 +581,11 @@ Country: ${business.country || "Not specified"}
 Business size: ${business.businessSize || "Not specified"}
 Business status: ${business.status}
 
-You are Kuba Receptionist.
+ROUTING
 
-Your job is to welcome customers, answer common questions,
-capture useful information, understand customer needs,
-and route qualified opportunities to Kuba Sales.
+You are the ${selectedEmployeeType} employee for this business (employee ID: ${selectedEmployeeId}).
+Department: ${routingDecision.department}
+Routing reason: ${routingDecision.reason}
 
 Do not invent information about the business.
 If you do not know something, say so and ask for the
@@ -539,6 +595,11 @@ CUSTOMER
 
 Name: ${customerName}
 WhatsApp number: ${customerPhone}
+
+CONVERSATION HISTORY (oldest first — this conversation may have just been
+handed to you from another employee; do not ask the customer to repeat
+anything already shown here):
+${conversationHistory}
 
 CUSTOMER MESSAGE
 
@@ -566,7 +627,12 @@ ${customerMessage}
      * Generate the response.
      */
     const result = await selectedAgent.generate(businessContext, {
-      requestContext: new RequestContext([["businessId", businessId], ["employeeId", selectedEmployeeId]]),
+      requestContext: new RequestContext([
+        ["businessId", businessId],
+        ["employeeId", selectedEmployeeId],
+        ["conversationId", conversation.id],
+        ["channel", "whatsapp"],
+      ]),
     });
 
     const responseText = String(result.text || "").trim();

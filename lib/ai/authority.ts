@@ -42,6 +42,7 @@ export const AI_ACTIONS = [
   "create_hr_task",
   "read_operations_overview",
   "create_operations_task",
+  "request_handoff",
 ] as const;
 
 export type AIAction = (typeof AI_ACTIONS)[number];
@@ -79,6 +80,7 @@ export const ACTION_META: Record<AIAction, { kind: ActionKind; label: string; de
   create_hr_task: { kind: "write", label: "Create HR tasks", description: "Create an internal HR task (onboarding step, document reminder, policy follow-up). Never a hiring, firing, or compensation decision." },
   read_operations_overview: { kind: "read", label: "View operations overview", description: "Read task, appointment, and automation-run status counts for this business." },
   create_operations_task: { kind: "write", label: "Create operations tasks", description: "Create an internal operational task (follow-up, handoff, coordination)." },
+  request_handoff: { kind: "write", label: "Hand off conversation", description: "Reassign the current live conversation to another eligible AI employee, or escalate it to a human. The model chooses only an intent — the platform resolves the real destination and enforces tenant/plan/channel eligibility." },
 };
 
 /**

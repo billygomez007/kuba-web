@@ -1,4 +1,4 @@
-type TrustedContextKey = "businessId" | "employeeId";
+type TrustedContextKey = "businessId" | "employeeId" | "conversationId" | "channel";
 
 type TrustedRequestContext = {
   get(key: never): unknown;
@@ -67,4 +67,30 @@ export function requireEmployeeId(
   }
 
   return employeeId;
+}
+
+/**
+ * The live customer conversation a tool call is acting on, when one exists.
+ * Unlike businessId/employeeId this is genuinely OPTIONAL: dashboard/test-
+ * console chat sessions (GenericChatWorkspace, the per-employee test page)
+ * have no backing `conversations` row at all, only a Mastra memory thread.
+ * Handoff only makes sense for a real, trackable customer conversation, so
+ * callers check for undefined and fail gracefully rather than throwing.
+ */
+export function readConversationId(
+  requestContext: TrustedRequestContext,
+): string | undefined {
+  return readTrustedContextValue(requestContext, "conversationId");
+}
+
+/**
+ * The inbound channel a tool call is running on (e.g. "website_chat",
+ * "whatsapp"). Defaults to "dashboard" for internal test/console sessions,
+ * which are always channel-eligible — the real security boundary is tenant/
+ * entitlement scoping, not this soft eligibility hint.
+ */
+export function readChannel(
+  requestContext: TrustedRequestContext,
+): string {
+  return readTrustedContextValue(requestContext, "channel") ?? "dashboard";
 }

@@ -11,7 +11,15 @@ import {
   users,
 } from "@/db/schema";
 import { CUSTOM_TOOL_CATALOG, isCustomToolId } from "@/mastra/agents/custom";
+import { customChannelScope, REAL_CUSTOMER_CHANNELS } from "@/lib/communications/channel-policy";
 import CustomToolPermissions from "@/app/components/employees/CustomToolPermissions";
+
+const CHANNEL_LABELS: Record<string, string> = {
+  website_chat: "Website Chat",
+  whatsapp: "WhatsApp",
+  email: "Email",
+  voice: "Voice",
+};
 
 type PageProps = {
   params: Promise<{
@@ -111,6 +119,8 @@ export default async function EmployeeSettingsPage({
     granted: boolean;
   }[] = [];
 
+  let customChannelCatalog: { channel: string; label: string; granted: boolean }[] = [];
+
   if (employee.type === "custom") {
     const grantedRows = await db
       .select({ scope: aiEmployeeScopes.scope })
@@ -123,6 +133,7 @@ export default async function EmployeeSettingsPage({
           eq(aiEmployeeScopes.status, "active"),
         ),
       );
+    const grantedScopes = new Set(grantedRows.map((row) => row.scope));
     const grantedToolIds = new Set(
       grantedRows.map((row) => row.scope.replace(/^tool:/, "")).filter((id) => isCustomToolId(id)),
     );
@@ -133,6 +144,11 @@ export default async function EmployeeSettingsPage({
       riskLevel: entry.riskLevel,
       description: entry.description,
       granted: grantedToolIds.has(toolId),
+    }));
+    customChannelCatalog = REAL_CUSTOMER_CHANNELS.map((channel) => ({
+      channel,
+      label: CHANNEL_LABELS[channel] ?? channel,
+      granted: grantedScopes.has(customChannelScope(channel)),
     }));
   }
 
@@ -277,6 +293,7 @@ export default async function EmployeeSettingsPage({
               employeeId={employee.id}
               canManage={canEdit}
               initialCatalog={customToolCatalog}
+              initialChannels={customChannelCatalog}
             />
           )}
 

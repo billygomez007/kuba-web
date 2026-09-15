@@ -1,5 +1,139 @@
 # SuperKuba — Current State Audit
 
+## 2026-09-15 update — AI Workforce orchestration, handoffs & channel routing
+
+Turns the 12 independently-real AI employees from the prior pass into one
+coordinated workforce: a canonical channel-eligibility policy, a real
+AI-initiated handoff mechanism (AI-to-AI and AI-to-human), and two
+previously-undiscovered routing bugs fixed in Website Chat and WhatsApp.
+
+**AUDIT FIRST — this codebase already had far more real orchestration
+infrastructure than expected**, and none of it was duplicated:
+`conversationRouting` (department/team/aiEmployee/assignedUser/assignmentType/
+status), the `handoffs` table, `lib/communications/router.ts`/`team-router.ts`
+(keyword-based department detection + team-based AI-employee routing),
+`app/api/conversations/{takeover,resume,assign,assign-human}` (human takeover,
+return-to-AI, and human-triggered AI reassignment — all already real and
+already used identical conversationRouting/conversations/handoffs field
+writes), and `app/api/inbox/workspace` + the Inbox/Handoffs pages already
+read and display `needsHuman`, routing status, and handoff timeline entries.
+This pass writes into that existing surface rather than replacing any of it —
+every existing human-facing flow is untouched, and the new AI-initiated paths
+produce data those exact same readers already understood.
+
+**TWO REAL BUGS FOUND AND FIXED**:
+1. `lib/communications/ai-agent-registry.ts`'s `getKubaAgent()` matched
+   underscored type keys (`"customer_support"`, `"general_manager"`) against
+   the real, hyphenated `aiEmployees.type` values (`"customer-support"`,
+   `"general-manager"`) used everywhere else in the codebase. Every inbound
+   Website Chat/WhatsApp conversation correctly routed to a Customer Support
+   or General Manager employee (conversationRouting/conversations recorded
+   the right employee) but silently ran the Receptionist agent instead — the
+   routed employee's own tools/instructions never executed. Invisible in the
+   UI, no prior test coverage. Fixed by keying the registry with the same
+   hyphenated strings used by `lib/billing/ai-workforce-policy.ts`, extended
+   to cover all 11 static agent types (Custom has no static agent; see
+   below).
+2. The WhatsApp webhook's prompt hardcoded `"You are Kuba Receptionist... route
+   qualified opportunities to Kuba Sales"` regardless of which employee was
+   actually selected — so even after correctly picking the Sales agent, the
+   model was told it was the Receptionist. Fixed to build the identity/
+   routing section from the actually-selected employee type, matching
+   Website Chat's existing pattern.
+
+**Canonical channel-eligibility policy** (`lib/communications/channel-policy.ts`):
+Receptionist, Sales, Customer Support, and Appointment are customer-facing on
+every real channel (Website Chat, WhatsApp, Email, Voice) by default; every
+other type (Marketing, Outreach, General Manager, Accountant, Finance, HR,
+Operations, Custom) is internal-only. A "dashboard" pseudo-channel represents
+the internal per-employee test console and is always eligible for every type
+— it is never a real customer channel. Custom employees can be granted a real
+channel explicitly (see below); no other type's eligibility is configurable.
+
+**AI-initiated handoff** (`lib/communications/handoff.ts` +
+`mastra/tools/request-handoff.ts`): the model supplies only a semantic
+`intent` ("sales" | "support" | "appointment" | "receptionist" | "human") and
+a `reason` — never a businessId, employeeId, or conversationId, all of which
+come from the trusted server-side RequestContext (a new
+`readConversationId`/`readChannel` pair in `mastra/tools/business-context.ts`,
+alongside the existing `requireBusinessId`/`requireEmployeeId`). The server
+resolves the real destination: an active, entitled, implemented, channel-
+eligible employee of the target type in the SAME business, or fails honestly
+with a reason (`resolveEmployeeForHandoff`). A resolved AI handoff writes the
+exact same `conversationRouting`/`conversations`/`handoffs` fields the
+existing human-triggered flows already write (verified against
+`app/api/workforce/orchestration/route.ts`'s own convention), so the Inbox,
+the Handoffs page, and the employee-dashboard handoff count all pick it up
+with zero frontend changes. A "human" intent never assigns a specific person
+— it sets `conversationRouting.status = "waiting_for_human"` and inserts a
+`handoffs` row with `toUserId: null`, exactly the state `needsHuman` in
+`/api/inbox/workspace` already checks for; a real staff member then claims it
+through the existing takeover/assign-human routes. The tool is wired into the
+four customer-facing agents (Receptionist, Sales, Customer Support,
+Appointment) with role-appropriate instructions on when to use which intent.
+Every handoff still goes through the existing `checkAIEmployeeAuthority()`
+policy (Assistant autonomy requires human approval, same as any other write
+action) and is audited (`ai.handoff.to_ai` / `ai.handoff.to_human`).
+
+**Direct-type routing fallback**: when a business hasn't configured
+Teams/`aiEmployeeTeams` (so `routeConversationToTeam` finds no AI employee for
+the detected department), Website Chat and WhatsApp previously always
+defaulted to Receptionist regardless of detected intent. Both routes now try
+`resolveEmployeeForDepartment` first — a real, active Sales/Support/
+Appointment employee for the business, if one exists and is channel-eligible
+— before falling back to Receptionist. The Finance and Marketing detected
+departments deliberately resolve to Support and Sales respectively (never to
+the internal Finance/Accountant/Marketing employees), since a customer-facing
+billing or promotion question needs a customer-facing employee; those
+internal employees stay reachable only via their own task tools.
+
+**Conversation history in the prompt**: both channel routes now include the
+last ~10 messages for the conversation in the prompt (`CONVERSATION HISTORY`),
+so a customer never has to repeat themselves — most importantly right after a
+handoff, when the receiving employee has no prior memory of the conversation.
+
+**Custom employee channel grants** (Section 16): reuses the exact same
+`aiEmployeeScopes` mechanism as Custom's tool grants, with a parallel
+`channel:<name>` scope namespace (`customChannelScope`/
+`isCustomEmployeeChannelGranted` in `channel-policy.ts`). The existing
+`GET/PUT /api/ai-employees/[id]/tools` route (tenant-scoped, `type ===
+"custom"`-only, `WORKFORCE_MANAGE`-gated) was extended to also manage
+channels, and `CustomToolPermissions.tsx` gained an "Allowed channels"
+section — a Custom employee is internal-only until an owner/admin explicitly
+checks a channel. No migration required; the platform's channel list (4 real
+channels) is the fixed ceiling — never a business-supplied string.
+
+**Internal employee coordination**: General Manager, Accountant, Finance, HR,
+and Operations already coordinate via their own `create-*-task` tools (built
+in the prior pass) rather than live customer-conversation handoffs — they
+have no customer conversation to hand off in the first place, by channel
+policy. Outreach→Sales and Marketing→Sales already used `createFollowUp`
+before this pass (verified still working, not touched) — a different,
+already-correct mechanism (pipeline handoff, not live-conversation
+reassignment) appropriate to their outbound/internal nature.
+
+**Tests**: one new file, `tests/ai-workforce-orchestration.test.mjs` (26
+tests) — channel policy classification for all 12 types, Custom channel
+grant/tenant-isolation, the getKubaAgent bug-fix regression, handoff
+resolution (success, no-eligible-destination, department mapping),
+`performAiHandoff`/`performHumanEscalation` persistence and cross-tenant
+refusal, `requestHandoffTool` authority integration (approval floor,
+graceful no-conversation failure, human escalation), and static regressions
+proving the tool's input schema never accepts a trusted ID and that both
+channel routes use the new fallback/context wiring. Full suite: 1717/1717
+passing.
+
+**Not done in this pass, by explicit scope decision, not oversight**:
+browser acceptance testing (no browser automation tool in this environment);
+Email and Voice channel adapters (neither exists as a live inbound route
+yet — the channel policy and handoff resolver already support them by name,
+so wiring an adapter later needs no new orchestration logic); Custom's
+"accepted intents"/escalation-behavior configuration beyond channel/tool
+grants (the spec's channel-grant and tool-grant mechanisms are built and
+real; a Custom employee's own instructions, set via the existing generic
+settings page, are where intent/escalation behavior is described today,
+consistent with how every other employee type's behavior is configured).
+
 ## 2026-09-15 update — Complete 12-employee AI Workforce: Accountant, Finance, HR, Operations, Custom
 
 Closes the final gap identified in the prior pass ("`accountant`, `finance`,

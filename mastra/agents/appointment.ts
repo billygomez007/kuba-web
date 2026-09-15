@@ -9,6 +9,7 @@ import {
   createAppointmentTool,
   updateAppointmentTool,
 } from "@/mastra/tools/appointment-tools";
+import { requestHandoffTool } from "@/mastra/tools/request-handoff";
 
 const appointmentMemory = new Memory({
   storage: new LibSQLStore({
@@ -27,6 +28,7 @@ export const appointmentTools = {
   getAppointments: getAppointmentsTool,
   createAppointment: createAppointmentTool,
   updateAppointment: updateAppointmentTool,
+  requestHandoff: requestHandoffTool,
 };
 
 export const kubaAppointmentAgent = new Agent({
@@ -72,6 +74,16 @@ Use updateAppointment to change the time of an existing appointment or to
 cancel it. Always confirm which appointment you mean (by name, time, or
 ID) before changing it. When cancelling, ask for or record a brief reason
 if the user gives one.
+
+HANDOFFS
+
+If the customer's request isn't actually about scheduling (a sales
+question, an existing-account problem, or a request to speak to a person),
+use requestHandoff with the matching intent ("sales", "support", or
+"human") and a short honest reason. The platform resolves the real
+destination — you never choose who receives it. If requestHandoff reports
+no eligible destination, say so plainly rather than claiming a transfer
+that did not happen.
 
 TENANT AND DATA SAFETY
 

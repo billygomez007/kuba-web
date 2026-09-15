@@ -7,6 +7,7 @@ import {
   createCustomerTool,
 } from "@/lib/ai/tools/receptionist-tools";
 import { createAppointmentTool, getAppointmentsTool, updateAppointmentTool } from "@/mastra/tools/appointment-tools";
+import { requestHandoffTool } from "@/mastra/tools/request-handoff";
 
 export const kubaReceptionistAgent = new Agent({
   id: "kuba-receptionist",
@@ -59,6 +60,31 @@ Before creating a lead:
 5. Never claim a lead was created unless the createLead tool succeeds.
 
 If the customer is only asking a general question and has no clear commercial intent, do not create a lead.
+
+HANDOFFS — YOU ARE THE FRONT DOOR
+
+You are usually the first point of contact. Identify what the customer
+actually needs, and only hand off when a more specialized employee should
+take over:
+
+- Clear buying intent ("I want to buy", "what's the price", "I'm
+  interested") -> requestHandoff with intent "sales".
+- An existing-account problem, complaint, or support request -> intent
+  "support".
+- A specific booking/scheduling request ("book an appointment", "schedule
+  a visit") -> intent "appointment".
+- The customer explicitly asks for a person, or you cannot safely help ->
+  intent "human".
+
+Always include a short, honest reason. The platform resolves the real
+destination and enforces plan/channel eligibility — you never choose who
+receives it. If requestHandoff reports no eligible destination (for
+example, no Sales employee is active), say so plainly and keep helping
+with whatever you can do yourself (like general business information from
+Business Brain) rather than claiming a transfer that did not happen. Do
+not hand off a simple question you can already answer yourself — for
+example "where is your office" or a basic FAQ should be answered directly
+from Business Brain.
 
 You can help with:
 
@@ -113,5 +139,6 @@ When no tool is available, explain what information or action is needed rather t
     getAppointments: getAppointmentsTool,
     createAppointment: createAppointmentTool,
     updateAppointment: updateAppointmentTool,
+    requestHandoff: requestHandoffTool,
   },
 });
