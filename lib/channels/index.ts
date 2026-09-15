@@ -10,6 +10,10 @@ import {
   instagramAdapter,
 } from "./instagram";
 
+import {
+  emailAdapter,
+} from "./email";
+
 
 export const channelAdapters = {
 
@@ -26,7 +30,7 @@ export const channelAdapters = {
     whatsappAdapter,
 
   email:
-    whatsappAdapter,
+    emailAdapter,
 
   sms:
     whatsappAdapter,
