@@ -88,6 +88,7 @@ const navigationGroups: NavigationGroup[] = [
       { label: "Inbox", href: "/dashboard/inbox", icon: "✉", permission: "messaging.view" },
       { label: "Customers", href: "/dashboard/customers", icon: "◎", permission: "customers.view" },
       { label: "Leads", href: "/dashboard/sales", icon: "↗", permission: "sales.view" },
+      { label: "CRM", href: "/dashboard/crm", icon: "▦", permission: "sales.view", children: ["Overview", "Pipeline"] },
       { label: "Conversations", href: "/dashboard/conversations", icon: "◌", permission: "messaging.view" },
       { label: "Follow-ups", href: "/dashboard/follow-ups", icon: "◌", permission: "followups.view" },
       { label: "Handoffs", href: "/dashboard/handoffs", icon: "⇄", permission: "messaging.manage" },

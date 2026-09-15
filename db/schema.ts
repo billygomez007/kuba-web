@@ -640,6 +640,18 @@ export const leads = sqliteTable("leads", {
   }).notNull(),
 });
 
+export const crmPipelines = sqliteTable("crm_pipelines", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), name: text("name").notNull(), description: text("description"), isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false), status: text("status").notNull().default("active"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const crmPipelineStages = sqliteTable("crm_pipeline_stages", {
+  id: text("id").primaryKey(), pipelineId: text("pipeline_id").notNull(), businessId: text("business_id").notNull(), name: text("name").notNull(), position: integer("position").notNull(), stageType: text("stage_type").notNull().default("open"), status: text("status").notNull().default("active"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const crmDeals = sqliteTable("crm_deals", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), customerId: text("customer_id"), leadId: text("lead_id"), title: text("title").notNull(), description: text("description"), pipelineId: text("pipeline_id").notNull(), stageId: text("stage_id").notNull(), assignedEmployeeId: text("assigned_employee_id"), assignedUserId: text("assigned_user_id"), status: text("status").notNull().default("open"), value: text("value"), currency: text("currency").default("GHS"), expectedCloseDate: integer("expected_close_date", { mode: "timestamp_ms" }), actualCloseDate: integer("actual_close_date", { mode: "timestamp_ms" }), source: text("source"), productInterest: text("product_interest"), nextAction: text("next_action"), nextActionDate: integer("next_action_date", { mode: "timestamp_ms" }), lossReason: text("loss_reason"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const appointments = sqliteTable(
   "appointments",
   {

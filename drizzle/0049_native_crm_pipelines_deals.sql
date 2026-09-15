@@ -1,0 +1,7 @@
+CREATE TABLE crm_pipelines (id text PRIMARY KEY NOT NULL, business_id text NOT NULL, name text NOT NULL, description text, is_default integer NOT NULL DEFAULT 0, status text NOT NULL DEFAULT 'active', created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE TABLE crm_pipeline_stages (id text PRIMARY KEY NOT NULL, pipeline_id text NOT NULL, business_id text NOT NULL, name text NOT NULL, position integer NOT NULL, stage_type text NOT NULL DEFAULT 'open', status text NOT NULL DEFAULT 'active', created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE TABLE crm_deals (id text PRIMARY KEY NOT NULL, business_id text NOT NULL, customer_id text, lead_id text, title text NOT NULL, description text, pipeline_id text NOT NULL, stage_id text NOT NULL, assigned_employee_id text, assigned_user_id text, status text NOT NULL DEFAULT 'open', value text, currency text DEFAULT 'GHS', expected_close_date integer, actual_close_date integer, source text, product_interest text, next_action text, next_action_date integer, loss_reason text, created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE INDEX crm_pipelines_business_idx ON crm_pipelines(business_id);
+CREATE INDEX crm_pipeline_stages_pipeline_idx ON crm_pipeline_stages(pipeline_id, position);
+CREATE INDEX crm_deals_business_stage_idx ON crm_deals(business_id, stage_id);
+CREATE INDEX crm_deals_business_customer_idx ON crm_deals(business_id, customer_id);
