@@ -32,6 +32,7 @@ let db, schema, answerRoute, statusRoute, callsRoute, originalFetch;
 
 const BIZ_A = "kora-os";
 const BIZ_B = "realtegic-works";
+const BIZ_STARTER = "starter-voice-denied";
 
 function id(label) {
   return `${label}-${Math.random().toString(36).slice(2, 10)}`;
@@ -54,9 +55,28 @@ function postForm(routeHandler, path, formFields, { validSignature = true, extra
   return routeHandler(request);
 }
 
-async function seedBusiness(businessId, name) {
+async function seedBusiness(businessId, name, plan = "pro") {
   const now = new Date();
   await db.insert(schema.businesses).values({ id: businessId, name, slug: businessId, status: "active", createdAt: now, updatedAt: now });
+  // Voice is a Pro capability. Keep these webhook fixtures representative of
+  // a legitimate Voice-enabled tenant instead of relying on businesses.plan
+  // (which entitlement resolution intentionally ignores).
+  await db.insert(schema.subscriptions).values({
+    id: id("subscription"),
+    businessId,
+    provider: "stripe",
+    providerCustomerId: `cus_${businessId}`,
+    providerSubscriptionId: `sub_${businessId}`,
+    providerEventId: `evt_${businessId}`,
+    plan,
+    status: "active",
+    currentPeriodStart: now,
+    currentPeriodEnd: new Date(now.getTime() + 30 * 86400000),
+    cancelAtPeriodEnd: false,
+    trialEnd: null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 async function seedPlivoEmployeeAndNumber(businessId, number, callDirection = "both") {
@@ -92,6 +112,7 @@ test.before(async () => {
 
   await seedBusiness(BIZ_A, "Kora OS");
   await seedBusiness(BIZ_B, "Realtegic Works");
+  await seedBusiness(BIZ_STARTER, "Starter Voice Denied", "starter");
 
   originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -110,6 +131,13 @@ test.after(async () => {
 
 test("SECURITY: an answer webhook with an invalid signature is rejected with 403 and nothing is persisted", async () => {
   const response = await postForm(answerRoute.POST, "/api/voice/plivo/answer", { To: "+15551110000", From: "+15559990000", CallUUID: id("call") }, { validSignature: false });
+  assert.equal(response.status, 403);
+});
+
+test("SECURITY: a Starter business without Voice entitlement cannot admit inbound Voice", async () => {
+  const number = "+15551110009";
+  await seedPlivoEmployeeAndNumber(BIZ_STARTER, number);
+  const response = await postForm(answerRoute.POST, "/api/voice/plivo/answer", { To: number, From: "+15559990009", CallUUID: id("call") });
   assert.equal(response.status, 403);
 });
 
