@@ -4,8 +4,9 @@ import { eq } from "drizzle-orm";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { aiEmployees } from "@/db/schema";
+import { aiEmployees, businesses } from "@/db/schema";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getCorporateEmployeeEmail } from "@/lib/email/corporate-identities";
 
 
 export async function GET() {
@@ -54,10 +55,20 @@ export async function GET() {
         ),
       );
 
+  const businessRows = await db
+    .select({ slug: businesses.slug })
+    .from(businesses)
+    .where(eq(businesses.id, business.businessId))
+    .limit(1);
+  const businessSlug = businessRows[0]?.slug ?? "";
+
 
   return NextResponse.json({
     success:true,
-    employees,
+    employees: employees.map((employee) => ({
+      ...employee,
+      email: getCorporateEmployeeEmail({ businessSlug, employeeType: employee.type }),
+    })),
   });
 
 }
