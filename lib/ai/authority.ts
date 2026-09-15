@@ -35,6 +35,13 @@ export const AI_ACTIONS = [
   "escalate_ticket",
   "request_external_message",
   "create_marketing_task",
+  "read_payroll_summary",
+  "create_accounting_task",
+  "create_finance_task",
+  "read_hr_overview",
+  "create_hr_task",
+  "read_operations_overview",
+  "create_operations_task",
 ] as const;
 
 export type AIAction = (typeof AI_ACTIONS)[number];
@@ -65,6 +72,13 @@ export const ACTION_META: Record<AIAction, { kind: ActionKind; label: string; de
   escalate_ticket: { kind: "write", label: "Escalate tickets", description: "Flag a ticket for human attention." },
   request_external_message: { kind: "communication", label: "Send customer messages", description: "Request approval to send a WhatsApp, SMS, or email message to a customer. Always requires human approval." },
   create_marketing_task: { kind: "write", label: "Create marketing tasks", description: "Create an internal task (content review, design request, launch prep) — never customer-facing." },
+  read_payroll_summary: { kind: "read", label: "View payroll summary", description: "Read payroll run and payslip totals — the only real financial-record data this platform stores. Never invoices, revenue, or bank data." },
+  create_accounting_task: { kind: "write", label: "Create accounting tasks", description: "Create an internal task for a human accountant (reconciliation, review, filing prep). Never moves money or alters financial records." },
+  create_finance_task: { kind: "write", label: "Create finance tasks", description: "Create an internal task or recommendation for management (budget review, forecast follow-up). Never executes a financial transaction." },
+  read_hr_overview: { kind: "read", label: "View HR overview", description: "Read employee, department, and leave-request counts. Never compensation or protected-characteristic data." },
+  create_hr_task: { kind: "write", label: "Create HR tasks", description: "Create an internal HR task (onboarding step, document reminder, policy follow-up). Never a hiring, firing, or compensation decision." },
+  read_operations_overview: { kind: "read", label: "View operations overview", description: "Read task, appointment, and automation-run status counts for this business." },
+  create_operations_task: { kind: "write", label: "Create operations tasks", description: "Create an internal operational task (follow-up, handoff, coordination)." },
 };
 
 /**

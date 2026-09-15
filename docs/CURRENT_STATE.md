@@ -1,5 +1,108 @@
 # SuperKuba — Current State Audit
 
+## 2026-09-15 update — Complete 12-employee AI Workforce: Accountant, Finance, HR, Operations, Custom
+
+Closes the final gap identified in the prior pass ("`accountant`, `finance`,
+`hr`, `operations`, and `custom` remain deliberately unbuilt"). The owner's
+explicit direction for this pass: build all five properly, with real
+runtime/tools/permissions/configuration/tenant isolation/lifecycle/tests, not
+a flag flip. Pro and Enterprise now both discover and can activate all 12
+catalog types; Starter/Growth are unchanged.
+
+**Policy**: `lib/billing/ai-workforce-policy.ts`'s `STANDARD_EMPLOYEE_TYPES`
+gained `accountant`, `finance`, `hr`, `operations`, and `custom`, all
+`{minPlan: "pro", implemented: true}` — the same single source of truth every
+other check (`isEmployeeTypeEntitled`, `canActivateEmployee`,
+`getEmployeeAccessState`, the catalog's `implementation` field) already
+derived from. `custom` was previously modeled as Enterprise-module-grant-only;
+that path is now removed in favor of being a standard Pro+ type like every
+other one, per this pass's explicit instruction that Enterprise must never
+have fewer employees than Pro. Pro's `employeeLimit` was raised from 10 to 15
+(`lib/billing/plan-definitions.ts`) so the 12-type catalog is never
+constrained by an arbitrary headcount ceiling that predates it — the type
+ceiling, not the count, is what decides availability, preserving this
+codebase's own established invariant.
+
+**Kuba Accountant** (`mastra/agents/accountant.ts`,
+`app/api/ai/accountant/route.ts`) reads real payroll run totals
+(`mastra/tools/finance/get-payroll-summary.ts`, shared with Finance) — the
+only structured financial-record data this schema actually stores (no
+invoicing/AR/AP tables exist) — and can create an internal accounting task
+(`create_accounting_task`, a new authority action). Explicitly not a licensed
+accountant/tax adviser; cannot move money, file taxes, or alter a financial
+record; honestly reports unsupported data (invoicing, revenue) as
+"not connected" rather than estimating it.
+
+**Kuba Finance** (`mastra/agents/finance.ts`, `app/api/ai/finance/route.ts`)
+shares the same payroll-summary tool, framed as cost-side planning input, plus
+`create_finance_task`. Every forecast/scenario must be explicitly labeled an
+estimate; the agent can never claim to move money, approve a purchase, or
+execute an investment — no such tool exists.
+
+**Kuba HR** (`mastra/agents/hr.ts`, `app/api/ai/hr/route.ts`) reads real
+headcount/department/leave-request counts from the existing Human Workforce
+schema (`hrEmployees`, `hrDepartments`, `hrLeaveRequests` — a substantial,
+already-production-grade module this pass discovered and reused rather than
+duplicated) via `get-hr-overview.ts`, and can create an internal HR task
+(`create_hr_task`). Hard-coded boundary, enforced in both the agent's
+instructions and the fact that no such tool exists: never hires, fires,
+disciplines, changes compensation, or uses protected-characteristic data.
+
+**Kuba Operations** (`mastra/agents/operations.ts`,
+`app/api/ai/operations/route.ts`) reads real open/overdue task counts,
+upcoming appointment counts, and automation-run status counts
+(`get-operations-overview.ts`, plus the existing `getAppointmentsTool`), and
+can create an internal operations task (`create_operations_task`).
+
+**Custom AI employee** — the largest new piece: a curated, platform-controlled
+tool-permission framework, not an unrestricted agent.
+`mastra/agents/custom.ts` defines `CUSTOM_TOOL_CATALOG`, a ceiling of ~20 real,
+already-shipped tools (every one already goes through
+`checkAIEmployeeAuthority()` on every call) spanning knowledge, sales,
+appointments, support, marketing, finance, HR, and operations. A business
+grants a subset per Custom employee via real `aiEmployeeScopes` rows — an
+existing schema table with zero prior consumers, so no migration was needed.
+Grants are managed through a new `GET/PUT /api/ai-employees/[id]/tools` route
+(tenant-scoped, `WORKFORCE_MANAGE`-gated, restricted to `type === "custom"`,
+and only ever accepts a tool ID from the curated catalog — never an arbitrary
+client-supplied string) and a new "Allowed tools" checklist section
+(`CustomToolPermissions.tsx`) added to the existing generic employee settings
+page. Because each Custom employee has its own name/objective/instructions/
+tool set, its agent is built dynamically per request
+(`createCustomAgent(...)`) from real `aiEmployees`/`aiEmployeeSettings` data
+and the employee's own resolved grants — reusing existing schema fields
+(`aiEmployees.name`/`description`, `aiEmployeeSettings.goals`/
+`roleInstructions`) rather than adding new configuration columns. A granted
+tool still fully respects the employee's own autonomy/approval policy — a
+grant only ever adds a capability, never bypasses the approval floor. Custom
+can never: execute code, make an arbitrary HTTP request, access another
+tenant, or exceed what the curated catalog allows.
+
+**Tests**: two new files —
+`tests/ai-employee-accountant-finance-hr-operations.test.mjs` (34 combined
+with the Custom file's tests; agent registration, honest-data and
+honest-empty-state coverage for payroll/HR/operations reads, authority +
+tenant isolation for all four new write actions, route entitlement-ordering
+regressions) and `tests/ai-employee-custom.test.mjs` (catalog shape, tool
+filtering, a granted tool still respecting the approval floor, tenant
+isolation of scope grants, and static regressions on both new routes). Three
+existing test files (`ai-workforce-policy-model`, `ai-workforce-catalog-ui`,
+`canonical-plan-catalog-policy`) were updated to assert the new positive
+state — the old "accountant/finance/hr/operations/custom are
+unimplemented/Enterprise-only" assertions were replaced, never just deleted,
+with equivalent assertions using a genuinely unmodeled type
+(`some-unknown-type`) as the fail-closed proof case. Full suite: 1691/1691
+passing.
+
+**Not done in this pass, by explicit scope decision, not oversight**:
+mobile-viewport/browser acceptance testing (no browser automation tool
+available in this environment); none of the five new employees were wired
+into the inbound Website Chat/WhatsApp channel registry
+(`lib/communications/ai-agent-registry.ts`) — all five default to internal
+use only, matching this pass's own instruction ("Do NOT automatically make
+every new employee customer-facing") and the precedent already set by
+Outreach, which also isn't wired into that registry.
+
 ## 2026-09-15 update — AI Workforce completion: Marketing, Appointment, deactivation, and the Configure 404 fix
 
 **Root cause of "Configure/Open employee → 404" found and fixed.**

@@ -36,7 +36,7 @@ const common: BillingFeature[] = ["businessBrain", "websiteChat", "basicInbox", 
 export const planDefinitions: PlanDefinition[] = [
   { id: "starter", name: "Starter", employeeLimit: 1, automationLimit: 5, includedVoiceMinutes: 0, features: [...common], capabilities: starterCapabilities },
   { id: "growth", name: "Growth", employeeLimit: 3, automationLimit: 20, includedVoiceMinutes: 0, features: [...common, "salesBasic", "marketingBasic"], capabilities: growthCapabilities },
-  { id: "pro", name: "Pro", employeeLimit: 10, automationLimit: 100, includedVoiceMinutes: 500, features: [...common, "voice", "salesBasic", "salesAdvanced", "marketingBasic", "marketingAdvanced", "advancedAnalytics", "advancedAutomations", "customIntegrations", "orchestration", "certification", "monitoring"], capabilities: proCapabilities },
+  { id: "pro", name: "Pro", employeeLimit: 15, automationLimit: 100, includedVoiceMinutes: 500, features: [...common, "voice", "salesBasic", "salesAdvanced", "marketingBasic", "marketingAdvanced", "advancedAnalytics", "advancedAutomations", "customIntegrations", "orchestration", "certification", "monitoring"], capabilities: proCapabilities },
   { id: "enterprise", name: "Enterprise", employeeLimit: null, automationLimit: null, includedVoiceMinutes: 5000, features: [...common, "voice", "salesBasic", "salesAdvanced", "marketingBasic", "marketingAdvanced", "advancedAnalytics", "advancedAutomations", "customIntegrations", "orchestration", "certification", "monitoring", "whiteLabel"], capabilities: allCapabilities },
 ];
 

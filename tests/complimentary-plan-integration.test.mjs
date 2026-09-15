@@ -96,5 +96,5 @@ test("a normal Starter business (no override) is unaffected — complimentary st
 test("getBusinessPlan reflects the complimentary business as Pro with Pro's real limits (not a special uncapped exemption)", async () => {
   const plan = await entitlements.getBusinessPlan(BIZ_COMPLIMENTARY);
   assert.equal(plan.id, "pro");
-  assert.equal(plan.employeeLimit, 10);
+  assert.equal(plan.employeeLimit, 15);
 });

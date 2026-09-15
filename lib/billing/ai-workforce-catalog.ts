@@ -25,13 +25,10 @@
  * `implementation` is a SEPARATE axis from plan entitlement: it records
  * whether the employee type has a real, working chat runtime and workspace
  * today, independent of which plan would otherwise be allowed to activate
- * it. Two of the approved model's named Pro-tier types — Marketing and
- * Appointment — are "coming-soon": there is no app/api/ai/marketing or
- * app/api/ai/appointment route, and app/dashboard/employees/[id]/page.tsx
- * falls through to a generic "workspace is being prepared" placeholder for
- * any type it doesn't explicitly recognize. Showing them as an active
- * "Activate" button would create an employee record with nothing to do.
- * See the engagement report for the full list and reasoning.
+ * it. As of the "complete 12-employee AI workforce" pass, every catalog
+ * type below has a real runtime (app/api/ai/{type}/route.ts) and is
+ * "available" — there is no longer a "coming-soon" type in this catalog.
+ * See docs/CURRENT_STATE.md for the full history and reasoning.
  */
 import {
   allowedEmployeeTypesForPlan,
@@ -156,8 +153,8 @@ const rawEmployeeCatalog: RawCatalogEntry[] = [
     name: "Kuba Accountant",
     roleName: "Accountant",
     category: "Finance",
-    description: "Supports bookkeeping, financial records, reporting, and accounting workflows.",
-    capabilities: ["Organize records", "Support reporting", "Track finance tasks", "Escalate exceptions"],
+    description: "Explains payroll records, prepares accounting tasks for human review, and flags anomalies — not a licensed accountant or tax adviser.",
+    capabilities: ["Summarize payroll records", "Flag anomalies", "Create accounting tasks", "Prepare information for accountants"],
     icon: "◎",
     avatar: "/avatars/accountant.png",
     templateId: "kuba-accountant",
@@ -167,8 +164,8 @@ const rawEmployeeCatalog: RawCatalogEntry[] = [
     name: "Kuba Finance",
     roleName: "Finance Analyst",
     category: "Finance",
-    description: "Supports financial planning, analysis, and budgeting.",
-    capabilities: ["Financial planning", "Budget tracking", "Analysis and reporting", "Escalate exceptions"],
+    description: "Analyzes real financial data and supports planning, budgeting, and forecasting — clearly labels every estimate as an estimate.",
+    capabilities: ["Financial performance summaries", "Scenario & forecast support", "Budget follow-up tasks", "Escalate exceptions"],
     icon: "◍",
     avatar: "/avatars/finance.png",
     templateId: "kuba-finance",
@@ -178,8 +175,8 @@ const rawEmployeeCatalog: RawCatalogEntry[] = [
     name: "Kuba HR",
     roleName: "HR Assistant",
     category: "People",
-    description: "Supports recruitment, employee information, and people operations.",
-    capabilities: ["Support recruitment", "Track employee information", "People operations", "Escalate exceptions"],
+    description: "Supports HR operations — headcount and leave visibility, onboarding checklists, and policy questions — never a hiring, firing, or compensation decision.",
+    capabilities: ["Headcount & leave overview", "Onboarding checklists", "Policy Q&A", "Create HR tasks"],
     icon: "◉",
     avatar: "/avatars/hr.png",
     templateId: "kuba-hr",
@@ -189,8 +186,8 @@ const rawEmployeeCatalog: RawCatalogEntry[] = [
     name: "Kuba Operations",
     roleName: "Operations Coordinator",
     category: "Operations",
-    description: "Coordinates business processes and monitors operational workflows.",
-    capabilities: ["Coordinate processes", "Monitor workflows", "Surface bottlenecks", "Escalate exceptions"],
+    description: "Coordinates day-to-day operations — tasks, appointments, and workflow status — and flags what needs attention.",
+    capabilities: ["Operations overview", "Identify overdue work", "Create operational tasks", "Coordinate handoffs"],
     icon: "⌁",
     avatar: "/avatars/operations.png",
     templateId: "kuba-operations",
@@ -200,8 +197,8 @@ const rawEmployeeCatalog: RawCatalogEntry[] = [
     name: "Custom Employee",
     roleName: "Custom Employee",
     category: "Custom",
-    description: "A custom AI employee built around a specific business workflow, configured for your Enterprise agreement.",
-    capabilities: ["Define responsibilities", "Choose a communication style", "Connect business context", "Set approval expectations"],
+    description: "A custom AI employee built around a specific business role, with tools you choose from a curated, safe catalog.",
+    capabilities: ["Define objective & instructions", "Choose allowed tools", "Set autonomy & approvals", "Connect business knowledge"],
     icon: "◇",
     avatar: "/avatars/receptionist.png",
     templateId: "custom",

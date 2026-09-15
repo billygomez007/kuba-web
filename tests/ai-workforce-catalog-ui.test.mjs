@@ -48,7 +48,7 @@ function entitlementsFor(planId) {
 test("the catalog defines every approved-model employee type exactly once", () => {
   const types = employeeCatalog.map((entry) => entry.type);
   assert.equal(new Set(types).size, types.length, "no duplicate type keys");
-  for (const required of ["receptionist", "sales", "customer-support", "outreach", "marketing", "appointment"]) {
+  for (const required of ["receptionist", "sales", "customer-support", "outreach", "marketing", "appointment", "accountant", "finance", "hr", "operations", "custom"]) {
     assert.ok(types.includes(required), `expected ${required} in the catalog`);
   }
 });
@@ -67,20 +67,16 @@ test("every catalog entry has the metadata the UI actually renders", () => {
   }
 });
 
-test("implementation status matches what actually has a working chat runtime (no misleading Activate button)", () => {
-  const expectedAvailable = new Set([
-    "receptionist", "sales", "customer-support", "outreach", "general-manager",
-    "marketing", "appointment",
-  ]);
+test("implementation status matches what actually has a working chat runtime (no misleading Activate button) — every catalog type is now available, none coming-soon", () => {
   for (const entry of employeeCatalog) {
-    const expected = expectedAvailable.has(entry.type) ? "available" : "coming-soon";
-    assert.equal(entry.implementation, expected, `${entry.type} implementation status`);
+    assert.equal(entry.implementation, "available", `${entry.type} implementation status`);
   }
 });
 
-test("Marketing and Appointment now have real Mastra agents + /api/ai routes and are available, not coming-soon", () => {
-  assert.equal(getCatalogEntry("marketing").implementation, "available");
-  assert.equal(getCatalogEntry("appointment").implementation, "available");
+test("every catalog type, including the newest five (Accountant, Finance, HR, Operations, Custom), has a real Mastra agent + /api/ai route and is available, not coming-soon", () => {
+  for (const type of ["marketing", "appointment", "accountant", "finance", "hr", "operations", "custom"]) {
+    assert.equal(getCatalogEntry(type).implementation, "available", type);
+  }
 });
 
 test("the catalog's implementation field is DERIVED from isEmployeeImplementationAvailable, not hand-set — it can never drift from what the policy enforces", () => {
@@ -117,12 +113,11 @@ test("minimumSelfServePlanToActivate matches the final approved model for every 
   assert.equal(minimumSelfServePlanToActivate("general-manager"), "pro");
   assert.equal(minimumSelfServePlanToActivate("marketing"), "pro");
   assert.equal(minimumSelfServePlanToActivate("appointment"), "pro");
-});
-
-test("minimumSelfServePlanToActivate is null for Custom AI and unassigned legacy types — none of them are ever self-serve activatable", () => {
-  for (const type of ["custom", "accountant", "finance", "hr", "operations"]) {
-    assert.equal(minimumSelfServePlanToActivate(type), null, type);
-  }
+  assert.equal(minimumSelfServePlanToActivate("accountant"), "pro");
+  assert.equal(minimumSelfServePlanToActivate("finance"), "pro");
+  assert.equal(minimumSelfServePlanToActivate("hr"), "pro");
+  assert.equal(minimumSelfServePlanToActivate("operations"), "pro");
+  assert.equal(minimumSelfServePlanToActivate("custom"), "pro");
 });
 
 // --- 3. UI surfaces are consolidated onto the shared catalog ----------------

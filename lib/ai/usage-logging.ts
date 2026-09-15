@@ -25,7 +25,12 @@ export function logAIUsage(entry: {
     | "command_center_qa"
     | "website_chat"
     | "marketing"
-    | "appointment";
+    | "appointment"
+    | "accountant"
+    | "finance"
+    | "hr"
+    | "operations"
+    | "custom";
   businessId: string;
   employeeId?: string | null;
   model: string;

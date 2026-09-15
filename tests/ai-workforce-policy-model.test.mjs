@@ -138,9 +138,11 @@ for (const type of ["custom", "some-unknown-type"]) {
 }
 
 // ---------------------------------------------------------------------------
-// PRO — Receptionist/Support/Sales/Outreach/General Manager PASS;
-// Marketing/Appointment are commercially included but EMPLOYEE_NOT_AVAILABLE;
-// Custom/unknown still FAIL; 11th employee hits the limit
+// PRO — Receptionist/Support/Sales/Outreach/General Manager PASS; every
+// other standard type (Marketing, Appointment, Accountant, Finance, HR,
+// Operations, Custom) is now commercially included AND genuinely built, so
+// all twelve catalog types pass on Pro; only a truly unmodeled type FAILS;
+// 11th employee hits the limit
 // ---------------------------------------------------------------------------
 
 for (const type of ["receptionist", "customer-support", "sales", "outreach", "general-manager"]) {
@@ -150,8 +152,8 @@ for (const type of ["receptionist", "customer-support", "sales", "outreach", "ge
   });
 }
 
-for (const type of ["marketing", "appointment"]) {
-  test(`PRO: ${type} is commercially entitled and now genuinely built — activation is allowed`, () => {
+for (const type of ["marketing", "appointment", "accountant", "finance", "hr", "operations", "custom"]) {
+  test(`PRO: ${type} is commercially entitled and genuinely built — activation is allowed`, () => {
     // Commercial entitlement (dimension A) genuinely holds on Pro...
     assert.ok(allowedEmployeeTypesForPlan(entitlementsFor("pro")).includes(type));
     // ...and now a real Mastra agent + /api/ai route exist, so activation succeeds too.
@@ -160,37 +162,28 @@ for (const type of ["marketing", "appointment"]) {
   });
 }
 
-for (const type of ["custom", "some-unknown-type"]) {
-  test(`PRO: ${type} FAILS — never assigned a commercial tier, so it is not merely coming-soon, it is not entitled at all`, () => {
-    const decision = canActivateEmployee(entitlementsFor("pro"), type, 0);
-    assert.equal(decision.allowed, false);
-    assert.equal(decision.code, "EMPLOYEE_TYPE_NOT_ENTITLED");
-  });
-}
+test("PRO: a truly unmodeled type FAILS — never assigned a commercial tier, so it is not merely coming-soon, it is not entitled at all", () => {
+  const decision = canActivateEmployee(entitlementsFor("pro"), "some-unknown-type", 0);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.code, "EMPLOYEE_TYPE_NOT_ENTITLED");
+});
 
-test("PRO: up to 10 employees allowed, the 11th FAILS with EMPLOYEE_LIMIT_REACHED", () => {
-  const allowedAtNine = canActivateEmployee(entitlementsFor("pro"), "receptionist", 9);
-  assert.deepEqual(allowedAtNine, { allowed: true });
+test("PRO: up to 15 employees allowed (room for the complete 12-type catalog plus headroom), the 16th FAILS with EMPLOYEE_LIMIT_REACHED", () => {
+  const allowedAtFourteen = canActivateEmployee(entitlementsFor("pro"), "receptionist", 14);
+  assert.deepEqual(allowedAtFourteen, { allowed: true });
 
-  const deniedAtTen = canActivateEmployee(entitlementsFor("pro"), "receptionist", 10);
-  assert.equal(deniedAtTen.allowed, false);
-  assert.equal(deniedAtTen.code, "EMPLOYEE_LIMIT_REACHED");
+  const deniedAtFifteen = canActivateEmployee(entitlementsFor("pro"), "receptionist", 15);
+  assert.equal(deniedAtFifteen.allowed, false);
+  assert.equal(deniedAtFifteen.code, "EMPLOYEE_LIMIT_REACHED");
 });
 
 // ---------------------------------------------------------------------------
 // ENTERPRISE
 // ---------------------------------------------------------------------------
 
-test("ENTERPRISE: every production-ready standard employee type is available with no arbitrary Starter/Growth/Pro restriction", () => {
+test("ENTERPRISE: every standard employee type — the complete 12-type catalog — is available with no arbitrary Starter/Growth/Pro restriction, and Enterprise never has fewer working employees than Pro", () => {
   for (const type of STANDARD_EMPLOYEE_TYPE_LIST) {
-    if (!isEmployeeImplementationAvailable(type)) continue; // marketing/appointment handled separately below
-    const decision = canActivateEmployee(entitlementsFor("enterprise"), type, 0);
-    assert.deepEqual(decision, { allowed: true }, `expected ${type} to be allowed on Enterprise`);
-  }
-});
-
-test("ENTERPRISE: Marketing and Appointment are commercially included and now genuinely built — Enterprise never has fewer working employees than Pro", () => {
-  for (const type of ["marketing", "appointment"]) {
+    assert.ok(isEmployeeImplementationAvailable(type), `expected ${type} to be implemented`);
     const decision = canActivateEmployee(entitlementsFor("enterprise"), type, 0);
     assert.deepEqual(decision, { allowed: true }, `expected ${type} to be allowed on Enterprise`);
   }
@@ -213,25 +206,10 @@ test("ENTERPRISE: default (unconfigured) employee limit is unlimited, never an a
   assert.deepEqual(decision, { allowed: true });
 });
 
-test("ENTERPRISE: Custom AI without explicit configuration fails with ENTERPRISE_CONFIGURATION_REQUIRED, not a generic upgrade prompt", () => {
-  const decision = canActivateEmployee(entitlementsFor("enterprise"), "custom", 0);
-  assert.equal(decision.allowed, false);
-  assert.equal(decision.code, "ENTERPRISE_CONFIGURATION_REQUIRED");
-  assert.equal(decision.requiredPlan, undefined);
-});
-
 test("ENTERPRISE: an unrecognized type not yet granted fails with ENTERPRISE_CONFIGURATION_REQUIRED — unknown to the policy never implies availability", () => {
   const decision = canActivateEmployee(entitlementsFor("enterprise"), "bespoke-legal-employee", 0);
   assert.equal(decision.allowed, false);
   assert.equal(decision.code, "ENTERPRISE_CONFIGURATION_REQUIRED");
-});
-
-test("ENTERPRISE: Custom AI explicit configuration establishes commercial entitlement but activation still fails closed until its runtime exists", () => {
-  const withCustomModule = entitlementsFor("enterprise", { modules: ["custom"] });
-  assert.equal(isEmployeeTypeEntitled(withCustomModule, "custom"), true);
-  const decision = canActivateEmployee(withCustomModule, "custom", 0);
-  assert.equal(decision.allowed, false);
-  assert.equal(decision.code, "EMPLOYEE_NOT_AVAILABLE");
 });
 
 test("ENTERPRISE: an explicit grant never makes an unknown employee implementation-ready", () => {
@@ -243,25 +221,26 @@ test("ENTERPRISE: an explicit grant never makes an unknown employee implementati
 });
 
 // ---------------------------------------------------------------------------
-// Legacy, unassigned types (accountant, finance, hr, operations) fail closed
-// on every plan exactly like a made-up type — no commercial tier has been
-// assigned to them by the product owner.
+// Accountant, Finance, HR, Operations, Custom: formerly legacy/unassigned
+// catalog types, now standard Pro+ types with a real runtime, exactly like
+// Marketing and Appointment before them — fail below Pro, pass at Pro and
+// Enterprise, and are commercially entitled without any Enterprise module
+// grant (the entitlements.modules path is reserved for a truly future/
+// unmodeled type, not for anything currently in the catalog).
 // ---------------------------------------------------------------------------
 
-for (const type of ["accountant", "finance", "hr", "operations"]) {
-  test(`${type}: has no assigned commercial tier — fails on Starter/Growth/Pro and requires explicit Enterprise configuration`, () => {
-    for (const planId of ["starter", "growth", "pro"]) {
+for (const type of ["accountant", "finance", "hr", "operations", "custom"]) {
+  test(`${type}: minPlan is pro — fails on Starter/Growth, passes on Pro and Enterprise with no module grant required`, () => {
+    for (const planId of ["starter", "growth"]) {
       const decision = canActivateEmployee(entitlementsFor(planId), type, 0);
       assert.equal(decision.allowed, false, `${type} on ${planId}`);
       assert.equal(decision.code, "EMPLOYEE_TYPE_NOT_ENTITLED");
+      assert.equal(decision.requiredPlan, "pro");
     }
-    const enterpriseDecision = canActivateEmployee(entitlementsFor("enterprise"), type, 0);
-    assert.equal(enterpriseDecision.allowed, false);
-    assert.equal(enterpriseDecision.code, "ENTERPRISE_CONFIGURATION_REQUIRED");
-
-    const grantedDecision = canActivateEmployee(entitlementsFor("enterprise", { modules: [type] }), type, 0);
-    assert.equal(grantedDecision.allowed, false);
-    assert.equal(grantedDecision.code, "EMPLOYEE_NOT_AVAILABLE");
+    for (const planId of ["pro", "enterprise"]) {
+      const decision = canActivateEmployee(entitlementsFor(planId), type, 0);
+      assert.deepEqual(decision, { allowed: true }, `${type} on ${planId}`);
+    }
   });
 }
 
@@ -311,6 +290,13 @@ test("every implemented runtime chat route uses isEmployeeTypeEntitled with the 
     "app/api/ai/customer-support/route.ts": "customer-support",
     "app/api/ai/outreach/route.ts": "outreach",
     "app/api/ai/general-manager/route.ts": "general-manager",
+    "app/api/ai/marketing/route.ts": "marketing",
+    "app/api/ai/appointment/route.ts": "appointment",
+    "app/api/ai/accountant/route.ts": "accountant",
+    "app/api/ai/finance/route.ts": "finance",
+    "app/api/ai/hr/route.ts": "hr",
+    "app/api/ai/operations/route.ts": "operations",
+    "app/api/ai/custom/route.ts": "custom",
   };
 
   for (const [file, type] of Object.entries(routeToType)) {
@@ -323,14 +309,12 @@ test("every implemented runtime chat route uses isEmployeeTypeEntitled with the 
   }
 });
 
-test("there is no runtime route for a not-yet-implemented, unassigned-tier employee type (custom, accountant, finance, hr, operations)", () => {
-  for (const type of ["custom", "accountant", "finance", "hr", "operations"]) {
-    assert.equal(existsSync(`app/api/ai/${type}/route.ts`), false, `expected no runtime route to exist for ${type}`);
-  }
+test("there is no runtime route for a genuinely unmodeled employee type", () => {
+  assert.equal(existsSync("app/api/ai/some-unknown-type/route.ts"), false, "expected no runtime route to exist for an unmodeled type");
 });
 
-test("marketing and appointment now have a real runtime route, matching their implemented: true policy status", () => {
-  for (const type of ["marketing", "appointment"]) {
+test("every standard employee type (all 12 catalog types) now has a real runtime route, matching its implemented: true policy status", () => {
+  for (const type of STANDARD_EMPLOYEE_TYPE_LIST) {
     assert.equal(existsSync(`app/api/ai/${type}/route.ts`), true, `expected a real runtime route for ${type}`);
   }
 });
@@ -359,13 +343,13 @@ test("the activation route uses the same canActivateEmployee policy for both new
   );
 });
 
-test("direct API activation cannot bypass entitlement: canActivateEmployee still denies Custom (never assigned a commercial tier) regardless of the count check outcome", () => {
-  const customDecision = canActivateEmployee(entitlementsFor("enterprise"), "custom", 0);
-  assert.equal(customDecision.allowed, false);
+test("direct API activation cannot bypass entitlement: canActivateEmployee still denies a genuinely unmodeled type regardless of the count check outcome", () => {
+  const decision = canActivateEmployee(entitlementsFor("enterprise"), "some-unknown-type", 0);
+  assert.equal(decision.allowed, false);
 });
 
-test("Marketing and Appointment activation succeeds given an empty slot on the plan that commercially includes them — count passing AND implementation both now hold", () => {
-  for (const type of ["marketing", "appointment"]) {
+test("every Pro+ standard employee type activation succeeds given an empty slot on a plan that commercially includes it — count passing AND implementation both now hold", () => {
+  for (const type of ["marketing", "appointment", "accountant", "finance", "hr", "operations", "custom"]) {
     const decision = canActivateEmployee(entitlementsFor("pro"), type, 0);
     assert.deepEqual(decision, { allowed: true });
   }
@@ -418,6 +402,13 @@ test("tenant isolation unchanged: every entitlement check in the runtime routes 
     "app/api/ai/customer-support/route.ts",
     "app/api/ai/outreach/route.ts",
     "app/api/ai/general-manager/route.ts",
+    "app/api/ai/marketing/route.ts",
+    "app/api/ai/appointment/route.ts",
+    "app/api/ai/accountant/route.ts",
+    "app/api/ai/finance/route.ts",
+    "app/api/ai/hr/route.ts",
+    "app/api/ai/operations/route.ts",
+    "app/api/ai/custom/route.ts",
   ]) {
     const source = await readFile(file, "utf8");
     assert.match(source, /getBusinessEntitlements\(business\.id\)/);
@@ -427,20 +418,22 @@ test("tenant isolation unchanged: every entitlement check in the runtime routes 
 
 // ---------------------------------------------------------------------------
 // allowedEmployeeTypesForPlan is COMMERCIAL entitlement only (dimension A) —
-// it intentionally still lists Marketing/Appointment on Pro, because they
-// really are commercially included; canActivateEmployee is what layers
-// implementation availability on top.
+// it intentionally lists every Pro-tier type on Pro, including Custom,
+// because they really are all commercially included now; canActivateEmployee
+// is what layers implementation availability on top (and confirms it holds
+// too, since every one of them is genuinely built).
 // ---------------------------------------------------------------------------
 
-test("allowedEmployeeTypesForPlan reflects commercial entitlement only, per the final approved model", () => {
+test("allowedEmployeeTypesForPlan reflects commercial entitlement only, per the final approved model — Pro and Enterprise both include the complete 12-type catalog", () => {
   assert.deepEqual([...allowedEmployeeTypesForPlan(entitlementsFor("starter"))], ["receptionist"]);
   assert.deepEqual(
     [...allowedEmployeeTypesForPlan(entitlementsFor("growth"))],
     ["receptionist", "customer-support", "sales"],
   );
   const proAllowed = [...allowedEmployeeTypesForPlan(entitlementsFor("pro"))];
-  for (const type of ["receptionist", "customer-support", "sales", "outreach", "general-manager", "marketing", "appointment"]) {
+  const enterpriseAllowed = [...allowedEmployeeTypesForPlan(entitlementsFor("enterprise"))];
+  for (const type of STANDARD_EMPLOYEE_TYPE_LIST) {
     assert.ok(proAllowed.includes(type), `expected ${type} to be commercially included on Pro`);
+    assert.ok(enterpriseAllowed.includes(type), `expected ${type} to be commercially included on Enterprise`);
   }
-  assert.ok(!proAllowed.includes("custom"), "custom must never appear as commercially allowed outside Enterprise");
 });

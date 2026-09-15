@@ -58,7 +58,7 @@ test("Pro is marked recommended/flagship; no other plan is", () => {
 test("active-employee limits match the only approved direction: Starter 1, Growth up to 3, Pro all standard (uncapped by count), Enterprise unlimited", () => {
   assert.equal(getPlanLimits(getPlanDefinition("starter")).employeeLimit, 1);
   assert.equal(getPlanLimits(getPlanDefinition("growth")).employeeLimit, 3);
-  assert.equal(getPlanLimits(getPlanDefinition("pro")).employeeLimit, 10, "Pro's limit must exceed the 5 currently-implemented standard types so it never actually constrains them");
+  assert.equal(getPlanLimits(getPlanDefinition("pro")).employeeLimit, 15, "Pro's limit must exceed the complete 12-type standard catalog so the type ceiling, not an arbitrary headcount, decides availability");
   assert.equal(getPlanLimits(getPlanDefinition("enterprise")).employeeLimit, null, "Enterprise must be unlimited (null), never an arbitrary large integer");
 });
 
@@ -97,13 +97,13 @@ test("getEmployeeAccessState: not entitled surfaces the correct requiredPlan (Sa
 });
 
 test("getEmployeeAccessState: entitled and implemented are independent dimensions, proven with a genuinely unassigned-tier type (never conflate the two)", () => {
-  const state = getEmployeeAccessState(entitlementsFor("pro"), "accountant", 0);
-  assert.equal(state.entitled, false, "accountant was never assigned any commercial tier");
+  const state = getEmployeeAccessState(entitlementsFor("pro"), "some-unknown-type", 0);
+  assert.equal(state.entitled, false, "an unmodeled type was never assigned any commercial tier");
   assert.equal(state.implemented, false, "and has no real runtime either");
 });
 
-test("getEmployeeAccessState: all seven standard employees (including Marketing and Appointment, now genuinely built) are entitled+implemented+usage-available on Pro with room to spare", () => {
-  for (const type of ["receptionist", "sales", "customer-support", "outreach", "general-manager", "marketing", "appointment"]) {
+test("getEmployeeAccessState: all twelve standard employees (the complete AI workforce) are entitled+implemented+usage-available on Pro with room to spare", () => {
+  for (const type of ["receptionist", "sales", "customer-support", "outreach", "general-manager", "marketing", "appointment", "accountant", "finance", "hr", "operations", "custom"]) {
     const state = getEmployeeAccessState(entitlementsFor("pro"), type, 0);
     assert.equal(state.entitled, true, `${type} should be entitled on Pro`);
     assert.equal(state.implemented, true, `${type} should be implemented`);

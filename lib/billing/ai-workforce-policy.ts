@@ -29,10 +29,10 @@ import type { BusinessEntitlements, PlanId } from "./entitlements";
  * is commercially entitled ONLY if explicitly granted via
  * entitlements.modules, and still cannot be activated until it is explicitly
  * represented here as implemented. Being "unknown to the policy" must never
- * itself be a path to availability, even for Enterprise. This applies to legacy/out-of-model catalog types
- * (accountant, finance, hr, operations) exactly the same way it applies to
- * a made-up string — none of them have been assigned a commercial tier by
- * the product owner, so all of them fail closed until that happens.
+ * itself be a path to availability, even for Enterprise. Every catalog type
+ * (see lib/billing/ai-workforce-catalog.ts) is now explicitly modeled below
+ * — this fail-closed path exists for any FUTURE type that hasn't been
+ * assigned a tier yet, not for anything currently in the catalog.
  */
 
 export type EmployeeActivationCode =
@@ -58,12 +58,18 @@ export type EmployeeActivationDecision =
  * dimension A only — dimension B (`implemented`) is checked independently,
  * and BOTH must hold before canActivateEmployee ever allows it.
  *
- * "custom" is deliberately NOT listed here — it is Enterprise-only and must
- * always go through the explicit entitlements.modules grant path below,
- * never through a minPlan comparison. The same is true of any other
- * type not listed here (accountant, finance, hr, operations, or anything
- * else) — no commercial tier has been assigned to them, so they fall
- * through to that identical unmodeled-type path on every plan.
+ * As of the "complete 12-employee AI workforce" pass, EVERY catalog type has
+ * been assigned a commercial tier and a real runtime — accountant, finance,
+ * hr, operations, and custom (a curated, user-configured tool framework; see
+ * mastra/agents/custom.ts) all join the list below at minPlan "pro", the
+ * same tier as every other Pro-tier type. There is no longer an
+ * Enterprise-only, entitlements.modules-gated employee type — Enterprise's
+ * own guarantee ("never fewer AI employees than Pro") means gating a type
+ * behind a manual per-Enterprise-account module grant would make it
+ * Enterprise-only or slower-to-enable than Pro, which is no longer the
+ * approved model. The entitlements.modules path below still exists for a
+ * genuinely unmodeled/future type (e.g. a brand-new catalog entry not yet
+ * assigned a tier) — it is simply no longer used by any type in this table.
  */
 const STANDARD_EMPLOYEE_TYPES: Record<string, { minPlan: Exclude<PlanId, "enterprise">; implemented: boolean }> = {
   "receptionist": { minPlan: "starter", implemented: true },
@@ -73,6 +79,11 @@ const STANDARD_EMPLOYEE_TYPES: Record<string, { minPlan: Exclude<PlanId, "enterp
   "general-manager": { minPlan: "pro", implemented: true },
   "marketing": { minPlan: "pro", implemented: true },
   "appointment": { minPlan: "pro", implemented: true },
+  "accountant": { minPlan: "pro", implemented: true },
+  "finance": { minPlan: "pro", implemented: true },
+  "hr": { minPlan: "pro", implemented: true },
+  "operations": { minPlan: "pro", implemented: true },
+  "custom": { minPlan: "pro", implemented: true },
 };
 
 /** Every employee type the approved product model explicitly tiers. */

@@ -21,6 +21,11 @@ const RUNTIME_ENDPOINT: Record<string, string> = {
   "general-manager": "/api/ai/general-manager",
   marketing: "/api/ai/marketing",
   appointment: "/api/ai/appointment",
+  accountant: "/api/ai/accountant",
+  finance: "/api/ai/finance",
+  hr: "/api/ai/hr",
+  operations: "/api/ai/operations",
+  custom: "/api/ai/custom",
 };
 
 type Props = {

@@ -6,9 +6,12 @@ import { db } from "@/db";
 import {
   aiEmployees,
   aiEmployeeSettings,
+  aiEmployeeScopes,
   businessUsers,
   users,
 } from "@/db/schema";
+import { CUSTOM_TOOL_CATALOG, isCustomToolId } from "@/mastra/agents/custom";
+import CustomToolPermissions from "@/app/components/employees/CustomToolPermissions";
 
 type PageProps = {
   params: Promise<{
@@ -98,6 +101,40 @@ export default async function EmployeeSettingsPage({
   const canEdit =
     business.role === "owner" ||
     business.role === "admin";
+
+  let customToolCatalog: {
+    toolId: string;
+    label: string;
+    category: string;
+    riskLevel: "low" | "medium";
+    description: string;
+    granted: boolean;
+  }[] = [];
+
+  if (employee.type === "custom") {
+    const grantedRows = await db
+      .select({ scope: aiEmployeeScopes.scope })
+      .from(aiEmployeeScopes)
+      .where(
+        and(
+          eq(aiEmployeeScopes.businessId, business.businessId),
+          eq(aiEmployeeScopes.aiEmployeeId, employee.id),
+          eq(aiEmployeeScopes.effect, "allow"),
+          eq(aiEmployeeScopes.status, "active"),
+        ),
+      );
+    const grantedToolIds = new Set(
+      grantedRows.map((row) => row.scope.replace(/^tool:/, "")).filter((id) => isCustomToolId(id)),
+    );
+    customToolCatalog = Object.entries(CUSTOM_TOOL_CATALOG).map(([toolId, entry]) => ({
+      toolId,
+      label: entry.label,
+      category: entry.category,
+      riskLevel: entry.riskLevel,
+      description: entry.description,
+      granted: grantedToolIds.has(toolId),
+    }));
+  }
 
   return (
     <main className="min-h-screen bg-[#07070A] text-white">
@@ -234,6 +271,14 @@ export default async function EmployeeSettingsPage({
               </select>
             </div>
           </section>
+
+          {employee.type === "custom" && (
+            <CustomToolPermissions
+              employeeId={employee.id}
+              canManage={canEdit}
+              initialCatalog={customToolCatalog}
+            />
+          )}
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-6 sm:p-8">
             <h2 className="text-xl font-black">
