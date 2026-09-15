@@ -1,8 +1,7 @@
 import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { db } from "@/db";
 import {
   aiEmployees,
@@ -20,30 +19,25 @@ type PageProps = {
 export default async function EmployeeSettingsPage({
   params,
 }: PageProps) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user) {
+  const user = await getCurrentUser();
+  if (!user) {
     redirect("/login");
   }
 
   const { id } = await params;
 
-  const membership = await db
-    .select({
-      businessId: businessUsers.businessId,
-      role: businessUsers.role,
-    })
-    .from(businessUsers)
-    .where(eq(businessUsers.userId, session.user.id))
-    .limit(1);
+  // Must honor the caller's currently SELECTED business (the
+  // superkuba_business_id cookie) — see app/dashboard/employees/[id]/page.tsx
+  // for the full explanation of why a raw "first membership row" query
+  // 404s real employees for any multi-business user who has switched away
+  // from their first business.
+  const membership = await getCurrentMembership();
 
-  const business = membership[0];
-
-  if (!business) {
+  if (!membership) {
     redirect("/onboarding");
   }
+
+  const business = { businessId: membership.businessId, role: membership.role };
 
   const employeeResult = await db
     .select({

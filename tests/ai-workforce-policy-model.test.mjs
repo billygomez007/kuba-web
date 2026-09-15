@@ -151,14 +151,12 @@ for (const type of ["receptionist", "customer-support", "sales", "outreach", "ge
 }
 
 for (const type of ["marketing", "appointment"]) {
-  test(`PRO: ${type} is commercially entitled but not yet built — EMPLOYEE_NOT_AVAILABLE, not EMPLOYEE_TYPE_NOT_ENTITLED, and no upgrade prompt`, () => {
+  test(`PRO: ${type} is commercially entitled and now genuinely built — activation is allowed`, () => {
     // Commercial entitlement (dimension A) genuinely holds on Pro...
     assert.ok(allowedEmployeeTypesForPlan(entitlementsFor("pro")).includes(type));
-    // ...but activation is still denied, for an entirely different reason.
+    // ...and now a real Mastra agent + /api/ai route exist, so activation succeeds too.
     const decision = canActivateEmployee(entitlementsFor("pro"), type, 0);
-    assert.equal(decision.allowed, false);
-    assert.equal(decision.code, "EMPLOYEE_NOT_AVAILABLE");
-    assert.equal(decision.requiredPlan, undefined, "an already-entitled-but-unbuilt type must never carry an upgrade prompt");
+    assert.deepEqual(decision, { allowed: true });
   });
 }
 
@@ -191,11 +189,10 @@ test("ENTERPRISE: every production-ready standard employee type is available wit
   }
 });
 
-test("ENTERPRISE: Marketing and Appointment are commercially included but still EMPLOYEE_NOT_AVAILABLE — Enterprise doesn't get a working employee the product hasn't built yet", () => {
+test("ENTERPRISE: Marketing and Appointment are commercially included and now genuinely built — Enterprise never has fewer working employees than Pro", () => {
   for (const type of ["marketing", "appointment"]) {
     const decision = canActivateEmployee(entitlementsFor("enterprise"), type, 0);
-    assert.equal(decision.allowed, false);
-    assert.equal(decision.code, "EMPLOYEE_NOT_AVAILABLE");
+    assert.deepEqual(decision, { allowed: true }, `expected ${type} to be allowed on Enterprise`);
   }
 });
 
@@ -326,9 +323,15 @@ test("every implemented runtime chat route uses isEmployeeTypeEntitled with the 
   }
 });
 
-test("there is no runtime route for a not-yet-implemented employee type (marketing, appointment, custom, accountant, finance, hr, operations)", () => {
-  for (const type of ["marketing", "appointment", "custom", "accountant", "finance", "hr", "operations"]) {
+test("there is no runtime route for a not-yet-implemented, unassigned-tier employee type (custom, accountant, finance, hr, operations)", () => {
+  for (const type of ["custom", "accountant", "finance", "hr", "operations"]) {
     assert.equal(existsSync(`app/api/ai/${type}/route.ts`), false, `expected no runtime route to exist for ${type}`);
+  }
+});
+
+test("marketing and appointment now have a real runtime route, matching their implemented: true policy status", () => {
+  for (const type of ["marketing", "appointment"]) {
+    assert.equal(existsSync(`app/api/ai/${type}/route.ts`), true, `expected a real runtime route for ${type}`);
   }
 });
 
@@ -356,15 +359,16 @@ test("the activation route uses the same canActivateEmployee policy for both new
   );
 });
 
-test("direct API activation cannot bypass Coming Soon: canActivateEmployee denies Marketing/Appointment/Custom regardless of the count check outcome", () => {
-  for (const type of ["marketing", "appointment"]) {
-    // Even with an empty slot on the exact plan that commercially includes
-    // the type, activation is still denied — count passing is not enough.
-    const decision = canActivateEmployee(entitlementsFor("pro"), type, 0);
-    assert.equal(decision.allowed, false);
-  }
+test("direct API activation cannot bypass entitlement: canActivateEmployee still denies Custom (never assigned a commercial tier) regardless of the count check outcome", () => {
   const customDecision = canActivateEmployee(entitlementsFor("enterprise"), "custom", 0);
   assert.equal(customDecision.allowed, false);
+});
+
+test("Marketing and Appointment activation succeeds given an empty slot on the plan that commercially includes them — count passing AND implementation both now hold", () => {
+  for (const type of ["marketing", "appointment"]) {
+    const decision = canActivateEmployee(entitlementsFor("pro"), type, 0);
+    assert.deepEqual(decision, { allowed: true });
+  }
 });
 
 // ---------------------------------------------------------------------------

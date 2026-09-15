@@ -34,6 +34,7 @@ export const AI_ACTIONS = [
   "create_ticket",
   "escalate_ticket",
   "request_external_message",
+  "create_marketing_task",
 ] as const;
 
 export type AIAction = (typeof AI_ACTIONS)[number];
@@ -63,6 +64,7 @@ export const ACTION_META: Record<AIAction, { kind: ActionKind; label: string; de
   create_ticket: { kind: "write", label: "Create support tickets", description: "Open a new support ticket." },
   escalate_ticket: { kind: "write", label: "Escalate tickets", description: "Flag a ticket for human attention." },
   request_external_message: { kind: "communication", label: "Send customer messages", description: "Request approval to send a WhatsApp, SMS, or email message to a customer. Always requires human approval." },
+  create_marketing_task: { kind: "write", label: "Create marketing tasks", description: "Create an internal task (content review, design request, launch prep) — never customer-facing." },
 };
 
 /**

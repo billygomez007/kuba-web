@@ -89,7 +89,11 @@ export default function EmployeeTestPage() {
               ? "/api/ai/receptionist"
               : employee.type === "outreach"
                 ? "/api/ai/outreach"
-                : "";
+                : employee.type === "marketing"
+                  ? "/api/ai/marketing"
+                  : employee.type === "appointment"
+                    ? "/api/ai/appointment"
+                    : "";
 
       if (!endpoint) throw new Error("This employee does not have a connected test runtime yet.");
       const body = employee.type === "receptionist"

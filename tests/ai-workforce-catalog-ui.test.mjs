@@ -68,16 +68,19 @@ test("every catalog entry has the metadata the UI actually renders", () => {
 });
 
 test("implementation status matches what actually has a working chat runtime (no misleading Activate button)", () => {
-  const expectedAvailable = new Set(["receptionist", "sales", "customer-support", "outreach", "general-manager"]);
+  const expectedAvailable = new Set([
+    "receptionist", "sales", "customer-support", "outreach", "general-manager",
+    "marketing", "appointment",
+  ]);
   for (const entry of employeeCatalog) {
     const expected = expectedAvailable.has(entry.type) ? "available" : "coming-soon";
     assert.equal(entry.implementation, expected, `${entry.type} implementation status`);
   }
 });
 
-test("Marketing and Appointment are named in the approved Pro-tier model but have no working runtime yet, so they're coming-soon", () => {
-  assert.equal(getCatalogEntry("marketing").implementation, "coming-soon");
-  assert.equal(getCatalogEntry("appointment").implementation, "coming-soon");
+test("Marketing and Appointment now have real Mastra agents + /api/ai routes and are available, not coming-soon", () => {
+  assert.equal(getCatalogEntry("marketing").implementation, "available");
+  assert.equal(getCatalogEntry("appointment").implementation, "available");
 });
 
 test("the catalog's implementation field is DERIVED from isEmployeeImplementationAvailable, not hand-set — it can never drift from what the policy enforces", () => {
@@ -112,11 +115,8 @@ test("minimumSelfServePlanToActivate matches the final approved model for every 
   assert.equal(minimumSelfServePlanToActivate("customer-support"), "growth");
   assert.equal(minimumSelfServePlanToActivate("outreach"), "pro");
   assert.equal(minimumSelfServePlanToActivate("general-manager"), "pro");
-});
-
-test("minimumSelfServePlanToActivate is null for Marketing/Appointment on every self-serve plan — being commercially entitled on Pro is not enough while they're coming-soon, so the UI must never render an 'Upgrade to Pro' claim that a plan change can't actually satisfy", () => {
-  assert.equal(minimumSelfServePlanToActivate("marketing"), null);
-  assert.equal(minimumSelfServePlanToActivate("appointment"), null);
+  assert.equal(minimumSelfServePlanToActivate("marketing"), "pro");
+  assert.equal(minimumSelfServePlanToActivate("appointment"), "pro");
 });
 
 test("minimumSelfServePlanToActivate is null for Custom AI and unassigned legacy types — none of them are ever self-serve activatable", () => {

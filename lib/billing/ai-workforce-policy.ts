@@ -71,8 +71,8 @@ const STANDARD_EMPLOYEE_TYPES: Record<string, { minPlan: Exclude<PlanId, "enterp
   "sales": { minPlan: "growth", implemented: true },
   "outreach": { minPlan: "pro", implemented: true },
   "general-manager": { minPlan: "pro", implemented: true },
-  "marketing": { minPlan: "pro", implemented: false },
-  "appointment": { minPlan: "pro", implemented: false },
+  "marketing": { minPlan: "pro", implemented: true },
+  "appointment": { minPlan: "pro", implemented: true },
 };
 
 /** Every employee type the approved product model explicitly tiers. */

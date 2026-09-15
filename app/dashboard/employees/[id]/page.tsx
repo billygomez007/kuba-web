@@ -1,12 +1,10 @@
 import { and, eq, count } from "drizzle-orm";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
+import { getCurrentMembership, getCurrentUser } from "@/lib/auth/tenant";
 import { db } from "@/db";
 import {
   aiEmployees,
-  businessUsers,
   users,
   conversations,
   handoffs,
@@ -17,9 +15,11 @@ import ReceptionistWorkspace from "../../../components/employees/ReceptionistWor
 import CustomerSupportWorkspace from "../../../components/employees/CustomerSupportWorkspace";
 import GeneralManagerWorkspace from "../../../components/employees/GeneralManagerWorkspace";
 import OutreachWorkspace from "../../../components/employees/OutreachWorkspace";
+import GenericChatWorkspace from "../../../components/employees/GenericChatWorkspace";
 import AIEmployeeHeader from "../../../components/employees/AIEmployeeHeader";
 import { getBusinessEntitlements } from "@/lib/billing/entitlements";
 import { isEmployeeTypeEntitled } from "@/lib/billing/ai-workforce-policy";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
 type Props = {
   params: Promise<{
@@ -30,34 +30,26 @@ type Props = {
 export default async function EmployeeWorkspace({
   params,
 }: Props) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user) {
+  const user = await getCurrentUser();
+  if (!user) {
     redirect("/login");
   }
 
   const { id } = await params;
 
-  const membership = await db
-    .select({
-      businessId: businessUsers.businessId,
-    })
-    .from(businessUsers)
-    .where(
-      eq(
-        businessUsers.userId,
-        session.user.id,
-      ),
-    )
-    .limit(1);
+  // Must honor the caller's currently SELECTED business (the
+  // superkuba_business_id cookie), not just "any membership row" — a user
+  // who belongs to more than one business and has switched away from their
+  // first one would otherwise have every employee here resolved against
+  // the wrong business and hit the notFound() below for a perfectly real
+  // employee. Matches every other tenant-scoped route in the app.
+  const membership = await getCurrentMembership();
 
-  const business = membership[0];
-
-  if (!business) {
+  if (!membership) {
     redirect("/onboarding");
   }
+
+  const business = { businessId: membership.businessId };
 
   const employeeResult = await db
     .select({
@@ -142,11 +134,13 @@ export default async function EmployeeWorkspace({
       <div className="mx-auto max-w-7xl">
 
         <AIEmployeeHeader
+          employeeId={employee.id}
           name={employee.name}
           type={employee.type}
           status={employee.status}
           description={employee.description}
           notEntitledUnderCurrentPlan={!isEmployeeTypeEntitled(await getBusinessEntitlements(business.businessId), employee.type)}
+          canManage={hasPermission(membership.role, membership.permissions, PERMISSIONS.WORKFORCE_MANAGE)}
         />
 
 
@@ -202,15 +196,11 @@ export default async function EmployeeWorkspace({
           ) : employee.type === "outreach" ? (
             <OutreachWorkspace employeeId={employee.id} />
           ) : (
-            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-8">
-              <h2 className="text-2xl font-bold">
-                {employee.name}
-              </h2>
-
-              <p className="mt-2 text-white/40">
-                This AI employee workspace is being prepared.
-              </p>
-            </section>
+            <GenericChatWorkspace
+              employeeId={employee.id}
+              employeeName={employee.name}
+              employeeType={employee.type}
+            />
           )}
         </div>
 

@@ -1,5 +1,92 @@
 # SuperKuba — Current State Audit
 
+## 2026-09-15 update — AI Workforce completion: Marketing, Appointment, deactivation, and the Configure 404 fix
+
+**Root cause of "Configure/Open employee → 404" found and fixed.**
+`app/dashboard/employees/[id]/page.tsx` and its `settings` page resolved the
+caller's business with a raw, non-cookie-aware `businessUsers` query —
+always the user's *first* membership row, ignoring the
+`superkuba_business_id` cookie. Any user belonging to more than one
+business who had switched away from their first one had every employee
+lookup on these two pages resolved against the wrong business, producing a
+genuine 404 for a real employee. Both pages now use the same cookie-aware
+`getCurrentMembership()` every other tenant-scoped route already used.
+Regression: `tests/employee-workspace-tenant-scoping.test.mjs`.
+
+**AI employee deactivation/reactivation implemented** — previously a real,
+documented gap (no code path wrote `aiEmployees.status` back to
+`"inactive"`). New `PATCH /api/ai-employees/[id]` (`{action: "deactivate" |
+"reactivate"}`), gated by `WORKFORCE_MANAGE`, tenant-checked, audited. No
+runtime changes were needed: every chat route already resolves employees
+via `eq(aiEmployees.status, "active")`, and `checkAIEmployeeAuthority`
+already requires an active employee, so flipping this one column was
+sufficient to stop new autonomous execution immediately. Historical
+conversations/activities/settings are untouched; reactivating restores the
+same row. A real Deactivate/Reactivate control was added to
+`AIEmployeeHeader`. Tests: `tests/ai-employee-deactivation.test.mjs`.
+
+**Marketing and Appointment are now genuinely implemented**, closing two of
+the "Coming Soon" cards in the approved Pro-tier catalog
+(`lib/billing/ai-workforce-policy.ts`'s `STANDARD_EMPLOYEE_TYPES.*.implemented`
+flipped to `true` for both — the single source of truth every other
+gate/UI/activation-policy check already derives from, so no other file
+needed a manual update). `accountant`, `finance`, `hr`, `operations`, and
+`custom` remain deliberately unbuilt: none of the first four were ever
+assigned a commercial tier in the approved plan model (a product-scope
+decision, not an engineering gap), and `custom` is intentionally
+Enterprise-module-grant-gated by design.
+
+- **Kuba Appointment** (`mastra/agents/appointment.ts`,
+  `app/api/ai/appointment/route.ts`) wraps the appointment tools that
+  already existed and were already fully production-ready
+  (`mastra/tools/appointment-tools.ts`: get/create/update, conflict
+  detection, authority-gated, audited) — only the agent, its instructions,
+  and the route were new.
+- **Kuba Marketing** (`mastra/agents/marketing.ts`,
+  `app/api/ai/marketing/route.ts`, `mastra/tools/marketing/`) is a
+  deliberately-scoped-down real implementation: it reads real business
+  knowledge/leads/follow-ups, drafts campaigns/content/audience plans
+  directly in conversation (never persisted, never sent — matching every
+  other employee's "no fake external action" floor), honestly reports
+  campaign-performance data as not connected rather than inventing
+  numbers, hands qualified leads to Sales via the existing
+  `createFollowUp` tool, and can create a real internal task
+  (`create_marketing_task`, a new authority action). A prior, more complete
+  14-tool build of this agent exists on the unmerged
+  `claude/marketing-ai-employee-f7z8s9` branch (diverged from a
+  three-week-stale `main` and built against entitlement APIs — `getBusinessPlan`,
+  `canUseFeature`, `BillingFeature` — that no longer exist in the current
+  capability-array-based `lib/billing/entitlements.ts`); it was not merged
+  as-is, but its agent instructions and design informed this rebuild. The
+  richer tool surface (channel-specific content drafting as separate
+  persisted-draft tools, audience segmentation as its own tool, an
+  executive marketing brief) remains a real, scoped follow-up if the
+  product wants it — the current agent already produces the same
+  deliverables conversationally.
+- Any employee type without a bespoke dashboard-style workspace (like
+  Marketing and Appointment today) now gets a real, working chat interface
+  (`GenericChatWorkspace`, calling the same `/api/ai/{type}` route the
+  per-employee test console uses) instead of the previous dead "This AI
+  employee workspace is being prepared" placeholder.
+- Nine existing tests that encoded the *old* "not yet built" state were
+  updated to assert the new, correct behavior (they were not deleted or
+  weakened — each now asserts the positive case with the same rigor).
+  Three new test files were added:
+  `tests/ai-employee-marketing-appointment.test.mjs` (agent registration,
+  authority, tenant isolation, conflict detection, route entitlement
+  ordering), plus the two above. Full suite: 1656/1656 passing.
+
+**Not done in this pass, by explicit scope decision, not oversight:**
+mobile-viewport/browser acceptance testing (no browser automation tool
+available in this environment — needs owner verification in a real
+browser), and wiring Marketing/Appointment into the Website Chat/WhatsApp
+inbound-channel registry (`lib/communications/ai-agent-registry.ts`) —
+Outreach, an existing real employee, isn't wired into that registry either
+today, since it's an outbound-only role; whether Appointment specifically
+should be reachable from the public chat widget is a real, separate
+product decision, not an oversight, and was left alone rather than guessed
+at.
+
 ## 2026-09-15 update — enterprise tenancy and Kora production gate
 
 The approved `feature/outreach-ai-employee` source contains the canonical

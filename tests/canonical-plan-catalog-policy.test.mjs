@@ -96,14 +96,14 @@ test("getEmployeeAccessState: not entitled surfaces the correct requiredPlan (Sa
   assert.equal(state.usageAvailable, true, "not-entitled must not be conflated with usage-exhausted");
 });
 
-test("getEmployeeAccessState: implemented=false for a commercially-included-but-not-built type (Marketing on Pro)", () => {
-  const state = getEmployeeAccessState(entitlementsFor("pro"), "marketing", 0);
-  assert.equal(state.entitled, true, "Marketing IS commercially part of Pro");
-  assert.equal(state.implemented, false, "but has no real runtime yet — never conflate the two dimensions");
+test("getEmployeeAccessState: entitled and implemented are independent dimensions, proven with a genuinely unassigned-tier type (never conflate the two)", () => {
+  const state = getEmployeeAccessState(entitlementsFor("pro"), "accountant", 0);
+  assert.equal(state.entitled, false, "accountant was never assigned any commercial tier");
+  assert.equal(state.implemented, false, "and has no real runtime either");
 });
 
-test("getEmployeeAccessState: all five standard employees are entitled+implemented+usage-available on Pro with room to spare", () => {
-  for (const type of ["receptionist", "sales", "customer-support", "outreach", "general-manager"]) {
+test("getEmployeeAccessState: all seven standard employees (including Marketing and Appointment, now genuinely built) are entitled+implemented+usage-available on Pro with room to spare", () => {
+  for (const type of ["receptionist", "sales", "customer-support", "outreach", "general-manager", "marketing", "appointment"]) {
     const state = getEmployeeAccessState(entitlementsFor("pro"), type, 0);
     assert.equal(state.entitled, true, `${type} should be entitled on Pro`);
     assert.equal(state.implemented, true, `${type} should be implemented`);

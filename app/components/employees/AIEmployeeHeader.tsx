@@ -1,25 +1,57 @@
 "use client";
 
+import { useState } from "react";
 import { getCatalogEntry, getEmployeeAvatar } from "@/lib/billing/ai-workforce-catalog";
 
 type Props = {
+  employeeId: string;
   name: string;
   type: string;
   status: string;
   description?: string | null;
   /** True if this employee's type isn't included in the business's current plan. */
   notEntitledUnderCurrentPlan?: boolean;
+  /** Owner/admin — the same WORKFORCE_MANAGE gate the settings page and activation API enforce server-side. */
+  canManage?: boolean;
 };
 
 export default function AIEmployeeHeader({
+  employeeId,
   name,
   type,
-  status,
+  status: initialStatus,
   description,
   notEntitledUnderCurrentPlan = false,
+  canManage = false,
 }: Props) {
+  const [status, setStatus] = useState(initialStatus);
+  const [pending, setPending] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const avatar = getEmployeeAvatar(type);
   const category = getCatalogEntry(type)?.category || "AI Workforce";
+  const isActive = status === "active";
+
+  async function toggleStatus() {
+    setPending(true);
+    setStatusError("");
+    try {
+      const response = await fetch(`/api/ai-employees/${employeeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: isActive ? "deactivate" : "reactivate" }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setStatusError(data.error || "Unable to update this employee.");
+        return;
+      }
+      setStatus(data.employee.status);
+    } catch {
+      setStatusError("Unable to update this employee. Check your connection and try again.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <section className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-8 shadow-2xl backdrop-blur-xl">
@@ -53,9 +85,30 @@ export default function AIEmployeeHeader({
               {name}
             </h1>
 
-            <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+            <span
+              className={
+                isActive
+                  ? "rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300"
+                  : "rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/45"
+              }
+            >
               {status}
             </span>
+
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => void toggleStatus()}
+                disabled={pending}
+                className={
+                  isActive
+                    ? "rounded-full border border-amber-400/20 bg-amber-400/[0.06] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300 transition hover:bg-amber-400/[0.12] disabled:opacity-50"
+                    : "rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-300 transition hover:bg-cyan-400/[0.12] disabled:opacity-50"
+                }
+              >
+                {pending ? "Working…" : isActive ? "Deactivate" : "Reactivate"}
+              </button>
+            )}
 
             {notEntitledUnderCurrentPlan && (
               <span
@@ -68,6 +121,17 @@ export default function AIEmployeeHeader({
 
           </div>
 
+          {statusError && (
+            <p className="mt-2 text-xs text-rose-300" role="alert">
+              {statusError}
+            </p>
+          )}
+
+          {!isActive && (
+            <p className="mt-2 text-xs text-white/40">
+              Inactive — no longer takes new conversations or actions. Conversation history and settings are preserved; reactivate to resume.
+            </p>
+          )}
 
           <p className="mt-2 text-sm font-semibold uppercase tracking-wider text-cyan-300/60">
             {category}

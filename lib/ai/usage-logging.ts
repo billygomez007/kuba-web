@@ -23,7 +23,9 @@ export function logAIUsage(entry: {
     | "outreach_research"
     | "executive_briefing"
     | "command_center_qa"
-    | "website_chat";
+    | "website_chat"
+    | "marketing"
+    | "appointment";
   businessId: string;
   employeeId?: string | null;
   model: string;
