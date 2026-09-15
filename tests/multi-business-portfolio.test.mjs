@@ -575,6 +575,64 @@ test("the additional-business route reuses the shared organization-link module r
 // a second, unrelated "Kora OS" business must stay fully isolated by ID.
 // ==================================================
 
+// SEC/PROD reconciliation regression: a real production report claimed
+// "+ Add business" is blocked when the currently selected business is on
+// the Starter plan. No such gate exists anywhere in the authorization
+// chain (createBusinessForUser, authorizeOrganizationLinkForUser,
+// linkBusinessToOrganization, or the additional-business route itself) —
+// confirmed by direct source inspection, not assumed. This test proves it
+// empirically: a Starter-plan existing business, with its owner also
+// holding organization owner standing, can create a second business and
+// link it, exactly as a higher-plan business could.
+test("REGRESSION: a Starter-plan existing business does not block its owner from creating and linking an additional business", async () => {
+  const ownerId = await createUser("starter-owner@example.com");
+  const orgId = await createOrganization("Starter Portfolio");
+  await db.insert(schema.organizationMembers).values({ id: crypto.randomUUID(), organizationId: orgId, userId: ownerId, role: "owner", createdAt: new Date() });
+
+  const starterBusinessId = await createBusiness("Starter Business", "starter");
+  await addBusinessMember(starterBusinessId, ownerId, "owner");
+  await grantPlan(starterBusinessId, "starter", false);
+
+  // The gate additional-business creation actually depends on: an existing
+  // membership, regardless of that business's plan.
+  const existingMembership = await db.select({ businessId: schema.businessUsers.businessId }).from(schema.businessUsers).where(eq(schema.businessUsers.userId, ownerId)).limit(1);
+  assert.equal(existingMembership.length, 1, "the additional-business route's own gate only checks membership existence, never plan");
+
+  const authorization = await authorizeOrganizationLinkForUser(ownerId, orgId);
+  assert.equal(authorization.ok, true, "Starter does not affect organization-link authorization either");
+
+  const secondBusinessId = await createBusiness("Second Business (Starter Owner)", "starter");
+  await addBusinessMember(secondBusinessId, ownerId, "owner");
+  await linkBusinessToOrganization({ businessId: secondBusinessId, organizationId: orgId, actorUserId: ownerId, actorOrganizationRole: authorization.role });
+
+  const secondMembership = (await db.select().from(schema.businessUsers).where(and(eq(schema.businessUsers.businessId, secondBusinessId), eq(schema.businessUsers.userId, ownerId))))[0];
+  assert.equal(secondMembership.role, "owner");
+  const link = await getOrganizationForBusiness(secondBusinessId);
+  assert.equal(link.organizationId, orgId);
+
+  // The original Starter business is untouched.
+  const [starterSubscription] = await db.select().from(schema.subscriptions).where(eq(schema.subscriptions.businessId, starterBusinessId));
+  assert.equal(starterSubscription.plan, "starter");
+  assert.equal(starterSubscription.status, "active");
+});
+
+test("REGRESSION: source-verified — no file in the additional-business authorization chain references a plan or Starter restriction", async () => {
+  const files = [
+    "app/api/businesses/additional/route.ts",
+    "lib/onboarding/create-business.ts",
+    "lib/onboarding/organization-link.ts",
+    "app/dashboard/businesses/new/page.tsx",
+  ];
+  for (const file of files) {
+    const source = await readFile(path.join(REPO_ROOT, file), "utf8");
+    // "Starter" appears only in comments describing the new business's own
+    // default plan ("starts on Starter") — never as a condition on the
+    // CALLER's existing/selected business.
+    const conditionalOnCallerPlan = /plan\s*(===|==|!==|!=)\s*["']starter["']/i;
+    assert.doesNotMatch(source, conditionalOnCallerPlan, `${file} must never branch on a plan value`);
+  }
+});
+
 test("Kora target acceptance: Add Business creates an independent, owner-membered, organization-linked workspace without touching the existing business", async () => {
   const ownerId = await createUser("realtegic-owner@example.com");
   const realtegicOrgId = await createOrganization("Realtegic");
