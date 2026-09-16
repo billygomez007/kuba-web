@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { appointments, customers, branches, aiEmployees, users } from "@/db/schema";
+import { appointments, customers, branches, aiEmployees, users, crmDeals } from "@/db/schema";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { getOperationsContext } from "@/lib/customer-operations-auth";
 import { assertAppointmentConflict, parseDate, validateReferences, validateTimezone } from "@/lib/customer-operations";
@@ -60,10 +60,12 @@ export async function POST(request: Request) {
     const timezone = validateTimezone(body.timezone);
     const values = { customerId: body.customerId || null, leadId: body.leadId || null, conversationId: body.conversationId || null, branchId: body.branchId || null, assignedUserId: body.assignedUserId || null, assignedHumanEmployeeId: body.assignedHumanEmployeeId || null, assignedAiEmployeeId: body.assignedAiEmployeeId || null };
     await validateReferences(context.membership.businessId, values);
+    const dealId = body.dealId ? String(body.dealId) : null;
+    if (dealId && !(await db.select({ id: crmDeals.id }).from(crmDeals).where(and(eq(crmDeals.id, dealId), eq(crmDeals.businessId, context.membership.businessId))).limit(1))[0]) throw new Error("dealId does not belong to the selected business.");
     await assertAppointmentConflict(context.membership.businessId, startAt, endAt, values);
     const now = new Date();
     const id = crypto.randomUUID();
-    await db.insert(appointments).values({ id, businessId: context.membership.businessId, title, description: body.description || null, ...values, startAt, endAt, timezone, status: "scheduled", appointmentType: body.appointmentType || "meeting", meetingMode: body.meetingMode || "in_person", location: body.location || null, meetingUrl: body.meetingUrl || null, createdBy: context.session.user.id, createdAt: now, updatedAt: now, confirmedAt: null, completedAt: null, cancelledAt: null, noShowAt: null, cancellationReason: null });
+    await db.insert(appointments).values({ id, businessId: context.membership.businessId, title, description: body.description || null, ...values, dealId, startAt, endAt, timezone, status: "scheduled", appointmentType: body.appointmentType || "meeting", meetingMode: body.meetingMode || "in_person", location: body.location || null, meetingUrl: body.meetingUrl || null, createdBy: context.session.user.id, createdAt: now, updatedAt: now, confirmedAt: null, completedAt: null, cancelledAt: null, noShowAt: null, cancellationReason: null });
     await createAuditLog({ businessId: context.membership.businessId, userId: context.session.user.id, action: "appointment.created", resource: "appointment", resourceId: id, metadata: { status: "scheduled" } });
     return NextResponse.json({ success: true, id }, { status: 201 });
   } catch (error) { return errorResponse(error); }

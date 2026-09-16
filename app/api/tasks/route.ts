@@ -17,6 +17,7 @@ import {
   automations,
   businessUsers,
   customers,
+  crmDeals,
   leads,
   tasks,
 } from "@/db/schema";
@@ -37,6 +38,7 @@ async function invalidTaskRelation(body: Record<string, unknown>, businessId: st
     ["leadId", leads, leads.id, leads.businessId],
     ["customerId", customers, customers.id, customers.businessId],
     ["automationId", automations, automations.id, automations.businessId],
+    ["dealId", crmDeals, crmDeals.id, crmDeals.businessId],
   ] as const;
   for (const [key, table, idColumn, businessColumn] of checks) {
     const value = body[key];
@@ -240,6 +242,8 @@ export async function POST(
         body.customerId
           ? String(body.customerId)
           : null,
+
+      dealId: body.dealId ? String(body.dealId) : null,
 
       automationId:
         body.automationId
@@ -466,6 +470,10 @@ export async function PATCH(
         body.assignedEmployeeId
           ? String(body.assignedEmployeeId)
           : null;
+    }
+
+    if (body.dealId !== undefined) {
+      updates.dealId = body.dealId ? String(body.dealId) : null;
     }
 
     if (body.dueAt !== undefined) {
