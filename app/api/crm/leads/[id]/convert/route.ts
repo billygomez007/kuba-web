@@ -12,7 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const lead = (await db.select().from(leads).where(and(eq(leads.id, id), eq(leads.businessId, membership.businessId))).limit(1))[0];
   if (!lead) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
-  const existing = (await db.select({ id: crmDeals.id }).from(crmDeals).where(and(eq(crmDeals.businessId, membership.businessId), eq(crmDeals.leadId, id), eq(crmDeals.status, "open")).limit(1))[0];
+  const existing = (await db.select({ id: crmDeals.id }).from(crmDeals).where(and(eq(crmDeals.businessId, membership.businessId), eq(crmDeals.leadId, id), eq(crmDeals.status, "open"))).limit(1))[0];
   if (existing) return NextResponse.json({ id: existing.id, existing: true });
   const body = await request.json();
   const stage = (await db.select().from(crmPipelineStages).where(and(eq(crmPipelineStages.id, String(body.stageId || "")), eq(crmPipelineStages.pipelineId, String(body.pipelineId || "")), eq(crmPipelineStages.businessId, membership.businessId))).limit(1))[0];
