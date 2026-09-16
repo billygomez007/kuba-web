@@ -5,6 +5,7 @@ import { crmDeals, crmPipelineStages, leads } from "@/db/schema";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { createAuditLog } from "@/lib/auth/audit";
+import { emitCrmEvent } from "@/lib/crm/events";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const membership = await getCurrentMembership();
@@ -20,5 +21,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const now = new Date(); const dealId = crypto.randomUUID(); const status = stage.stageType === "won" ? "won" : stage.stageType === "lost" ? "lost" : "open";
   await db.insert(crmDeals).values({ id: dealId, businessId: membership.businessId, customerId: lead.customerId, leadId: lead.id, title: body.title || lead.name || "Qualified opportunity", description: lead.notes || null, pipelineId: stage.pipelineId, stageId: stage.id, assignedEmployeeId: lead.assignedEmployeeId, assignedUserId: null, status, value: body.value || lead.estimatedValue || null, currency: body.currency || lead.currency || "GHS", expectedCloseDate: null, actualCloseDate: status === "open" ? null : now, source: lead.source || null, productInterest: lead.service || null, nextAction: body.nextAction || null, nextActionDate: null, lossReason: null, createdAt: now, updatedAt: now });
   await createAuditLog({ businessId: membership.businessId, userId: membership.userId, action: "crm.lead.converted", resource: "deal", resourceId: dealId, metadata: { leadId: id } });
+  await emitCrmEvent(membership.businessId, "crm.lead.converted", { leadId: id, dealId, customerId: lead.customerId, pipelineId: stage.pipelineId, stageId: stage.id });
   return NextResponse.json({ success: true, id: dealId }, { status: 201 });
 }

@@ -80,10 +80,13 @@ const triggerOptions = [
     value: "ai_employee.action_completed",
     label: "AI employee action completed",
   },
-  {
-    value: "follow_up.due",
-    label: "Follow-up becomes due",
-  },
+  { value: "follow_up.due", label: "Follow-up becomes due" },
+  { value: "crm.lead.converted", label: "Lead converted" },
+  { value: "crm.deal.created", label: "Deal created" },
+  { value: "crm.deal.stage_changed", label: "Deal stage changed" },
+  { value: "crm.deal.won", label: "Deal won" },
+  { value: "crm.deal.lost", label: "Deal lost" },
+  { value: "crm.deal.reopened", label: "Deal reopened" },
 ];
 
 const actionOptions = [
