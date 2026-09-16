@@ -41,7 +41,13 @@ export const emailAdapter: ChannelAdapter = {
 
     try {
       const inboundDomain = getInboundDomain();
-      const replyTo = payload.replyTo || (inboundDomain ? buildReplyToAddress(createReplyToken({ businessId: payload.businessId, conversationId: payload.conversationId }), inboundDomain) : undefined);
+      const signedReplyAddress = inboundDomain
+        ? buildReplyToAddress(
+            createReplyToken({ businessId: payload.businessId, conversationId: payload.conversationId }),
+            inboundDomain,
+          )
+        : undefined;
+      const replyTo = payload.replyTo || (signedReplyAddress ? `SuperKuba <${signedReplyAddress}>` : undefined);
       const response = await getResend().emails.send({
         from,
         to: payload.recipient,

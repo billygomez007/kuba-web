@@ -33,7 +33,8 @@ test("Email adapter remains the canonical signed-thread sender", async () => {
   assert.match(adapter, /eq\(integrations\.businessId, payload\.businessId\)/);
   assert.match(adapter, /eq\(integrations\.provider, "email"\)/);
   assert.match(adapter, /eq\(integrations\.status, "active"\)/);
-  assert.match(adapter, /buildReplyToAddress\(createReplyToken\(\{ businessId: payload\.businessId, conversationId: payload\.conversationId \}\)/);
+  assert.match(adapter, /buildReplyToAddress\(\s*createReplyToken\(\{ businessId: payload\.businessId, conversationId: payload\.conversationId \}\)/s);
+  assert.match(adapter, /SuperKuba <\$\{signedReplyAddress\}>/);
   assert.match(adapter, /replyTo/);
   assert.match(adapter, /idempotencyKey:/);
 });
