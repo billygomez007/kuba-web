@@ -10,12 +10,18 @@ const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 
 test("migration journal preserves historical widget 0045 and renumbers metadata", async () => {
   const journal = JSON.parse(await readFile(path.join(ROOT, "drizzle/meta/_journal.json"), "utf8"));
-  const tail = journal.entries.slice(-4).map((entry) => entry.tag);
+  const tail = journal.entries.slice(-10).map((entry) => entry.tag);
   assert.deepEqual(tail, [
+    "0041_whatsapp_webhook_health_and_message_status",
+    "0042_cuddly_starhawk",
+    "0043_outreach_campaign_engine",
     "0044_steep_human_torch",
     "0045_superkuba_widget_origins",
     "0046_organization_portfolio_reconciliation",
     "0047_add_message_metadata",
+    "0048_google_calendar_appointment_refs",
+    "0049_native_crm_pipelines_deals",
+    "0050_native_crm_linkages",
   ]);
   assert.equal((await readFile(path.join(ROOT, "drizzle/0045_superkuba_widget_origins.sql"), "utf8")).trim(), "ALTER TABLE `integrations` ADD `allowed_origins` text;");
   assert.match(await readFile(path.join(ROOT, "drizzle/0047_add_message_metadata.sql"), "utf8"), /ADD `metadata` text/);
