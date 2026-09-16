@@ -87,3 +87,33 @@ test("clean bootstrap reproduces the current schema and accepts a generated futu
     await rm(temporaryRoot, { recursive: true, force: true });
   }
 });
+
+test("pre-0049 upgrade preserves existing rows while adding CRM schema", async () => {
+  const db = createClient({ url: "file::memory:" });
+  await db.executeMultiple(`
+    CREATE TABLE customers (id text PRIMARY KEY NOT NULL, business_id text NOT NULL, name text NOT NULL, phone text, email text, created_at integer NOT NULL, updated_at integer NOT NULL);
+    CREATE TABLE leads (id text PRIMARY KEY NOT NULL, business_id text NOT NULL, name text NOT NULL, phone text, email text, status text NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);
+    CREATE TABLE tasks (id text PRIMARY KEY NOT NULL, business_id text NOT NULL, title text NOT NULL, status text NOT NULL, priority text NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);
+    CREATE TABLE appointments (id text PRIMARY KEY NOT NULL, business_id text NOT NULL, title text NOT NULL, start_at integer NOT NULL, end_at integer NOT NULL, status text NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);
+  `);
+  await db.execute("INSERT INTO customers (id, business_id, name, phone, email, created_at, updated_at) VALUES ('customer-1', 'business-1', 'Existing Customer', '+233000000001', 'customer@example.com', 1, 1)");
+  await db.execute("INSERT INTO leads (id, business_id, name, phone, email, status, created_at, updated_at) VALUES ('lead-1', 'business-1', 'Existing Lead', '+233000000002', 'lead@example.com', 'new', 1, 1)");
+  await db.execute("INSERT INTO tasks (id, business_id, title, status, priority, created_at, updated_at) VALUES ('task-1', 'business-1', 'Existing Task', 'open', 'normal', 1, 1)");
+  await db.execute("INSERT INTO appointments (id, business_id, title, start_at, end_at, status, created_at, updated_at) VALUES ('appointment-1', 'business-1', 'Existing Appointment', 10, 20, 'scheduled', 1, 1)");
+  for (const file of ["drizzle/0049_native_crm_pipelines_deals.sql", "drizzle/0050_native_crm_linkages.sql"]) {
+    const sql = await readFile(path.join(repositoryRoot, file), "utf8");
+    for (const statement of sql.split(/;\s*/).map((item) => item.trim()).filter(Boolean)) await db.execute(statement);
+  }
+  assert.equal((await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='crm_pipelines'")).rows.length, 1, "CRM pipeline table should exist");
+  assert.equal((await db.execute("SELECT id FROM crm_pipeline_stages")).rows.length, 0);
+  assert.deepEqual((await db.execute("SELECT id FROM customers WHERE id='customer-1'")).rows.map((row) => row.id), ["customer-1"]);
+  assert.deepEqual((await db.execute("SELECT id FROM leads WHERE id='lead-1'")).rows.map((row) => row.id), ["lead-1"]);
+  assert.equal((await db.execute("SELECT deal_id FROM tasks WHERE id='task-1'")).rows[0].deal_id, null);
+  assert.equal((await db.execute("SELECT deal_id FROM appointments WHERE id='appointment-1'")).rows[0].deal_id, null);
+  assert.equal((await db.execute("PRAGMA index_list(tasks)")).rows.some((row) => row.name === "tasks_business_deal_idx"), true);
+  assert.equal((await db.execute("PRAGMA index_list(appointments)")).rows.some((row) => row.name === "appointments_business_deal_idx"), true);
+  await assert.rejects(async () => {
+    await db.execute("CREATE TABLE crm_pipelines (id text PRIMARY KEY NOT NULL)");
+  });
+  db.close();
+});
