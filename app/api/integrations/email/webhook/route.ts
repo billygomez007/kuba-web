@@ -15,6 +15,7 @@ import { verifyResendWebhookSignature } from "@/lib/email/webhook-signature";
 import { getInboundWebhookSecret } from "@/lib/email/inbound-config";
 import { correlateInboundEmail, normalizeEmailAddress } from "@/lib/email/inbound-correlation";
 import { sanitizeInboundEmailBody } from "@/lib/email/sanitize";
+import { retrieveResendReceivedEmail } from "@/lib/email/resend-receiving";
 import { classifyEmailProviderError } from "@/lib/email/error-classification";
 import { markRecipientReplied } from "@/lib/outreach/campaign-reply-handoff";
 import { addSuppression } from "@/lib/outreach/suppression";
@@ -159,9 +160,9 @@ async function handleInboundEmail(event: ResendWebhookEvent) {
   const from = asString(data.from);
   const to = asStringArray(data.to);
   const subject = asString(data.subject) ?? "";
-  const text = asString(data.text);
-  const html = asString(data.html);
-  const messageIdHeader = asString(readHeader(data, "Message-ID"));
+  let text = asString(data.text);
+  let html = asString(data.html);
+  let messageIdHeader = asString(readHeader(data, "Message-ID"));
   const inReplyTo = asString(readHeader(data, "In-Reply-To"));
   const references = asString(readHeader(data, "References"));
 
@@ -185,6 +186,18 @@ async function handleInboundEmail(event: ResendWebhookEvent) {
   }
 
   const correlation = await correlateInboundEmail({ to, from });
+
+  // Resend's email.received webhook carries routing metadata but the full
+  // message body is retrieved separately through the Receiving API.
+  // Perform this before tenant writes so a provider failure can be retried
+  // without creating a partial customer/conversation/message.
+  if (providerEventId && !text && !html) {
+    const receivedEmail = await retrieveResendReceivedEmail(providerEventId);
+    text = receivedEmail.text;
+    html = receivedEmail.html;
+    messageIdHeader = messageIdHeader ?? receivedEmail.messageId;
+  }
+
   const sanitized = sanitizeInboundEmailBody({ text, html });
   const now = new Date();
 
