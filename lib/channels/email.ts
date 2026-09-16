@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { integrations } from "@/db/schema";
 import { getResend } from "@/lib/email/resend";
+import { createReplyToken, buildReplyToAddress } from "@/lib/email/reply-token";
+import { getInboundDomain } from "@/lib/email/inbound-config";
 
 import type { ChannelAdapter } from "./types";
 
@@ -38,12 +40,15 @@ export const emailAdapter: ChannelAdapter = {
     }
 
     try {
+      const inboundDomain = getInboundDomain();
+      const replyTo = payload.replyTo || (inboundDomain ? buildReplyToAddress(createReplyToken({ businessId: payload.businessId, conversationId: payload.conversationId }), inboundDomain) : undefined);
       const response = await getResend().emails.send({
         from,
         to: payload.recipient,
-        subject: "Message from SuperKuba",
+        subject: payload.subject || "Message from SuperKuba",
         text: payload.message,
-      });
+        ...(replyTo ? { replyTo } : {}),
+      }, { idempotencyKey: `kuba-email-${payload.businessId}-${payload.conversationId}-${Buffer.from(payload.message).toString("base64url").slice(0, 48)}` });
 
       if (response.error) {
         return { success: false, error: response.error.message || response.error.name };

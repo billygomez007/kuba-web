@@ -13,6 +13,8 @@ export interface SendMessagePayload {
   conversationId: string;
   recipient: string;
   message: string;
+  subject?: string;
+  replyTo?: string;
 }
 
 

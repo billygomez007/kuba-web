@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
+import { getCurrentMembership } from "@/lib/auth/tenant";
 import { db } from "@/db";
 import { getChannelAdapter } from "@/lib/channels/router";
 import { routeConversation } from "@/lib/ai-routing/router";
@@ -15,11 +16,8 @@ import { canAccessConversation } from "@/lib/communications/conversation-access"
 import {
   messages,
   conversations,
-  businessUsers,
   aiEmployees,
   aiEmployeeActivities,
-  businesses,
-  aiBusinessSettings,
   leads,
   followUps,
 } from "@/db/schema";
@@ -62,21 +60,8 @@ export async function POST(
   }
 
 
-  const membership = await db
-    .select({
-      businessId: businessUsers.businessId,
-    })
-    .from(businessUsers)
-    .where(
-      eq(
-        businessUsers.userId,
-        session.user.id,
-      ),
-    )
-    .limit(1);
-
-
-  const business = membership[0];
+  const membership = await getCurrentMembership();
+  const business = membership ? { businessId: membership.businessId } : null;
 
 
   if (!business) {
@@ -146,49 +131,6 @@ export async function POST(
   }
 
   const now = new Date();
-
-
-  const businessResult =
-    await db
-      .select({
-        business: businesses,
-      })
-      .from(businessUsers)
-      .innerJoin(
-        businesses,
-        eq(
-          businessUsers.businessId,
-          businesses.id,
-        ),
-      )
-      .where(
-        eq(
-          businessUsers.userId,
-          session.user.id,
-        ),
-      )
-      .limit(1);
-
-
-  const businessProfile =
-    businessResult[0]?.business;
-
-
-  const businessKnowledge =
-    await db
-      .select()
-      .from(aiBusinessSettings)
-      .where(
-        eq(
-          aiBusinessSettings.businessId,
-          business.businessId,
-        ),
-      )
-      .limit(1);
-
-
-  const knowledge =
-    businessKnowledge[0];
 
 
   const businessContext =
@@ -373,8 +315,7 @@ export async function POST(
     createdAt: now,
   });
 
-  const aiResult =
-    await kubaSalesAgent.generate(
+  const aiResult = channel === "email" ? null : await kubaSalesAgent.generate(
       `${businessContext}
 
 CUSTOMER MESSAGE:
@@ -389,7 +330,7 @@ ${content}`,
     );
 
 
-  await db.insert(messages).values({
+  if (aiResult) await db.insert(messages).values({
     id: crypto.randomUUID(),
     businessId: business.businessId,
     conversationId,
@@ -404,7 +345,7 @@ ${content}`,
   });
 
 
-  if(assignedEmployee[0]){
+  if (aiResult && assignedEmployee[0]) {
 
     await logAIActivity({
 
