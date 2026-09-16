@@ -683,6 +683,9 @@ export const appointments = sqliteTable(
     noShowAt: integer("no_show_at", { mode: "timestamp_ms" }),
     cancellationReason: text("cancellation_reason"),
     dealId: text("deal_id"),
+    externalProvider: text("external_provider"),
+    externalEventId: text("external_event_id"),
+    externalCalendarId: text("external_calendar_id"),
   },
   (table) => [
     index("appointments_business_start_idx").on(table.businessId, table.startAt),
