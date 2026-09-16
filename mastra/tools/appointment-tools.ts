@@ -8,19 +8,23 @@ import { assertAppointmentConflict, appointmentTransitions, assertTransition, pa
 import { requireBusinessId, requireEmployeeId } from "@/mastra/tools/business-context";
 import { checkAIEmployeeAuthority, fileActionApproval } from "@/lib/ai/authority";
 import { createAuditLog } from "@/lib/auth/audit";
+import { assertWithinConfiguredWorkingHours, createGoogleEvent, deleteGoogleEventForAppointment, googleBusyIntervals, hasBusyConflict, updateGoogleEventForAppointment } from "@/lib/google-calendar";
 
 const appointmentInput = z.object({ appointmentId: z.string() });
 
 const createAppointmentInput = z.object({ title: z.string(), startAt: z.string(), endAt: z.string(), timezone: z.string(), customerId: z.string().optional(), leadId: z.string().optional(), conversationId: z.string().optional(), branchId: z.string().optional(), assignedUserId: z.string().optional(), assignedAiEmployeeId: z.string().optional() });
 
+async function assertGoogleAvailability(businessId: string, startAt: Date, endAt: Date) { const busy = await googleBusyIntervals(businessId, startAt, endAt); if (hasBusyConflict(startAt, endAt, busy)) throw new Error("The selected time conflicts with Google Calendar availability."); }
+
 export async function performCreateAppointment(businessId: string, employeeId: string, input: z.infer<typeof createAppointmentInput>) {
   const startAt = parseDate(input.startAt, "startAt"); const endAt = parseDate(input.endAt, "endAt");
   if (startAt >= endAt) throw new Error("startAt must be before endAt.");
-  const timezone = validateTimezone(input.timezone);
+  const timezone = validateTimezone(input.timezone); await assertWithinConfiguredWorkingHours(businessId, startAt, endAt, timezone);
   const refs = { customerId: input.customerId || null, leadId: input.leadId || null, conversationId: input.conversationId || null, branchId: input.branchId || null, assignedUserId: input.assignedUserId || null, assignedHumanEmployeeId: null, assignedAiEmployeeId: input.assignedAiEmployeeId || null };
-  await validateReferences(businessId, refs); await assertAppointmentConflict(businessId, startAt, endAt, refs);
+  await validateReferences(businessId, refs); await assertAppointmentConflict(businessId, startAt, endAt, refs); await assertGoogleAvailability(businessId, startAt, endAt);
   const id = crypto.randomUUID(); const now = new Date();
-  await db.insert(appointments).values({ id, businessId, title: input.title.trim(), description: null, ...refs, startAt, endAt, timezone, status: "scheduled", appointmentType: "meeting", meetingMode: "in_person", location: null, meetingUrl: null, createdBy: "ai-receptionist", createdAt: now, updatedAt: now, confirmedAt: null, completedAt: null, cancelledAt: null, noShowAt: null, cancellationReason: null });
+  await db.insert(appointments).values({ id, businessId, title: input.title.trim(), description: null, ...refs, startAt, endAt, timezone, status: "scheduled", appointmentType: "meeting", meetingMode: "in_person", location: null, meetingUrl: null, createdBy: "ai-receptionist", createdAt: now, updatedAt: now, confirmedAt: null, completedAt: null, cancelledAt: null, noShowAt: null, cancellationReason: null, dealId: null, externalProvider: null, externalEventId: null, externalCalendarId: null });
+  try { const external = await createGoogleEvent(businessId, { id, title: input.title.trim(), description: null, startAt, endAt, timezone, location: null }); if (external) await db.update(appointments).set({ externalProvider: "google_calendar", externalEventId: external.eventId, externalCalendarId: external.calendarId, updatedAt: new Date() }).where(and(eq(appointments.id, id), eq(appointments.businessId, businessId))); } catch { /* canonical appointment remains; sync status is represented by missing linkage */ }
   await createAuditLog({ businessId, userId: null, action: "ai.create_appointment", resource: "appointment", resourceId: id, description: `AI employee created appointment "${input.title.trim()}".`, metadata: { employeeId } });
   return { success: true, appointmentId: id };
 }
@@ -33,9 +37,10 @@ export async function performUpdateAppointment(businessId: string, employeeId: s
   if (status) assertTransition(appointmentTransitions, current.status as keyof typeof appointmentTransitions, status);
   const nextStart = startAt ? parseDate(startAt, "startAt") : current.startAt; const nextEnd = endAt ? parseDate(endAt, "endAt") : current.endAt;
   if (nextStart >= nextEnd) throw new Error("startAt must be before endAt.");
-  await assertAppointmentConflict(businessId, nextStart, nextEnd, current, appointmentId);
+  await assertWithinConfiguredWorkingHours(businessId, nextStart, nextEnd, current.timezone); await assertAppointmentConflict(businessId, nextStart, nextEnd, current, appointmentId); await assertGoogleAvailability(businessId, nextStart, nextEnd);
   const now = new Date();
   await db.update(appointments).set({ startAt: nextStart, endAt: nextEnd, status: status || current.status, cancellationReason: status === "cancelled" ? cancellationReason || null : current.cancellationReason, cancelledAt: status === "cancelled" ? now : current.cancelledAt, updatedAt: now }).where(and(eq(appointments.id, appointmentId), eq(appointments.businessId, businessId)));
+  try { const updated = { ...current, startAt: nextStart, endAt: nextEnd, status: status || current.status }; if (status === "cancelled") await deleteGoogleEventForAppointment(businessId, updated); else await updateGoogleEventForAppointment(businessId, updated); } catch { /* canonical appointment remains truthful; provider sync is retried by reconciliation */ }
   await createAuditLog({ businessId, userId: null, action: "ai.update_appointment", resource: "appointment", resourceId: appointmentId, description: `AI employee updated appointment.`, metadata: { employeeId, status: status || current.status } });
   return { success: true, appointmentId };
 }

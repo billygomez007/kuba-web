@@ -129,7 +129,7 @@ export default function IntegrationsPage() {
   const commChannels = items.filter(i => i.category === "Communication Channels");
   const socialChannels = items.filter(i => i.category === "Social Channels");
   const remainingIntegrations = [
-    { name: "Calendar", href: "/dashboard/integrations/calendar", status: "Coming Soon", description: "Google Calendar, Outlook, and Apple Calendar connections." },
+    { name: "Calendar", href: "/dashboard/integrations/calendar", status: "Google Calendar available", description: "Connect Google Calendar; Outlook and Apple Calendar remain Coming Soon." },
     { name: "Payments", href: "/dashboard/integrations/payments", status: "Platform Billing Only", description: "Business merchant payments are not configured." },
     { name: "Accounting", href: "/dashboard/integrations/accounting", status: "Coming Soon", description: "QuickBooks, Xero, Sage, and other accounting sync." },
     { name: "CRM", href: "/dashboard/integrations/crm", status: "Coming Soon", description: "External CRM contact, lead, and deal synchronization." },

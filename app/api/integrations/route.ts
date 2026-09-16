@@ -26,6 +26,7 @@ const ALL_PROVIDERS = [
   "meta",
   "telegram",
   "calendar",
+  "google_calendar",
   "stripe",
   "paystack",
   "quickbooks",

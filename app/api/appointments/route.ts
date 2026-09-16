@@ -5,9 +5,10 @@ import { db } from "@/db";
 import { appointments, customers, branches, aiEmployees, users, crmDeals } from "@/db/schema";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { getOperationsContext } from "@/lib/customer-operations-auth";
-import { assertAppointmentConflict, parseDate, validateReferences, validateTimezone } from "@/lib/customer-operations";
+import { assertAppointmentConflict, appointmentTransitions, parseDate, validateReferences, validateTimezone } from "@/lib/customer-operations";
 import { createAuditLog } from "@/lib/auth/audit";
 import { getBusinessDayBounds, getBusinessLocalization } from "@/lib/localization";
+import { assertWithinConfiguredWorkingHours, createGoogleEvent, deleteGoogleEventForAppointment, googleBusyIntervals, updateGoogleEventForAppointment } from "@/lib/google-calendar";
 
 const errorResponse = (error: unknown) => NextResponse.json({ error: error instanceof Error ? error.message : "Unable to process appointment." }, { status: 400 });
 
@@ -58,15 +59,28 @@ export async function POST(request: Request) {
     if (startAt >= endAt) throw new Error("startAt must be before endAt.");
     if (endAt.getTime() - startAt.getTime() > 24 * 60 * 60 * 1000) throw new Error("Appointment duration cannot exceed 24 hours.");
     const timezone = validateTimezone(body.timezone);
+    await assertWithinConfiguredWorkingHours(context.membership.businessId, startAt, endAt, timezone);
     const values = { customerId: body.customerId || null, leadId: body.leadId || null, conversationId: body.conversationId || null, branchId: body.branchId || null, assignedUserId: body.assignedUserId || null, assignedHumanEmployeeId: body.assignedHumanEmployeeId || null, assignedAiEmployeeId: body.assignedAiEmployeeId || null };
     await validateReferences(context.membership.businessId, values);
     const dealId = body.dealId ? String(body.dealId) : null;
     if (dealId && !(await db.select({ id: crmDeals.id }).from(crmDeals).where(and(eq(crmDeals.id, dealId), eq(crmDeals.businessId, context.membership.businessId))).limit(1))[0]) throw new Error("dealId does not belong to the selected business.");
     await assertAppointmentConflict(context.membership.businessId, startAt, endAt, values);
+    const googleBusy = await googleBusyIntervals(context.membership.businessId, startAt, endAt); if (googleBusy.some((slot) => new Date(slot.start) < endAt && new Date(slot.end) > startAt)) throw new Error("The selected time conflicts with Google Calendar availability.");
     const now = new Date();
     const id = crypto.randomUUID();
-    await db.insert(appointments).values({ id, businessId: context.membership.businessId, title, description: body.description || null, ...values, dealId, startAt, endAt, timezone, status: "scheduled", appointmentType: body.appointmentType || "meeting", meetingMode: body.meetingMode || "in_person", location: body.location || null, meetingUrl: body.meetingUrl || null, createdBy: context.session.user.id, createdAt: now, updatedAt: now, confirmedAt: null, completedAt: null, cancelledAt: null, noShowAt: null, cancellationReason: null });
+    await db.insert(appointments).values({ id, businessId: context.membership.businessId, title, description: body.description || null, ...values, dealId, startAt, endAt, timezone, status: "scheduled", appointmentType: body.appointmentType || "meeting", meetingMode: body.meetingMode || "in_person", location: body.location || null, meetingUrl: body.meetingUrl || null, createdBy: context.session.user.id, createdAt: now, updatedAt: now, confirmedAt: null, completedAt: null, cancelledAt: null, noShowAt: null, cancellationReason: null, externalProvider: null, externalEventId: null, externalCalendarId: null });
+    let calendarSync: "synced" | "not_connected" | "failed" = "not_connected";
+    try { const external = await createGoogleEvent(context.membership.businessId, { id, title, description: body.description || null, startAt, endAt, timezone, location: body.location || null }); if (external) { await db.update(appointments).set({ externalProvider: "google_calendar", externalEventId: external.eventId, externalCalendarId: external.calendarId, updatedAt: new Date() }).where(and(eq(appointments.id, id), eq(appointments.businessId, context.membership.businessId))); calendarSync = "synced"; } } catch { calendarSync = "failed"; }
     await createAuditLog({ businessId: context.membership.businessId, userId: context.session.user.id, action: "appointment.created", resource: "appointment", resourceId: id, metadata: { status: "scheduled" } });
-    return NextResponse.json({ success: true, id }, { status: 201 });
+    return NextResponse.json({ success: true, id, calendarSync }, { status: 201 });
+  } catch (error) { return errorResponse(error); }
+}
+
+export async function PATCH(request: Request) {
+  const context = await getOperationsContext(PERMISSIONS.RECEPTION_MANAGE, "customer_ops.appointments");
+  if ("error" in context) return NextResponse.json(context, { status: context.status });
+  try { const body = await request.json(); const id = String(body.id || ""); const current = (await db.select().from(appointments).where(and(eq(appointments.id, id), eq(appointments.businessId, context.membership.businessId))).limit(1))[0]; if (!current) return NextResponse.json({ error: "Appointment not found." }, { status: 404 });
+    const nextStart = body.startAt ? parseDate(body.startAt, "startAt") : current.startAt; const nextEnd = body.endAt ? parseDate(body.endAt, "endAt") : current.endAt; if (nextStart >= nextEnd) throw new Error("startAt must be before endAt."); const timezone = validateTimezone(body.timezone || current.timezone); await assertWithinConfiguredWorkingHours(context.membership.businessId, nextStart, nextEnd, timezone); await assertAppointmentConflict(context.membership.businessId, nextStart, nextEnd, current, id); const status = body.status || current.status; if (status !== current.status) { const allowed = appointmentTransitions[current.status as keyof typeof appointmentTransitions] || []; if (!allowed.includes(status)) throw new Error("Invalid appointment status transition."); }
+    await db.update(appointments).set({ title: body.title ? String(body.title).trim() : current.title, startAt: nextStart, endAt: nextEnd, timezone, status, location: body.location ?? current.location, description: body.description ?? current.description, updatedAt: new Date(), cancelledAt: status === "cancelled" ? new Date() : current.cancelledAt }).where(and(eq(appointments.id, id), eq(appointments.businessId, context.membership.businessId))); const updated = { ...current, title: body.title ? String(body.title).trim() : current.title, startAt: nextStart, endAt: nextEnd, timezone, status, location: body.location ?? current.location, description: body.description ?? current.description }; let calendarSync = "not_connected"; try { calendarSync = status === "cancelled" ? (await deleteGoogleEventForAppointment(context.membership.businessId, updated)).status : (await updateGoogleEventForAppointment(context.membership.businessId, updated)).status; } catch { calendarSync = "failed"; } await createAuditLog({ businessId: context.membership.businessId, userId: context.session.user.id, action: status === "cancelled" ? "appointment.cancelled" : "appointment.updated", resource: "appointment", resourceId: id, metadata: { calendarSync } }); return NextResponse.json({ success: true, id, calendarSync });
   } catch (error) { return errorResponse(error); }
 }
