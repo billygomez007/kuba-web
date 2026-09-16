@@ -54,7 +54,7 @@ export const emailAdapter: ChannelAdapter = {
         return { success: false, error: response.error.message || response.error.name };
       }
 
-      return { success: true, externalMessageId: response.data?.id };
+      return { success: true, externalMessageId: response.data?.id, replyTo };
     } catch (error) {
       return {
         success: false,

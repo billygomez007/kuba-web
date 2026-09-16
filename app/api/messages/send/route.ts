@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { getCurrentMembership } from "@/lib/auth/tenant";
+import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { db } from "@/db";
 import { getChannelAdapter } from "@/lib/channels/router";
 import { routeConversation } from "@/lib/ai-routing/router";
@@ -17,9 +18,9 @@ import {
   messages,
   conversations,
   aiEmployees,
-  aiEmployeeActivities,
   leads,
   followUps,
+  integrations,
 } from "@/db/schema";
 
 
@@ -73,6 +74,11 @@ export async function POST(
         status: 404,
       },
     );
+  }
+
+  const senderMembership = await getBusinessMembership(session.user.id, business.businessId);
+  if (!senderMembership || !hasPermission(senderMembership.role, senderMembership.permissions, PERMISSIONS.MESSAGING_MANAGE)) {
+    return NextResponse.json({ error: "You do not have permission to send messages." }, { status: 403 });
   }
 
 
@@ -132,19 +138,68 @@ export async function POST(
 
   const now = new Date();
 
+  const integration = await db
+    .select({ id: integrations.id, provider: integrations.provider })
+    .from(integrations)
+    .where(and(eq(integrations.id, conversation[0].integrationId), eq(integrations.businessId, business.businessId)))
+    .limit(1);
+  const provider = integration[0]?.provider === "website_chat" ? "website" : integration[0]?.provider;
+  const supportedChannels = new Set([
+    "whatsapp",
+    "email",
+    "website",
+    "facebook",
+    "instagram",
+    "telegram",
+    "sms",
+  ]);
+  if (!provider || !supportedChannels.has(provider)) {
+    return NextResponse.json({ error: "Conversation channel is not configured." }, { status: 409 });
+  }
 
-  const businessContext =
-    await getBusinessKnowledge(
-      business.businessId,
-    );
+  const channel = provider as
+    | "whatsapp"
+    | "email"
+    | "website"
+    | "facebook"
+    | "instagram"
+    | "telegram"
+    | "sms";
+
+  const trimmedContent = typeof content === "string" ? content.trim() : "";
+  if (!trimmedContent) {
+    return NextResponse.json({ error: "Message cannot be empty." }, { status: 400 });
+  }
+
+  if (channel === "email" && !conversation[0].customerEmail) {
+    return NextResponse.json({ error: "This conversation has no customer email address." }, { status: 400 });
+  }
+
+  let subject: string | undefined;
+  if (channel === "email") {
+    const latestInbound = await db
+      .select({ metadata: messages.metadata })
+      .from(messages)
+      .where(and(eq(messages.conversationId, conversationId), eq(messages.businessId, business.businessId), eq(messages.direction, "inbound")))
+      .orderBy(desc(messages.createdAt))
+      .limit(1);
+    try {
+      const metadata = latestInbound[0]?.metadata ? JSON.parse(latestInbound[0].metadata) as { subject?: unknown } : null;
+      const inboundSubject = typeof metadata?.subject === "string" ? metadata.subject.trim() : "";
+      subject = inboundSubject ? (/^re:\s*/i.test(inboundSubject) ? inboundSubject : `Re: ${inboundSubject}`) : "Re: Your SuperKuba message";
+    } catch {
+      subject = "Re: Your SuperKuba message";
+    }
+  }
 
 
-  const routing =
-    routeConversation(content);
+  const businessContext = channel === "email" ? "" : await getBusinessKnowledge(business.businessId);
 
 
-  const assignedEmployee =
-    await db
+  const routing = channel === "email" ? null : routeConversation(trimmedContent);
+
+
+  const assignedEmployee = routing ? await db
       .select()
       .from(aiEmployees)
       .where(
@@ -159,7 +214,7 @@ export async function POST(
           ),
         ),
       )
-      .limit(1);
+      .limit(1) : [];
 
 
   if (assignedEmployee[0]) {
@@ -189,7 +244,8 @@ export async function POST(
 
 
   if (
-    shouldCreateFollowUp(content) &&
+      channel !== "email" &&
+    shouldCreateFollowUp(trimmedContent) &&
     assignedEmployee[0] &&
     conversation[0].customerId
   ) {
@@ -233,7 +289,7 @@ export async function POST(
           "Follow up with customer",
 
         description:
-          content,
+          trimmedContent,
 
         dueAt:
           new Date(
@@ -275,16 +331,6 @@ export async function POST(
   }
 
 
-  const channel =
-    conversation[0].integrationId as
-      | "whatsapp"
-      | "email"
-      | "website"
-      | "facebook"
-      | "instagram"
-      | "telegram"
-      | "sms";
-
   const adapter =
     getChannelAdapter(channel);
 
@@ -292,12 +338,23 @@ export async function POST(
     await adapter.send({
       businessId: business.businessId,
       conversationId,
-      recipient:
-        conversation[0].customerPhone ||
-        conversation[0].customerEmail ||
-        "unknown",
-      message: content,
+      recipient: channel === "email" ? conversation[0].customerEmail! : conversation[0].customerPhone || conversation[0].customerEmail || "unknown",
+      message: trimmedContent,
+      ...(subject ? { subject } : {}),
     });
+
+  if (!sent.success) {
+    return NextResponse.json({ error: "Unable to send this message." }, { status: 502 });
+  }
+
+  if (sent.externalMessageId) {
+    const existing = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.businessId, business.businessId), eq(messages.externalMessageId, sent.externalMessageId)))
+      .limit(1);
+    if (existing[0]) return NextResponse.json({ success: true, duplicate: true });
+  }
 
 
   await db.insert(messages).values({
@@ -310,8 +367,10 @@ export async function POST(
     direction: "outbound",
     senderType: "human",
     senderId: session.user.id,
-    content,
+    content: trimmedContent,
     messageType: "text",
+    status: channel === "email" ? "sent" : null,
+    metadata: channel === "email" ? JSON.stringify({ channel: "email", subject, replyTo: sent.replyTo ?? null }) : null,
     createdAt: now,
   });
 
@@ -319,7 +378,7 @@ export async function POST(
       `${businessContext}
 
 CUSTOMER MESSAGE:
-${content}`,
+${trimmedContent}`,
       {
         memory: {
           resource: session.user.id,

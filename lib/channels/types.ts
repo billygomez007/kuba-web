@@ -25,6 +25,7 @@ export interface ChannelAdapter {
   ): Promise<{
     success: boolean;
     externalMessageId?: string;
+    replyTo?: string;
     error?: string;
   }>;
 
