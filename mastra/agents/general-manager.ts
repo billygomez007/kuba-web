@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { crmToolsForEmployeeType } from "@/lib/ai/crm-tool-policy";
 import { defaultChatModel } from "@/lib/ai/model-config";
 
 import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge";
@@ -168,6 +169,7 @@ pretending that the action was completed.
   model: defaultChatModel(),
 
   tools: {
+    ...crmToolsForEmployeeType("general-manager"),
     getBusinessKnowledge: getBusinessKnowledgeTool,
   },
 });

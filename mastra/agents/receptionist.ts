@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { crmToolsForEmployeeType } from "@/lib/ai/crm-tool-policy";
 import { defaultChatModel } from "@/lib/ai/model-config";
 import { getBusinessKnowledgeTool } from "@/mastra/tools/get-business-knowledge";
 import { createLeadTool } from "@/mastra/tools/create-lead";
@@ -124,6 +125,7 @@ When no tool is available, explain what information or action is needed rather t
   model: defaultChatModel(),
 
   tools: {
+    ...crmToolsForEmployeeType("receptionist"),
     getBusinessKnowledge:
       getBusinessKnowledgeTool,
 

@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { crmToolsForEmployeeType } from "@/lib/ai/crm-tool-policy";
 import { defaultChatModel } from "@/lib/ai/model-config";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
@@ -150,5 +151,5 @@ plainly and offer the closest thing you can actually do.
 
   model: defaultChatModel(),
 
-  tools: marketingTools,
+  tools: { ...marketingTools, ...crmToolsForEmployeeType("marketing") },
 });

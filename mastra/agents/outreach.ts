@@ -1,4 +1,5 @@
 import { openai } from "@ai-sdk/openai";
+import { crmToolsForEmployeeType } from "@/lib/ai/crm-tool-policy";
 import { Agent } from "@mastra/core/agent";
 import { defaultChatModel } from "@/lib/ai/model-config";
 import { safeOutreachWebFetchTool } from "@/mastra/tools/safe-outreach-web-fetch";
@@ -746,6 +747,7 @@ them intelligently and respectfully.
   model: defaultChatModel(),
 
   tools: {
+    ...crmToolsForEmployeeType("outreach"),
     getBusinessKnowledge: getBusinessKnowledgeTool,
     saveOutreachProspect: saveOutreachProspectTool,
     saveOutreachEvidence: saveOutreachEvidenceTool,

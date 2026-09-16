@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { crmToolsForEmployeeType } from "@/lib/ai/crm-tool-policy";
 import { defaultChatModel } from "@/lib/ai/model-config";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
@@ -91,5 +92,5 @@ check instead of guessing.
 
   model: defaultChatModel(),
 
-  tools: accountantTools,
+  tools: { ...accountantTools, ...crmToolsForEmployeeType("accountant") },
 });

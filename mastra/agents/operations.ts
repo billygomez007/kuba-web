@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { crmToolsForEmployeeType } from "@/lib/ai/crm-tool-policy";
 import { defaultChatModel } from "@/lib/ai/model-config";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
@@ -89,5 +90,5 @@ can wait. Do not manufacture urgency that isn't backed by real data.
 
   model: defaultChatModel(),
 
-  tools: operationsTools,
+  tools: { ...operationsTools, ...crmToolsForEmployeeType("operations") },
 });

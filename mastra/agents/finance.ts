@@ -1,4 +1,5 @@
 import { Agent } from "@mastra/core/agent";
+import { crmToolsForEmployeeType } from "@/lib/ai/crm-tool-policy";
 import { defaultChatModel } from "@/lib/ai/model-config";
 import { Memory } from "@mastra/memory";
 import { LibSQLStore } from "@mastra/libsql";
@@ -96,5 +97,5 @@ remains the final decision maker.
 
   model: defaultChatModel(),
 
-  tools: financeTools,
+  tools: { ...financeTools, ...crmToolsForEmployeeType("finance") },
 });
