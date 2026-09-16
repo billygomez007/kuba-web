@@ -42,6 +42,13 @@ export const AI_ACTIONS = [
   "create_hr_task",
   "read_operations_overview",
   "create_operations_task",
+  "read_customer_crm",
+  "read_crm_deals",
+  "read_crm_pipelines",
+  "create_deal",
+  "update_deal",
+  "move_deal_stage",
+  "convert_lead_to_deal",
   "request_handoff",
 ] as const;
 
@@ -80,6 +87,13 @@ export const ACTION_META: Record<AIAction, { kind: ActionKind; label: string; de
   create_hr_task: { kind: "write", label: "Create HR tasks", description: "Create an internal HR task (onboarding step, document reminder, policy follow-up). Never a hiring, firing, or compensation decision." },
   read_operations_overview: { kind: "read", label: "View operations overview", description: "Read task, appointment, and automation-run status counts for this business." },
   create_operations_task: { kind: "write", label: "Create operations tasks", description: "Create an internal operational task (follow-up, handoff, coordination)." },
+  read_customer_crm: { kind: "read", label: "Read customer CRM", description: "Read tenant-scoped customer CRM context." },
+  read_crm_deals: { kind: "read", label: "Read CRM deals", description: "Read tenant-scoped CRM deals." },
+  read_crm_pipelines: { kind: "read", label: "Read CRM pipelines", description: "Read tenant-scoped CRM pipelines and stages." },
+  create_deal: { kind: "write", label: "Create CRM deals", description: "Create a CRM deal." },
+  update_deal: { kind: "write", label: "Update CRM deals", description: "Update a CRM deal." },
+  move_deal_stage: { kind: "write", label: "Move CRM deals", description: "Move a CRM deal between stages." },
+  convert_lead_to_deal: { kind: "write", label: "Convert leads to deals", description: "Convert a qualified lead into a CRM deal." },
   request_handoff: { kind: "write", label: "Hand off conversation", description: "Reassign the current live conversation to another eligible AI employee, or escalate it to a human. The model chooses only an intent — the platform resolves the real destination and enforces tenant/plan/channel eligibility." },
 };
 

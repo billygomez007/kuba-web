@@ -18,6 +18,7 @@ import { salesWorkPlanTool } from "@/mastra/tools/sales-work-plan";
 import { salesExternalActionTool } from "@/mastra/tools/sales-external-action";
 import { createAppointmentTool } from "@/mastra/tools/appointment-tools";
 import { requestHandoffTool } from "@/mastra/tools/request-handoff";
+import { getCustomerCrmContextTool, findLeadsTool, findDealsTool, getDealTool, listCrmPipelinesTool, listCrmStagesTool, createDealTool, updateDealTool, moveDealStageTool, convertLeadToDealTool, createDealFollowUpTaskTool } from "@/mastra/tools/crm-tools";
 
 const salesMemory = new Memory({
   storage: new LibSQLStore({
@@ -911,5 +912,16 @@ tools: {
   salesExternalAction: salesExternalActionTool,
   createAppointment: createAppointmentTool,
   requestHandoff: requestHandoffTool,
+  getCustomerCrmContext: getCustomerCrmContextTool,
+  findLeads: findLeadsTool,
+  findDeals: findDealsTool,
+  getDeal: getDealTool,
+  listCrmPipelines: listCrmPipelinesTool,
+  listCrmStages: listCrmStagesTool,
+  createDeal: createDealTool,
+  updateDeal: updateDealTool,
+  moveDealStage: moveDealStageTool,
+  convertLeadToDeal: convertLeadToDealTool,
+  createDealFollowUpTask: createDealFollowUpTaskTool,
 },
 });
