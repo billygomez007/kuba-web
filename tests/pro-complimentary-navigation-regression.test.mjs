@@ -201,7 +201,7 @@ test("a permission-restricted 'member' role on a Pro complimentary business sees
 // --- 5. No Coming Soon/Planned/placeholder items or empty groups, for any of the real resolved plans ---
 
 test("none of the five real resolved plans ever render a Coming Soon/Planned/placeholder label", async () => {
-  const placeholderLabels = ["Organization Overview", "Branch Overview", "Collections Agent", "Skills", "Calendar", "Payments", "Accounting", "CRM", "External Apps", "API / Developer Integrations", "Organization / Business Group", "Branches & Locations", "Roles & Permissions", "Invitations", "Security", "Social Channels"];
+  const placeholderLabels = ["Organization Overview", "Branch Overview", "Collections Agent", "Skills", "Calendar", "Payments", "Accounting", "External Apps", "API / Developer Integrations", "Organization / Business Group", "Branches & Locations", "Roles & Permissions", "Invitations", "Security", "Social Channels"];
   for (const bizId of [BIZ_STARTER, BIZ_GROWTH, BIZ_PRO_PAID, BIZ_PRO_COMP, BIZ_ENTERPRISE]) {
     const resolved = await entitlements.getBusinessEntitlements(bizId);
     const labels = flatLabels(visibleNav(permissionsLib.getRolePermissions("owner"), resolved.capabilities));

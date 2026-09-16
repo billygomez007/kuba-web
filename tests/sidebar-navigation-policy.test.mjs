@@ -95,7 +95,7 @@ test("previously-known stub/placeholder items are gone entirely, not merely hidd
   for (const href of removedLabelsByHref) {
     assert.equal(allHrefs.includes(href), false, `${href} must not appear in navigationGroups`);
   }
-  const removedLabels = ["Organization Overview", "Branch Overview", "Collections Agent", "Skills", "Calendar", "Payments", "Accounting", "CRM", "External Apps", "API / Developer Integrations", "Organization / Business Group", "Branches & Locations", "Roles & Permissions", "Invitations", "Security", "Social Channels"];
+  const removedLabels = ["Organization Overview", "Branch Overview", "Collections Agent", "Skills", "Calendar", "Payments", "Accounting", "External Apps", "API / Developer Integrations", "Organization / Business Group", "Branches & Locations", "Roles & Permissions", "Invitations", "Security", "Social Channels"];
   const allLabelsEverywhere = navigationGroups.flatMap((group) => group.items.map((item) => item.label));
   for (const label of removedLabels) {
     assert.equal(allLabelsEverywhere.includes(label), false, `"${label}" must not appear anywhere in navigationGroups`);
@@ -183,7 +183,16 @@ test("PRO: Voice is visible (both Pro-entitled via ai_workforce.voice and a genu
 });
 
 test("PRO: future placeholders remain hidden even though Pro is commercially broad", () => {
-  assert.equal(allLabels("pro").some((label) => ["Skills", "Collections Agent", "Calendar", "Payments", "Accounting", "CRM", "External Apps", "API / Developer Integrations"].includes(label)), false);
+  assert.equal(allLabels("pro").some((label) => ["Skills", "Collections Agent", "Calendar", "Payments", "Accounting", "External Apps", "API / Developer Integrations"].includes(label)), false);
+});
+
+
+test("PRO exposes the native CRM route with the canonical CRM permission and entitlement", () => {
+  const crm = navigationGroups.flatMap((group) => group.items).find((item) => item.label === "CRM");
+  assert.deepEqual(crm, { label: "CRM", href: "/dashboard/crm", icon: "◎", permission: "crm.view" });
+  assert.equal(navigationCapabilities["/dashboard/crm"], "integrations.crm");
+  assert.ok(allLabels("pro").includes("CRM"));
+  assert.equal(allLabels("growth").includes("CRM"), false);
 });
 
 // --- 6. ENTERPRISE ---
