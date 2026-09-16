@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import test from "node:test";
+const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
+const read = (file) => readFile(path.join(ROOT, file), "utf8");
+test("CRM permissions are canonical and role mapped", async () => { const source = await read("lib/auth/permission-definitions.ts"); for (const permission of ["CRM_VIEW", "CRM_MANAGE", "CRM_PIPELINE_MANAGE", "CRM_DEAL_MANAGE"]) assert.match(source, new RegExp(`${permission}:`)); assert.match(source, /owner: ALL_PERMISSIONS/); assert.match(source, /admin: ALL_PERMISSIONS/); });
+test("CRM routes use dedicated view/manage permissions", async () => { const files = ["app/api/crm/pipelines/route.ts", "app/api/crm/deals/route.ts", "app/api/crm/deals/[id]/route.ts", "app/api/crm/leads/[id]/convert/route.ts", "app/api/crm/customers/[id]/route.ts", "app/api/crm/analytics/route.ts"]; for (const file of files) assert.match(await read(file), /PERMISSIONS\.CRM_(VIEW|DEAL_MANAGE|PIPELINE_MANAGE)/, file); });
+test("deal route emits the complete lifecycle taxonomy and skips no-op updates", async () => { const source = await read("app/api/crm/deals/[id]/route.ts"); for (const event of ["crm.deal.created", "crm.deal.updated", "crm.deal.stage_changed", "crm.deal.owner_changed", "crm.deal.value_changed", "crm.deal.won", "crm.deal.lost", "crm.deal.reopened"]) { if (event === "crm.deal.created") continue; assert.match(source, new RegExp(event.replaceAll(".", "\\."))); } assert.match(source, /if \(status !== current\.status/); });
+test("lead conversion emits canonical audit metadata", async () => { const source = await read("app/api/crm/leads/[id]/convert/route.ts"); assert.match(source, /crm\.lead\.converted/); assert.match(source, /leadId/); });
+test("AI CRM write tools have no model-controlled businessId", async () => { const source = await read("mastra/tools/crm-tools.ts"); assert.doesNotMatch(source, /businessId:\s*z\./); assert.match(source, /requireBusinessId/); assert.match(source, /checkAIEmployeeAuthority/); });

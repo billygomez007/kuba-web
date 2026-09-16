@@ -8,7 +8,7 @@ import { createAuditLog } from "@/lib/auth/audit";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const membership = await getCurrentMembership();
-  if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.RECEPTION_MANAGE)) return NextResponse.json({ error: "CRM management denied." }, { status: 403 });
+  if (!membership || !hasPermission(membership.role, membership.permissions, PERMISSIONS.CRM_DEAL_MANAGE)) return NextResponse.json({ error: "CRM management denied." }, { status: 403 });
   const { id } = await context.params;
   const lead = (await db.select().from(leads).where(and(eq(leads.id, id), eq(leads.businessId, membership.businessId))).limit(1))[0];
   if (!lead) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
