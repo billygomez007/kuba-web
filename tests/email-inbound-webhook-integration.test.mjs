@@ -26,7 +26,8 @@ const WEBHOOK_SECRET_KEY = crypto.randomBytes(24); // raw key bytes backing RESE
 const WEBHOOK_SECRET = `whsec_${WEBHOOK_SECRET_KEY.toString("base64")}`;
 
 let tempDir;
-let db, schema, replyToken, suppression, webhookRoute;
+let db, schema, replyToken, suppression, webhookRoute, receiving;
+let originalFetch;
 
 const BIZ_A = "kora-os"; // tenant-isolation fixture business #1
 const BIZ_B = "realtegic-works"; // tenant-isolation fixture business #2
@@ -189,12 +190,15 @@ test.before(async () => {
   process.env.EMAIL_FROM = process.env.EMAIL_FROM || "campaigns@superkuba.test";
   process.env.RESEND_INBOUND_DOMAIN = INBOUND_DOMAIN;
   process.env.RESEND_WEBHOOK_SECRET = WEBHOOK_SECRET;
+  process.env.RESEND_RECEIVING_API_KEY = "test-receiving-key";
   delete process.env.RESEND_API_KEY;
+  originalFetch = globalThis.fetch;
 
   ({ db } = await import("@/db"));
   schema = await import("@/db/schema");
   replyToken = await import("@/lib/email/reply-token");
   suppression = await import("@/lib/outreach/suppression");
+  receiving = await import("@/lib/email/resend-receiving");
   webhookRoute = await import("@/app/api/integrations/email/webhook/route");
 
   await seedBusiness(BIZ_A, "Kora OS");
@@ -202,8 +206,18 @@ test.before(async () => {
 });
 
 test.after(async () => {
+  globalThis.fetch = originalFetch;
   await rm(tempDir, { recursive: true, force: true });
 });
+
+function mockReceivingApi(handler) {
+  let calls = 0;
+  globalThis.fetch = async (input, init) => {
+    calls += 1;
+    return handler({ input, init, calls });
+  };
+  return () => calls;
+}
 
 test("SECURITY: a request with an invalid webhook signature is rejected with 401 and nothing is persisted", async () => {
   const response = await postWebhook(
@@ -241,6 +255,95 @@ test("a verified reply-token address resolves MATCHED_CAMPAIGN, creates the conv
   assert.equal(messageRows[0].direction, "inbound");
   assert.equal(messageRows[0].content, "I'm interested, tell me more!");
   assert.equal(messageRows[0].businessId, BIZ_A);
+});
+
+test("RECEIVING API: a metadata-only email.received webhook retrieves and stores the canonical plain-text body", async () => {
+  const alias = `body-text@${INBOUND_DOMAIN}`;
+  const integrationId = await seedEmailIntegration(BIZ_A, alias);
+  const senderEmail = `body-text-${id("sender")}@customer.example`;
+  const providerEventId = id("resend");
+  const getCallCount = mockReceivingApi(({ input }) => {
+    assert.equal(String(input), `https://api.resend.com/emails/receiving/${encodeURIComponent(providerEventId)}`);
+    return new Response(JSON.stringify({ id: providerEventId, from: senderEmail, to: [alias], subject: "Question", text: "The canonical inbound body." }), { status: 200 });
+  });
+
+  const response = await postWebhook({ type: "email.received", data: { email_id: providerEventId, from: senderEmail, to: [alias], subject: "Question" } });
+  assert.equal(response.status, 200);
+
+  const messageRow = (await db.select().from(schema.messages).where(eq(schema.messages.externalMessageId, providerEventId)).limit(1))[0];
+  assert.equal(messageRow.content, "The canonical inbound body.");
+  assert.equal(messageRow.integrationId, integrationId);
+  const integration = (await db.select().from(schema.integrations).where(eq(schema.integrations.id, integrationId)).limit(1))[0];
+  assert.ok(integration.lastWebhookAt, "successful inbound processing should update lastWebhookAt");
+  assert.equal(getCallCount(), 1);
+});
+
+test("RECEIVING API: plain text is preferred when the canonical resource contains both text and html", async () => {
+  const alias = `body-both@${INBOUND_DOMAIN}`;
+  await seedEmailIntegration(BIZ_A, alias);
+  const providerEventId = id("resend");
+  mockReceivingApi(() => new Response(JSON.stringify({ id: providerEventId, text: "Prefer this text.", html: "<p>Do not store this HTML as the primary body.</p>" }), { status: 200 }));
+
+  await postWebhook({ type: "email.received", data: { email_id: providerEventId, from: `both-${id("sender")}@customer.example`, to: [alias] } });
+  const messageRow = (await db.select().from(schema.messages).where(eq(schema.messages.externalMessageId, providerEventId)).limit(1))[0];
+  assert.equal(messageRow.content, "Prefer this text.");
+});
+
+test("RECEIVING API: html-only canonical resources are safely converted to readable text", async () => {
+  const alias = `body-html@${INBOUND_DOMAIN}`;
+  await seedEmailIntegration(BIZ_A, alias);
+  const providerEventId = id("resend");
+  mockReceivingApi(() => new Response(JSON.stringify({ id: providerEventId, html: "<p>Hello <strong>there</strong>.</p><script>secret()</script>" }), { status: 200 }));
+
+  await postWebhook({ type: "email.received", data: { email_id: providerEventId, from: `html-${id("sender")}@customer.example`, to: [alias] } });
+  const messageRow = (await db.select().from(schema.messages).where(eq(schema.messages.externalMessageId, providerEventId)).limit(1))[0];
+  assert.equal(messageRow.content, "Hello there.");
+  assert.doesNotMatch(messageRow.content, /script|secret/);
+});
+
+test("RECEIVING API: provider failure is retryable and leaves no partial inbound records or leaked error text", async () => {
+  const alias = `body-failure@${INBOUND_DOMAIN}`;
+  await seedEmailIntegration(BIZ_A, alias);
+  const providerEventId = id("resend");
+  const senderEmail = `failure-${id("sender")}@customer.example`;
+  const secretLikeProviderText = "provider response contains test-receiving-key and must stay private";
+  mockReceivingApi(() => new Response(secretLikeProviderText, { status: 503 }));
+
+  const response = await postWebhook({ type: "email.received", data: { email_id: providerEventId, from: senderEmail, to: [alias] } });
+  const responseText = await response.text();
+  assert.equal(response.status, 500);
+  assert.doesNotMatch(responseText, /test-receiving-key|provider response/);
+  assert.equal((await db.select().from(schema.messages).where(eq(schema.messages.externalMessageId, providerEventId))).length, 0);
+  assert.equal((await db.select().from(schema.customers).where(eq(schema.customers.email, senderEmail))).length, 0);
+});
+
+test("RECEIVING API: a missing receiving credential fails closed without exposing credential material", async () => {
+  const configuredKey = process.env.RESEND_RECEIVING_API_KEY;
+  delete process.env.RESEND_RECEIVING_API_KEY;
+  try {
+    await assert.rejects(() => receiving.retrieveResendReceivedEmail("missing-key-check"), (error) => {
+      assert.match(error.message, /required to retrieve inbound email/);
+      assert.doesNotMatch(error.message, /test-receiving-key/);
+      return true;
+    });
+  } finally {
+    process.env.RESEND_RECEIVING_API_KEY = configuredKey;
+  }
+});
+
+test("RECEIVING API: duplicate webhooks are idempotent and do not retrieve or persist twice", async () => {
+  const alias = `body-duplicate@${INBOUND_DOMAIN}`;
+  await seedEmailIntegration(BIZ_A, alias);
+  const providerEventId = id("resend");
+  const senderEmail = `duplicate-${id("sender")}@customer.example`;
+  const getCallCount = mockReceivingApi(() => new Response(JSON.stringify({ id: providerEventId, text: "Only once." }), { status: 200 }));
+  const event = { type: "email.received", data: { email_id: providerEventId, from: senderEmail, to: [alias] } };
+
+  await postWebhook(event);
+  const duplicateResponse = await postWebhook(event);
+  assert.equal((await duplicateResponse.json()).duplicate, true);
+  assert.equal(getCallCount(), 1);
+  assert.equal((await db.select().from(schema.messages).where(eq(schema.messages.externalMessageId, providerEventId))).length, 1);
 });
 
 test("IDEMPOTENCY: redelivering the same provider event id is treated as a duplicate, not a second message", async () => {

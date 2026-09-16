@@ -317,6 +317,15 @@ async function handleInboundEmail(event: ResendWebhookEvent) {
     createdAt: now,
   });
 
+  // A successfully persisted inbound message is a truthful connection-health
+  // signal for this business's own Email integration. Keep the update scoped
+  // by both integration and business so a correlated message can never mark
+  // another tenant's integration as healthy.
+  await db
+    .update(integrations)
+    .set({ lastWebhookAt: now, updatedAt: now })
+    .where(and(eq(integrations.id, integrationId), eq(integrations.businessId, businessId)));
+
   console.log(JSON.stringify({
     event: "kuba_email_inbound",
     timestamp: now.toISOString(),
