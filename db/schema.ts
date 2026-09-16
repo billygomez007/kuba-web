@@ -682,6 +682,13 @@ export const appointments = sqliteTable(
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     noShowAt: integer("no_show_at", { mode: "timestamp_ms" }),
     cancellationReason: text("cancellation_reason"),
+<<<<<<< HEAD
+=======
+    dealId: text("deal_id"),
+    externalProvider: text("external_provider"),
+    externalEventId: text("external_event_id"),
+    externalCalendarId: text("external_calendar_id"),
+>>>>>>> 6cfa7f5 (Complete native CRM customer and deal lifecycle)
   },
   (table) => [
     index("appointments_business_start_idx").on(table.businessId, table.startAt),
@@ -920,6 +927,7 @@ export const tasks = sqliteTable("tasks", {
   leadId: text("lead_id"),
 
   customerId: text("customer_id"),
+  dealId: text("deal_id"),
 
   automationId: text("automation_id"),
 
