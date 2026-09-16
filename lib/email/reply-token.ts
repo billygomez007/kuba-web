@@ -92,6 +92,22 @@ export function buildReplyToAddress(token: string, inboundDomain: string): strin
   return `reply+${token}@${inboundDomain}`;
 }
 
+export function createOpaqueReplyToken(payload: Pick<ReplyTokenPayload, "businessId" | "conversationId">): string {
+  const nonce = crypto.randomBytes(15).toString("base64url");
+  const signature = sign(`${nonce}.${payload.businessId}.${payload.conversationId}`);
+  return `R${nonce}${signature}`;
+}
+
+export function verifyOpaqueReplyToken(token: string, payload: Pick<ReplyTokenPayload, "businessId" | "conversationId">): boolean {
+  if (!/^R[A-Za-z0-9_-]{63}$/.test(token)) return false;
+  const nonce = token.slice(1, 21);
+  const provided = token.slice(21);
+  const expected = sign(`${nonce}.${payload.businessId}.${payload.conversationId}`);
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+  return providedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
 /**
  * Extracts a reply token from a recipient address's local part, if it
  * matches the "reply+<token>" convention this codebase generates. Returns
@@ -108,7 +124,11 @@ export function extractReplyToken(recipientAddress: string): string | null {
   // case, since it is base64url (case-significant) and signed as such —
   // lowercasing it here would corrupt every token before verification ever
   // runs.
-  if (!localPart.toLowerCase().startsWith("reply+")) return null;
-  const token = localPart.slice("reply+".length);
+  const token = localPart.toLowerCase().startsWith("reply+")
+    ? localPart.slice("reply+".length)
+    : /^R[A-Za-z0-9_-]{63}$/.test(localPart)
+      ? localPart
+      : null;
+  if (!token) return null;
   return token || null;
 }

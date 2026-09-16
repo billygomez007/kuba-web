@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 
 import { db } from "@/db";
-import { conversations, integrations } from "@/db/schema";
-import { extractReplyToken, verifyReplyToken } from "@/lib/email/reply-token";
+import { conversations, integrations, messages } from "@/db/schema";
+import { extractReplyToken, verifyReplyToken, verifyOpaqueReplyToken } from "@/lib/email/reply-token";
 
 /**
  * Business-safe addressing + reply correlation (Phases 5-6 of the email
@@ -76,7 +76,17 @@ async function findReplyTokenMatch(toAddresses: string[]): Promise<InboundCorrel
     const token = extractReplyToken(address);
     if (!token) continue;
     const payload = verifyReplyToken(token);
-    if (!payload) continue;
+    if (!payload) {
+      if (!/^R[A-Za-z0-9_-]{63}$/.test(token)) continue;
+      const candidates = await db.select({ businessId: messages.businessId, conversationId: messages.conversationId, metadata: messages.metadata })
+        .from(messages)
+        .where(and(eq(messages.direction, "outbound"), like(messages.metadata, `%${token}%`)))
+        .limit(1);
+      const match = candidates.find((row) => row.metadata?.includes(token) && verifyOpaqueReplyToken(token, { businessId: row.businessId, conversationId: row.conversationId }));
+      if (!match) continue;
+      const existing = await db.select({ id: conversations.id }).from(conversations).where(and(eq(conversations.id, match.conversationId), eq(conversations.businessId, match.businessId))).limit(1);
+      return { classification: "MATCHED_THREAD", businessId: match.businessId, conversationId: match.conversationId, conversationExists: existing.length > 0 };
+    }
 
     if (payload.campaignId && payload.recipientId) {
       const existing = await db

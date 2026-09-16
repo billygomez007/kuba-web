@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { integrations } from "@/db/schema";
 import { getResend } from "@/lib/email/resend";
-import { createReplyToken, buildReplyToAddress } from "@/lib/email/reply-token";
+import { createReplyToken, buildReplyToAddress, createOpaqueReplyToken } from "@/lib/email/reply-token";
 import { getInboundDomain } from "@/lib/email/inbound-config";
 
 import type { ChannelAdapter } from "./types";
@@ -47,7 +47,11 @@ export const emailAdapter: ChannelAdapter = {
             inboundDomain,
           )
         : undefined;
-      const replyTo = payload.replyTo || (signedReplyAddress ? `SuperKuba <${signedReplyAddress}>` : undefined);
+      let replyTo = payload.replyTo || (signedReplyAddress ? `SuperKuba <${signedReplyAddress}>` : undefined);
+      if (!payload.replyTo && inboundDomain && signedReplyAddress && signedReplyAddress.split("@")[0].length > 64) {
+        const opaqueToken = createOpaqueReplyToken({ businessId: payload.businessId, conversationId: payload.conversationId });
+        replyTo = `SuperKuba <${opaqueToken}@${inboundDomain}>`;
+      }
       const response = await getResend().emails.send({
         from,
         to: payload.recipient,
