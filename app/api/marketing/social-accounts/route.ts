@@ -1,6 +1,5 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { marketingSocialAccounts } from "@/db/schema";
 import { requireMarketingAccess } from "@/lib/marketing/context";

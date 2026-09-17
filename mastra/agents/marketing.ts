@@ -10,6 +10,7 @@ import { getFollowUpsTool } from "@/mastra/tools/get-follow-ups";
 import { createFollowUpTool } from "@/mastra/tools/create-follow-up";
 import { getMarketingPerformanceTool } from "@/mastra/tools/marketing/get-marketing-performance";
 import { createMarketingTaskTool } from "@/mastra/tools/marketing/create-marketing-task";
+import { listMarketingCampaignsTool, listMarketingContentTool } from "@/mastra/tools/marketing/native-marketing";
 
 const marketingMemory = new Memory({
   storage: new LibSQLStore({
@@ -30,6 +31,8 @@ export const marketingTools = {
   createFollowUp: createFollowUpTool,
   getMarketingPerformance: getMarketingPerformanceTool,
   createMarketingTask: createMarketingTaskTool,
+  listMarketingCampaigns: listMarketingCampaignsTool,
+  listMarketingContent: listMarketingContentTool,
 };
 
 export const kubaMarketingAgent = new Agent({
