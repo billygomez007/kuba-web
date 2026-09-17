@@ -11,8 +11,9 @@ import {
 export async function marketingCampaignBelongsToBusiness(
   businessId: string,
   campaignId: string,
+  executor: Pick<typeof db, "select"> = db,
 ) {
-  const [row] = await db
+  const [row] = await executor
     .select({ id: marketingCampaigns.id })
     .from(marketingCampaigns)
     .where(
@@ -29,11 +30,13 @@ export async function marketingCampaignBelongsToBusiness(
 export async function marketingContentBelongsToBusiness(
   businessId: string,
   contentItemId: string,
+  executor: Pick<typeof db, "select"> = db,
 ) {
-  const [row] = await db
+  const [row] = await executor
     .select({
       id: marketingContentItems.id,
       campaignId: marketingContentItems.campaignId,
+      approvalStatus: marketingContentItems.approvalStatus,
     })
     .from(marketingContentItems)
     .where(
@@ -50,11 +53,13 @@ export async function marketingContentBelongsToBusiness(
 export async function marketingVariantBelongsToBusiness(
   businessId: string,
   variantId: string,
+  executor: Pick<typeof db, "select"> = db,
 ) {
-  const [row] = await db
+  const [row] = await executor
     .select({
       id: marketingContentVariants.id,
       contentItemId: marketingContentVariants.contentItemId,
+      channel: marketingContentVariants.channel,
     })
     .from(marketingContentVariants)
     .where(
@@ -89,9 +94,10 @@ export async function marketingAudienceBelongsToBusiness(
 export async function marketingSocialAccountBelongsToBusiness(
   businessId: string,
   socialAccountId: string,
+  executor: Pick<typeof db, "select"> = db,
 ) {
-  const [row] = await db
-    .select({ id: marketingSocialAccounts.id })
+  const [row] = await executor
+    .select({ id: marketingSocialAccounts.id, provider: marketingSocialAccounts.provider })
     .from(marketingSocialAccounts)
     .where(
       and(
@@ -101,5 +107,5 @@ export async function marketingSocialAccountBelongsToBusiness(
     )
     .limit(1);
 
-  return Boolean(row);
+  return row ?? null;
 }

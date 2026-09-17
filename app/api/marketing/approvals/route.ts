@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { db } from "@/db";
@@ -14,6 +14,8 @@ import {
   marketingContentBelongsToBusiness,
 } from "@/lib/marketing/ownership";
 
+import { getMarketingApprovalCenter } from "@/lib/marketing/publishing-operations";
+
 export async function GET() {
   const access = await requireMarketingAccess("view");
 
@@ -24,13 +26,8 @@ export async function GET() {
     );
   }
 
-  const approvals = await db
-    .select()
-    .from(marketingApprovals)
-    .where(eq(marketingApprovals.businessId, access.businessId))
-    .orderBy(desc(marketingApprovals.updatedAt));
-
-  return NextResponse.json({ approvals });
+  const approvals = await getMarketingApprovalCenter(access.businessId);
+  return NextResponse.json({ approvals, capabilities: access.capabilities, currentUserId: access.userId });
 }
 
 export async function POST(request: Request) {

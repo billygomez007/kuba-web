@@ -20,7 +20,8 @@ const sections = [
   ["Audiences", "/dashboard/marketing/audiences", "Define lawful segments from existing business data."],
   ["Assets", "/dashboard/marketing/assets", "Keep a catalog ready for future provider connections."],
   ["Approvals", "/dashboard/marketing/approvals", "Review work before anything can publish."],
-  ["Social accounts", "/dashboard/marketing/social", "Provider connections are intentionally not active yet."],
+  ["Publishing", "/dashboard/marketing/publishing", "Inspect scheduling intent and persisted provider results."],
+  ["Channel Readiness", "/dashboard/marketing/social", "Provider connections are intentionally not active yet."],
   ["Analytics", "/dashboard/marketing/analytics", "Native counts only; no invented provider metrics."],
 ] as const;
 
