@@ -1,0 +1,8 @@
+import { and, eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { marketingCampaigns } from "@/db/schema";
+import { requireMarketingAccess } from "@/lib/marketing/context";
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) { const access = await requireMarketingAccess("view"); if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status }); const { id } = await params; const [campaign] = await db.select().from(marketingCampaigns).where(and(eq(marketingCampaigns.id, id), eq(marketingCampaigns.businessId, access.businessId))); if (!campaign) return NextResponse.json({ error: "Campaign not found." }, { status: 404 }); return NextResponse.json({ campaign }); }
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) { const access = await requireMarketingAccess("manage"); if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status }); const { id } = await params; const body = await request.json().catch(() => null); const allowed = ["name", "description", "objective", "campaignType", "targetAudienceId", "offer", "landingUrl", "timezone", "status", "approvalStatus"] as const; const patch = Object.fromEntries(allowed.filter((key) => body && key in body).map((key) => [key, body[key]])); patch.updatedAt = new Date(); const result = await db.update(marketingCampaigns).set(patch).where(and(eq(marketingCampaigns.id, id), eq(marketingCampaigns.businessId, access.businessId))); if (result.rowsAffected === 0) return NextResponse.json({ error: "Campaign not found." }, { status: 404 }); return GET(_request, { params }); }

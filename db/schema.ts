@@ -3149,6 +3149,135 @@ export const outreachCampaigns = sqliteTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Native Marketing Command Center. These tables intentionally remain
+// provider-neutral: external social adapters can be added later without
+// changing the internal campaign/content lifecycle.
+
+export const marketingCampaigns = sqliteTable(
+  "marketing_campaigns",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    objective: text("objective").notNull().default("other"),
+    campaignType: text("campaign_type").notNull().default("organic"),
+    status: text("status").notNull().default("draft"),
+    targetAudienceId: text("target_audience_id"),
+    offer: text("offer"),
+    landingUrl: text("landing_url"),
+    timezone: text("timezone"),
+    startAt: integer("start_at", { mode: "timestamp_ms" }),
+    endAt: integer("end_at", { mode: "timestamp_ms" }),
+    budgetAmount: integer("budget_amount"),
+    budgetCurrency: text("budget_currency").notNull().default("USD"),
+    ownerUserId: text("owner_user_id"),
+    ownerEmployeeId: text("owner_employee_id"),
+    approvalStatus: text("approval_status").notNull().default("draft"),
+    createdByUserId: text("created_by_user_id"),
+    createdByEmployeeId: text("created_by_employee_id"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("marketing_campaigns_business_status_idx").on(table.businessId, table.status, table.updatedAt), index("marketing_campaigns_business_dates_idx").on(table.businessId, table.startAt, table.endAt)],
+);
+
+export const marketingCampaignChannels = sqliteTable(
+  "marketing_campaign_channels",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    channel: text("channel").notNull(),
+    socialAccountId: text("social_account_id"),
+    status: text("status").notNull().default("planned"),
+    scheduledStart: integer("scheduled_start", { mode: "timestamp_ms" }),
+    scheduledEnd: integer("scheduled_end", { mode: "timestamp_ms" }),
+    objectiveOverride: text("objective_override"),
+    audienceId: text("audience_id"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("marketing_campaign_channels_business_campaign_idx").on(table.businessId, table.campaignId), uniqueIndex("marketing_campaign_channels_campaign_channel_unique").on(table.campaignId, table.channel)],
+);
+
+export const marketingContentItems = sqliteTable(
+  "marketing_content_items",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    campaignId: text("campaign_id"),
+    title: text("title").notNull(),
+    contentType: text("content_type").notNull().default("post"),
+    brief: text("brief"),
+    status: text("status").notNull().default("draft"),
+    approvalStatus: text("approval_status").notNull().default("draft"),
+    createdByUserId: text("created_by_user_id"),
+    createdByEmployeeId: text("created_by_employee_id"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("marketing_content_items_business_status_idx").on(table.businessId, table.status, table.updatedAt), index("marketing_content_items_business_campaign_idx").on(table.businessId, table.campaignId)],
+);
+
+export const marketingContentVariants = sqliteTable(
+  "marketing_content_variants",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    contentItemId: text("content_item_id").notNull(),
+    channel: text("channel").notNull(),
+    headline: text("headline"),
+    text: text("text").notNull(),
+    description: text("description"),
+    callToAction: text("call_to_action"),
+    linkUrl: text("link_url"),
+    hashtags: text("hashtags"),
+    scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
+    status: text("status").notNull().default("draft"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("marketing_content_variants_business_schedule_idx").on(table.businessId, table.scheduledAt), uniqueIndex("marketing_content_variants_item_channel_unique").on(table.contentItemId, table.channel)],
+);
+
+export const marketingAudiences = sqliteTable("marketing_audiences", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), name: text("name").notNull(), description: text("description"), status: text("status").notNull().default("draft"), estimatedCount: integer("estimated_count"), createdBy: text("created_by").notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_audiences_business_idx").on(table.businessId, table.updatedAt)]);
+
+export const marketingAudienceRules = sqliteTable("marketing_audience_rules", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), audienceId: text("audience_id").notNull(), field: text("field").notNull(), operator: text("operator").notNull(), value: text("value").notNull(), position: integer("position").notNull().default(0), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_audience_rules_business_audience_idx").on(table.businessId, table.audienceId, table.position)]);
+
+export const marketingAssets = sqliteTable("marketing_assets", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), campaignId: text("campaign_id"), name: text("name").notNull(), assetType: text("asset_type").notNull(), fileReference: text("file_reference").notNull(), mimeType: text("mime_type"), sizeBytes: integer("size_bytes"), altText: text("alt_text"), metadata: text("metadata"), createdBy: text("created_by").notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_assets_business_campaign_idx").on(table.businessId, table.campaignId, table.updatedAt)]);
+
+export const marketingApprovals = sqliteTable("marketing_approvals", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), resourceType: text("resource_type").notNull(), resourceId: text("resource_id").notNull(), status: text("status").notNull().default("pending"), requestedByUserId: text("requested_by_user_id"), requestedByEmployeeId: text("requested_by_employee_id"), reviewedByUserId: text("reviewed_by_user_id"), reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }), comment: text("comment"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_approvals_business_status_idx").on(table.businessId, table.status, table.updatedAt), index("marketing_approvals_resource_idx").on(table.businessId, table.resourceType, table.resourceId)]);
+
+export const marketingSocialAccounts = sqliteTable("marketing_social_accounts", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), provider: text("provider").notNull(), externalAccountId: text("external_account_id"), displayName: text("display_name").notNull(), handle: text("handle"), accountType: text("account_type"), status: text("status").notNull().default("not_connected"), metadata: text("metadata"), connectedAt: integer("connected_at", { mode: "timestamp_ms" }), expiresAt: integer("expires_at", { mode: "timestamp_ms" }), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_social_accounts_business_provider_idx").on(table.businessId, table.provider, table.updatedAt), uniqueIndex("marketing_social_accounts_business_external_unique").on(table.businessId, table.provider, table.externalAccountId)]);
+
+export const marketingPublishJobs = sqliteTable("marketing_publish_jobs", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), campaignId: text("campaign_id"), contentItemId: text("content_item_id").notNull(), contentVariantId: text("content_variant_id"), socialAccountId: text("social_account_id"), channel: text("channel").notNull(), scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }), status: text("status").notNull().default("draft"), attemptCount: integer("attempt_count").notNull().default(0), idempotencyKey: text("idempotency_key").notNull(), providerPostId: text("provider_post_id"), publishedAt: integer("published_at", { mode: "timestamp_ms" }), failedAt: integer("failed_at", { mode: "timestamp_ms" }), failureCode: text("failure_code"), failureMessageSafe: text("failure_message_safe"), metadata: text("metadata"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_publish_jobs_business_schedule_idx").on(table.businessId, table.scheduledAt, table.status), uniqueIndex("marketing_publish_jobs_idempotency_unique").on(table.businessId, table.idempotencyKey)]);
+
+export const marketingAttributions = sqliteTable("marketing_attributions", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), campaignId: text("campaign_id").notNull(), customerId: text("customer_id"), leadId: text("lead_id"), dealId: text("deal_id"), eventType: text("event_type").notNull(), occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(), value: integer("value"), currency: text("currency"), metadata: text("metadata"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_attributions_business_campaign_idx").on(table.businessId, table.campaignId, table.occurredAt), index("marketing_attributions_business_event_idx").on(table.businessId, table.eventType, table.occurredAt)]);
+
+export const marketingMetricSnapshots = sqliteTable("marketing_metric_snapshots", {
+  id: text("id").primaryKey(), businessId: text("business_id").notNull(), campaignId: text("campaign_id"), metric: text("metric").notNull(), value: integer("value").notNull().default(0), currency: text("currency"), capturedAt: integer("captured_at", { mode: "timestamp_ms" }).notNull(), metadata: text("metadata"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("marketing_metric_snapshots_business_metric_idx").on(table.businessId, table.metric, table.capturedAt)]);
+
 export const outreachSequenceSteps = sqliteTable(
   "outreach_sequence_steps",
   {
