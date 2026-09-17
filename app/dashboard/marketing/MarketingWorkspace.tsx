@@ -69,7 +69,7 @@ export default function MarketingWorkspace({ mode = "overview" }: { mode?: strin
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/dashboard/marketing/content" className="rounded-control border border-border-default bg-surface-card px-4 py-2.5 text-sm font-semibold text-white hover:border-border-strong">Create content</Link>
-            <Link href="/dashboard/outreach/campaigns/new" className="rounded-control bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-cyan-300">Create campaign</Link>
+            <Link href="/dashboard/marketing/campaigns/new" className="rounded-control bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-cyan-300">Create campaign</Link>
           </div>
         </header>
 
