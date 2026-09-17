@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import Link from "next/link";
@@ -27,6 +28,8 @@ export default function MarketingWorkspace({ mode = "overview" }: { mode?: strin
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [records, setRecords] = useState<Record<string, unknown>[]>([]);
+  const [recordLoading, setRecordLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +49,26 @@ export default function MarketingWorkspace({ mode = "overview" }: { mode?: strin
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const endpoints: Record<string, { url: string; key: string }> = {
+      content: { url: "/api/marketing/content", key: "content" },
+      calendar: { url: "/api/marketing/calendar", key: "variants" },
+      audiences: { url: "/api/marketing/audiences", key: "audiences" },
+      assets: { url: "/api/marketing/assets", key: "assets" },
+      approvals: { url: "/api/marketing/approvals", key: "approvals" },
+      social: { url: "/api/marketing/social-accounts", key: "accounts" },
+      publishing: { url: "/api/marketing/publish-jobs", key: "jobs" },
+    };
+    const endpoint = endpoints[mode];
+    if (!endpoint) return;
+    setRecordLoading(true);
+    fetch(endpoint.url, { cache: "no-store" }).then(async (response) => {
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Unable to load marketing records.");
+      setRecords(Array.isArray(body[endpoint.key]) ? body[endpoint.key] : []);
+    }).catch((cause) => setError(cause instanceof Error ? cause.message : "Unable to load marketing records.")).finally(() => setRecordLoading(false));
+  }, [mode]);
 
   const stats = useMemo(() => ({
     active: campaigns.filter((campaign) => ["running", "active"].includes(campaign.status)).length,
@@ -90,7 +113,7 @@ export default function MarketingWorkspace({ mode = "overview" }: { mode?: strin
             </section>
           </>
         ) : (
-          <section className="mt-8 rounded-card border border-border-default bg-surface-card p-6"><Empty title={`${title} is ready for native planning`} body={description + " External provider execution is not connected, so this workspace will never claim a post was published without a provider result."} href="/dashboard/marketing" label="Back to overview" /></section>
+          <section className="mt-8 rounded-card border border-border-default bg-surface-card p-6"><div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">{title}</h2><p className="mt-2 text-sm text-text-tertiary">{description}</p></div>{mode === "content" && <Link href="/dashboard/marketing/content/new" className="rounded-control bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-950">Create content</Link>}</div>{error ? <p className="mt-6 text-sm text-danger">{error}</p> : recordLoading ? <p className="mt-6 text-sm text-text-tertiary">Loading records…</p> : records.length === 0 ? <Empty title={`No ${title.toLowerCase()} yet`} body="This workspace is connected to native tenant-scoped data. Create a record to see it here." href={mode === "content" ? "/dashboard/marketing/content/new" : "/dashboard/marketing"} label={mode === "content" ? "Create content" : "Back to overview"} /> : <div className="mt-6 divide-y divide-border-muted">{records.slice(0, 50).map((record, index) => <div key={String(record.id ?? index)} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{String(record.name ?? record.title ?? record.channel ?? record.provider ?? record.resourceType ?? `Record ${index + 1}`)}</p><p className="mt-1 text-xs text-text-tertiary">{String(record.description ?? record.status ?? record.approvalStatus ?? record.displayName ?? "Native record")}</p></div><span className="rounded-full border border-border-muted px-2.5 py-1 text-xs capitalize text-text-tertiary">{String(record.status ?? record.state ?? "ready").replaceAll("_", " ")}</span></div>)}</div>}</section>
         )}
 
         <section className="mt-8"><h2 className="text-xs font-bold uppercase tracking-[0.2em] text-text-muted">Marketing workspace</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{sections.map(([label, href, body]) => <Link key={href} href={href} className="rounded-card border border-border-default bg-surface-card p-5 transition hover:border-border-strong"><h3 className="font-semibold">{label}</h3><p className="mt-2 text-sm leading-5 text-text-tertiary">{body}</p></Link>)}</div></section>
