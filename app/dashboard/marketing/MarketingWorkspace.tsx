@@ -30,7 +30,7 @@ export default function MarketingWorkspace({ mode = "overview" }: { mode?: strin
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/outreach/campaigns", { cache: "no-store" })
+    fetch("/api/marketing/campaigns", { cache: "no-store" })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Unable to load campaigns.");
@@ -73,7 +73,7 @@ export default function MarketingWorkspace({ mode = "overview" }: { mode?: strin
           </div>
         </header>
 
-        {mode === "overview" ? (
+        {mode === "overview" || mode === "campaigns" ? (
           <>
             <section className="mt-8 grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
               <Stat label="Active campaigns" value={loading ? "—" : stats.active} />
@@ -84,13 +84,13 @@ export default function MarketingWorkspace({ mode = "overview" }: { mode?: strin
             <section className="mt-8 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
               <div className="rounded-card border border-border-default bg-surface-card p-6">
                 <div className="flex items-center justify-between gap-4"><h2 className="text-lg font-bold">Campaign performance</h2><Link href="/dashboard/marketing/analytics" className="text-xs font-semibold text-cyan-300">View analytics</Link></div>
-                {error ? <p className="mt-6 text-sm text-danger">{error}</p> : campaigns.length === 0 ? <Empty title="No campaigns yet" body="Create a campaign to start building a truthful native marketing plan." href="/dashboard/outreach/campaigns/new" /> : <div className="mt-6 space-y-3">{campaigns.slice(0, 5).map((campaign) => <Link key={campaign.id} href={`/dashboard/outreach/campaigns/${campaign.id}`} className="flex items-center justify-between rounded-control border border-border-muted bg-surface-page/40 px-4 py-3 hover:border-border-strong"><span><span className="block text-sm font-semibold">{campaign.name}</span><span className="text-xs text-text-tertiary">{campaign.channel} · {campaign.status}</span></span><span className="text-xs text-text-muted">{campaign.metrics?.enrolled ?? 0} enrolled</span></Link>)}</div>}
+                {error ? <p className="mt-6 text-sm text-danger">{error}</p> : campaigns.length === 0 ? <Empty title="No campaigns yet" body="Create a campaign to start building a truthful native marketing plan." href="/dashboard/marketing" label="Create campaign" /> : <div className="mt-6 space-y-3">{campaigns.slice(0, 5).map((campaign) => <Link key={campaign.id} href={`/dashboard/marketing/campaigns/${campaign.id}`} className="flex items-center justify-between rounded-control border border-border-muted bg-surface-page/40 px-4 py-3 hover:border-border-strong"><span><span className="block text-sm font-semibold">{campaign.name}</span><span className="text-xs text-text-tertiary">{campaign.status}</span></span><span className="text-xs text-text-muted">Native campaign</span></Link>)}</div>}
               </div>
               <div className="rounded-card border border-border-default bg-surface-card p-6"><h2 className="text-lg font-bold">Kuba Marketing AI</h2><p className="mt-3 text-sm leading-6 text-text-tertiary">Kuba Marketing can ground campaign and content drafts in Business Brain data. Every draft remains subject to human review and approval.</p><Link href="/dashboard/ai-employees" className="mt-5 inline-flex text-sm font-semibold text-cyan-300">Open AI Workforce →</Link></div>
             </section>
           </>
         ) : (
-          <section className="mt-8 rounded-card border border-border-default bg-surface-card p-6"><Empty title={`${title} is ready for native planning`} body={description + " External provider execution is not connected, so this workspace will never claim a post was published without a provider result."} href={mode === "campaigns" ? "/dashboard/outreach/campaigns" : "/dashboard/marketing"} label={mode === "campaigns" ? "Open campaigns" : "Back to overview"} /></section>
+          <section className="mt-8 rounded-card border border-border-default bg-surface-card p-6"><Empty title={`${title} is ready for native planning`} body={description + " External provider execution is not connected, so this workspace will never claim a post was published without a provider result."} href="/dashboard/marketing" label="Back to overview" /></section>
         )}
 
         <section className="mt-8"><h2 className="text-xs font-bold uppercase tracking-[0.2em] text-text-muted">Marketing workspace</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{sections.map(([label, href, body]) => <Link key={href} href={href} className="rounded-card border border-border-default bg-surface-card p-5 transition hover:border-border-strong"><h3 className="font-semibold">{label}</h3><p className="mt-2 text-sm leading-5 text-text-tertiary">{body}</p></Link>)}</div></section>

@@ -1,0 +1,9 @@
+import { desc, eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
+import { db } from "@/db";
+import { marketingAssets } from "@/db/schema";
+import { requireMarketingAccess } from "@/lib/marketing/context";
+
+export async function GET() { const access = await requireMarketingAccess("view"); if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status }); return NextResponse.json({ assets: await db.select().from(marketingAssets).where(eq(marketingAssets.businessId, access.businessId)).orderBy(desc(marketingAssets.updatedAt)) }); }
+export async function POST(request: Request) { const access = await requireMarketingAccess("manage"); if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status }); const body = await request.json().catch(() => null); const name = typeof body?.name === "string" ? body.name.trim() : ""; const fileReference = typeof body?.fileReference === "string" ? body.fileReference.trim() : ""; if (!name || !fileReference) return NextResponse.json({ error: "name and fileReference are required." }, { status: 400 }); const now = new Date(); const asset = { id: randomUUID(), businessId: access.businessId, campaignId: typeof body?.campaignId === "string" ? body.campaignId : null, name, assetType: typeof body?.assetType === "string" ? body.assetType : "other", fileReference, mimeType: typeof body?.mimeType === "string" ? body.mimeType : null, sizeBytes: typeof body?.sizeBytes === "number" ? body.sizeBytes : null, altText: typeof body?.altText === "string" ? body.altText : null, metadata: null, createdBy: access.userId, createdAt: now, updatedAt: now }; await db.insert(marketingAssets).values(asset); return NextResponse.json({ asset }, { status: 201 }); }

@@ -1,0 +1,8 @@
+import { and, eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { marketingContentItems } from "@/db/schema";
+import { requireMarketingAccess } from "@/lib/marketing/context";
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) { const access = await requireMarketingAccess("view"); if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status }); const { id } = await params; const [content] = await db.select().from(marketingContentItems).where(and(eq(marketingContentItems.id, id), eq(marketingContentItems.businessId, access.businessId))); if (!content) return NextResponse.json({ error: "Content not found." }, { status: 404 }); return NextResponse.json({ content }); }
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) { const access = await requireMarketingAccess("manage"); if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status }); const { id } = await params; const body = await request.json().catch(() => null); const patch: Record<string, unknown> = {}; for (const key of ["title", "contentType", "brief", "status", "approvalStatus", "campaignId"]) if (body && key in body) patch[key] = body[key]; patch.updatedAt = new Date(); const result = await db.update(marketingContentItems).set(patch).where(and(eq(marketingContentItems.id, id), eq(marketingContentItems.businessId, access.businessId))); if (result.rowsAffected === 0) return NextResponse.json({ error: "Content not found." }, { status: 404 }); return GET(_request, { params }); }
