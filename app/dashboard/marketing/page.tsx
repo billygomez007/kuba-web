@@ -1,5 +1,5 @@
-import MarketingWorkspace from "./MarketingWorkspace";
+import MarketingOverview from "./MarketingOverview";
 
 export default function MarketingPage() {
-  return <MarketingWorkspace />;
+  return <MarketingOverview />;
 }
