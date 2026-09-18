@@ -245,7 +245,17 @@ export async function sendWhatsAppViaProvider(
   const result = await response.json().catch(() => null);
 
   if (!response.ok) {
-    console.error("WhatsApp WATI send rejected.");
+    const providerError =
+      result && typeof result === "object"
+        ? JSON.stringify(result).slice(0, 1000)
+        : "unavailable";
+
+    console.error("WhatsApp WATI send rejected.", {
+      status: response.status,
+      statusText: response.statusText,
+      providerError,
+    });
+
     return { success: false, error: "provider_rejected" };
   }
 
