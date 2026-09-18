@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  resolveWhatsAppIntegrationByPhoneNumberId,
+  resolveWatiWhatsAppIntegrationByChannelNumber,
 } from "@/lib/channels/whatsapp";
 import {
   processWhatsAppInbound,
@@ -139,15 +139,19 @@ function normalizeStatus(
   }
 
   /*
-   * WATI status callbacks may correlate using either the provider's
-   * WhatsApp message ID or its local message ID. Prefer the WhatsApp ID
-   * because outbound sends persist the provider message ID when available.
+   * WATI outbound sends persist localMessageId as SuperKuba's canonical
+   * externalMessageId. Delivery-status callbacks must therefore prefer
+   * localMessageId so the shared persistence layer can correlate the
+   * callback to the exact outbound message.
+   *
+   * Other provider identifiers remain compatibility fallbacks for older
+   * records and alternate WATI payload shapes.
    */
   const externalMessageId =
-    asString(payload.whatsappMessageId) ||
-    nestedString(data, "whatsappMessageId") ||
     asString(payload.localMessageId) ||
     nestedString(data, "localMessageId") ||
+    asString(payload.whatsappMessageId) ||
+    nestedString(data, "whatsappMessageId") ||
     asString(payload.messageId) ||
     nestedString(data, "messageId") ||
     asString(payload.id) ||
@@ -207,7 +211,7 @@ export async function POST(request: NextRequest) {
   }
 
   const resolved =
-    await resolveWhatsAppIntegrationByPhoneNumberId(
+    await resolveWatiWhatsAppIntegrationByChannelNumber(
       channelPhoneNumber,
     );
 

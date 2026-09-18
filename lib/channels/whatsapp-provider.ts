@@ -206,11 +206,18 @@ export async function sendWhatsAppViaProvider(
     return { success: false, error: "provider_rejected" };
   }
 
+  // WATI delivery-status webhooks correlate outbound messages using
+  // localMessageId. Persist that identifier whenever WATI returns it so
+  // delivered/read/failed callbacks can update the exact stored message.
+  //
+  // Keep the older response shapes as compatibility fallbacks only.
   const externalMessageId =
-    result?.id ||
+    result?.localMessageId ||
+    result?.data?.localMessageId ||
     result?.messageId ||
-    result?.data?.id ||
-    result?.data?.messageId;
+    result?.data?.messageId ||
+    result?.id ||
+    result?.data?.id;
 
   if (!externalMessageId) {
     return { success: false, error: "no_message_id" };

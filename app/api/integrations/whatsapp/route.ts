@@ -99,8 +99,11 @@ export async function POST(request: Request) {
   if (transportProvider === "wati") {
     const apiBaseUrl =
       String(formData.get("apiBaseUrl") || "").trim();
-    const channelNumber =
-      String(formData.get("channelNumber") || "").trim();
+    const channelNumber = String(
+      formData.get("channelNumber") || "",
+    )
+      .replace(/\D/g, "")
+      .trim();
     const apiToken =
       String(formData.get("apiToken") || "").trim();
 

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { businesses, conversations, integrations, messages } from "@/db/schema";
 import {
   getWhatsAppProviderConfig,
+  getWhatsAppTransportProvider,
   sendWhatsAppViaProvider,
   type WhatsAppProviderConfig,
 } from "@/lib/channels/whatsapp-provider";
@@ -81,6 +82,57 @@ export async function resolveWhatsAppIntegrationByPhoneNumberId(
     .limit(1);
 
   return result[0] ?? null;
+}
+
+/**
+ * Resolve the SuperKuba tenant that owns a WATI channel number.
+ *
+ * WATI channel identities are compared in canonical digits-only form.
+ * Only active WATI-backed WhatsApp integrations are eligible.
+ * Tenant identity is derived exclusively from the stored integration.
+ */
+export async function resolveWatiWhatsAppIntegrationByChannelNumber(
+  channelNumber: string,
+) {
+  const normalizedChannelNumber =
+    String(channelNumber || "").replace(/\\D/g, "");
+
+  if (!normalizedChannelNumber) {
+    return null;
+  }
+
+  const candidates = await db
+    .select({ integration: integrations, business: businesses })
+    .from(integrations)
+    .innerJoin(
+      businesses,
+      eq(integrations.businessId, businesses.id),
+    )
+    .where(
+      and(
+        eq(integrations.provider, "whatsapp"),
+        eq(integrations.status, "active"),
+      ),
+    );
+
+  for (const candidate of candidates) {
+    if (
+      getWhatsAppTransportProvider(candidate.integration) !==
+      "wati"
+    ) {
+      continue;
+    }
+
+    const storedChannelNumber = String(
+      candidate.integration.externalPhoneNumberId || "",
+    ).replace(/\\D/g, "");
+
+    if (storedChannelNumber === normalizedChannelNumber) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 /**
