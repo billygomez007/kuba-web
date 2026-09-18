@@ -332,6 +332,7 @@ export async function POST(
     await adapter.send({
       businessId: business.businessId,
       conversationId,
+      integrationId: conversation[0].integrationId,
       recipient: channel === "email" ? conversation[0].customerEmail! : conversation[0].customerPhone || conversation[0].customerEmail || "unknown",
       message: trimmedContent,
       ...(subject ? { subject } : {}),
