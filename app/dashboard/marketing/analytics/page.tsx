@@ -1,5 +1,5 @@
-import MarketingWorkspace from "../MarketingWorkspace";
+import MarketingAnalyticsDashboard from "./MarketingAnalyticsDashboard";
 
 export default function MarketingAnalyticsPage() {
-  return <MarketingWorkspace mode="analytics" />;
+  return <MarketingAnalyticsDashboard />;
 }

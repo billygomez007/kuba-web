@@ -1,16 +1,72 @@
-import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { db } from "@/db";
-import { marketingApprovals, marketingAudiences, marketingCampaigns, marketingContentItems, marketingPublishJobs, marketingSocialAccounts } from "@/db/schema";
+
+import { getMarketingAnalyticsOperations } from "@/lib/marketing/analytics-operations";
 import { requireMarketingAccess } from "@/lib/marketing/context";
 
-export async function GET() {
+function parseDateParam(value: string | null) {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
+
+export async function GET(request: Request) {
   const access = await requireMarketingAccess("view");
-  if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
-  const businessId = access.businessId;
-  // Drizzle's SQLite table generic is invariant; the six tables share the same businessId contract.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const count = async (table: any) => Number((await db.select({ count: sql<number>`count(*)` }).from(table).where(eq(table.businessId, businessId)))[0]?.count ?? 0);
-  const [campaigns, content, approvals, jobs, audiences, social] = await Promise.all([count(marketingCampaigns), count(marketingContentItems), count(marketingApprovals), count(marketingPublishJobs), count(marketingAudiences), count(marketingSocialAccounts)]);
-  return NextResponse.json({ native: { campaigns, content, approvals, publishJobs: jobs, audiences, socialAccounts: social }, external: { status: "not_connected", metrics: ["ctr", "cpc", "cpm", "roas", "reach", "impressions", "likes", "shares", "comments", "videoViews"] } });
+
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.error },
+      { status: access.status },
+    );
+  }
+
+  const url = new URL(request.url);
+
+  const fromRaw = url.searchParams.get("from");
+  const toRaw = url.searchParams.get("to");
+
+  const from = parseDateParam(fromRaw);
+  const to = parseDateParam(toRaw);
+
+  if (fromRaw && !from) {
+    return NextResponse.json(
+      { error: "Invalid analytics from date." },
+      { status: 400 },
+    );
+  }
+
+  if (toRaw && !to) {
+    return NextResponse.json(
+      { error: "Invalid analytics to date." },
+      { status: 400 },
+    );
+  }
+
+  if (from && to && from > to) {
+    return NextResponse.json(
+      { error: "Analytics from date must be on or before to date." },
+      { status: 400 },
+    );
+  }
+
+  const analytics = await getMarketingAnalyticsOperations(
+    access.businessId,
+    {
+      from,
+      to,
+    },
+  );
+
+  return NextResponse.json({
+    ...analytics,
+    range: {
+      from,
+      to,
+    },
+  });
 }
