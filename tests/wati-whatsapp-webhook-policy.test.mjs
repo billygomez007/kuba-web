@@ -178,3 +178,15 @@ test("shared WhatsApp status persistence is scoped by integration and external m
     /statusUpdatedAt:\s*new Date\(\)/,
   );
 });
+
+test("WATI accepts both documented inbound message event names", () => {
+  assert.match(
+    source,
+    /eventType\s*===\s*"messageReceived"/,
+  );
+
+  assert.match(
+    source,
+    /eventType\s*===\s*"message"/,
+  );
+});
