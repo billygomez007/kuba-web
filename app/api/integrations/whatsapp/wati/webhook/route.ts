@@ -251,6 +251,29 @@ export async function POST(
     const externalMessageId =
       getStatusMessageId(payload);
 
+    const statusData = asRecord(payload.data);
+
+    console.info("WATI status correlation diagnostic", {
+      eventType,
+      selectedExternalMessageId: externalMessageId || null,
+      localMessageId:
+        asString(payload.localMessageId) ||
+        nestedString(statusData, "localMessageId") ||
+        null,
+      whatsappMessageId:
+        asString(payload.whatsappMessageId) ||
+        nestedString(statusData, "whatsappMessageId") ||
+        null,
+      messageId:
+        asString(payload.messageId) ||
+        nestedString(statusData, "messageId") ||
+        null,
+      id:
+        asString(payload.id) ||
+        nestedString(statusData, "id") ||
+        null,
+    });
+
     if (!externalMessageId) {
       return NextResponse.json(
         {
