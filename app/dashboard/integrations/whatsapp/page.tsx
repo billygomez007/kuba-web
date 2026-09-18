@@ -24,6 +24,11 @@ export default function WhatsAppIntegrationPage() {
   const [saving, setSaving] =
     useState(false);
 
+  const [
+    transportProvider,
+    setTransportProvider,
+  ] = useState<"meta" | "wati">("meta");
+
   const [disconnecting, setDisconnecting] =
     useState(false);
 
@@ -328,9 +333,9 @@ export default function WhatsAppIntegrationPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-white/50">
-                Enter your Meta WhatsApp Business
-                credentials. Your access token is
-                encrypted before it is stored.
+                Connect WhatsApp through Meta Cloud API
+                or WATI. Credentials are encrypted before
+                they are stored.
               </p>
             </div>
 
@@ -341,48 +346,125 @@ export default function WhatsAppIntegrationPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white/70">
-                  WhatsApp Business ID
+                  WhatsApp Provider
                 </label>
 
-                <input
-                  name="businessId"
-                  required
-                  placeholder="Enter WhatsApp Business ID"
+                <select
+                  name="transportProvider"
+                  value={transportProvider}
+                  onChange={(event) =>
+                    setTransportProvider(
+                      event.target.value === "wati"
+                        ? "wati"
+                        : "meta",
+                    )
+                  }
                   className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
-                />
+                >
+                  <option value="meta">
+                    Meta Cloud API
+                  </option>
+                  <option value="wati">
+                    WATI
+                  </option>
+                </select>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-white/70">
-                  Phone Number ID
-                </label>
+              {transportProvider === "wati" ? (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      WATI API Base URL
+                    </label>
 
-                <input
-                  name="phoneNumberId"
-                  required
-                  placeholder="Enter Phone Number ID"
-                  className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
-                />
-              </div>
+                    <input
+                      name="apiBaseUrl"
+                      required
+                      placeholder="https://live-mt-server.wati.io/..."
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+                  </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-white/70">
-                  Access Token
-                </label>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      Channel Number
+                    </label>
 
-                <input
-                  name="accessToken"
-                  type="password"
-                  required
-                  placeholder="Enter WhatsApp access token"
-                  className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
-                />
+                    <input
+                      name="channelNumber"
+                      required
+                      placeholder="233..."
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
 
-                <p className="mt-2 text-xs text-white/35">
-                  Kuba will never display the stored
-                  access token.
-                </p>
-              </div>
+                    <p className="mt-2 text-xs text-white/35">
+                      Use international format. Spaces and
+                      the + sign are removed before storage.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      WATI API Token
+                    </label>
+
+                    <input
+                      name="apiToken"
+                      type="password"
+                      required
+                      placeholder="Enter WATI API token"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      WhatsApp Business ID
+                    </label>
+
+                    <input
+                      name="businessId"
+                      required
+                      placeholder="Enter WhatsApp Business ID"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      Phone Number ID
+                    </label>
+
+                    <input
+                      name="phoneNumberId"
+                      required
+                      placeholder="Enter Phone Number ID"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      Access Token
+                    </label>
+
+                    <input
+                      name="accessToken"
+                      type="password"
+                      required
+                      placeholder="Enter WhatsApp access token"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+                  </div>
+                </>
+              )}
+
+              <p className="text-xs text-white/35">
+                Kuba never displays the stored access
+                token after connection.
+              </p>
 
               <button
                 type="submit"

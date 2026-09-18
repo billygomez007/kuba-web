@@ -3,7 +3,12 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { businesses, conversations, integrations, messages } from "@/db/schema";
-import { decrypt } from "@/lib/encryption";
+import {
+  getWhatsAppProviderConfig,
+  getWhatsAppTransportProvider,
+  sendWhatsAppViaProvider,
+  type WhatsAppProviderConfig,
+} from "@/lib/channels/whatsapp-provider";
 
 import type { ChannelAdapter } from "./types";
 
@@ -24,17 +29,15 @@ const DEFAULT_GRAPH_API_VERSION = "v25.0";
 // Outside that window a message template is required instead.
 const CUSTOMER_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export interface WhatsAppCredentials {
-  accessToken: string;
-  phoneNumberId: string;
-  graphApiVersion: string;
-}
+export type WhatsAppCredentials =
+  WhatsAppProviderConfig;
 
 export interface WhatsAppIntegrationRecord {
   id: string;
   businessId: string;
   externalPhoneNumberId: string | null;
   credentialsEncrypted: string | null;
+  metadata: string | null;
 }
 
 /**
@@ -97,6 +100,71 @@ export async function resolveWhatsAppIntegrationByPhoneNumberId(
  * unique within a given integration, so a duplicate check must always be
  * scoped by integrationId, never by externalMessageId alone.
  */
+/**
+ * Resolve the active WATI integration that owns a canonical
+ * WhatsApp channel number.
+ *
+ * WATI payload business identifiers are never trusted.
+ * Tenant ownership comes exclusively from the stored,
+ * authenticated SuperKuba integration.
+ */
+export async function resolveWatiWhatsAppIntegrationByChannelNumber(
+  channelNumber: string,
+) {
+  const normalizedChannelNumber =
+    String(channelNumber || "")
+      .replace(/\D/g, "")
+      .trim();
+
+  if (!normalizedChannelNumber) {
+    return null;
+  }
+
+  const candidates = await db
+    .select({
+      integration: integrations,
+      business: businesses,
+    })
+    .from(integrations)
+    .innerJoin(
+      businesses,
+      eq(integrations.businessId, businesses.id),
+    )
+    .where(
+      and(
+        eq(integrations.provider, "whatsapp"),
+        eq(integrations.status, "active"),
+      ),
+    );
+
+  for (const candidate of candidates) {
+    if (
+      getWhatsAppTransportProvider(
+        candidate.integration,
+      ) !== "wati"
+    ) {
+      continue;
+    }
+
+    const storedChannelNumber =
+      String(
+        candidate.integration.externalPhoneNumberId ||
+          "",
+      )
+        .replace(/\D/g, "")
+        .trim();
+
+    if (
+      storedChannelNumber ===
+      normalizedChannelNumber
+    ) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 export async function findWhatsAppMessageByExternalId(
   integrationId: string,
   externalMessageId: string,
@@ -120,6 +188,33 @@ export async function findWhatsAppMessageByExternalId(
  * send paths (human agent replies, AI tool-initiated sends) that only know
  * the trusted businessId, never a Meta phone_number_id.
  */
+export async function updateWhatsAppMessageStatus(params: {
+  integrationId: string;
+  externalMessageId: string;
+  status: string;
+}): Promise<void> {
+  const integrationId = params.integrationId.trim();
+  const externalMessageId = params.externalMessageId.trim();
+  const status = params.status.trim();
+
+  if (!integrationId || !externalMessageId || !status) {
+    return;
+  }
+
+  await db
+    .update(messages)
+    .set({
+      status,
+      statusUpdatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(messages.integrationId, integrationId),
+        eq(messages.externalMessageId, externalMessageId),
+      ),
+    );
+}
+
 export async function resolveWhatsAppIntegrationByBusinessId(
   businessId: string,
 ) {
@@ -152,34 +247,7 @@ export async function resolveWhatsAppIntegrationByBusinessId(
 export function getWhatsAppCredentialsForIntegration(
   integration: WhatsAppIntegrationRecord,
 ): WhatsAppCredentials | null {
-  const graphApiVersion =
-    process.env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_API_VERSION;
-
-  if (integration.credentialsEncrypted && integration.externalPhoneNumberId) {
-    return {
-      accessToken: decrypt(integration.credentialsEncrypted),
-      phoneNumberId: integration.externalPhoneNumberId,
-      graphApiVersion,
-    };
-  }
-
-  const legacyAccessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const legacyPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-  if (
-    !legacyAccessToken ||
-    !legacyPhoneNumberId ||
-    (integration.externalPhoneNumberId &&
-      integration.externalPhoneNumberId !== legacyPhoneNumberId)
-  ) {
-    return null;
-  }
-
-  return {
-    accessToken: legacyAccessToken,
-    phoneNumberId: legacyPhoneNumberId,
-    graphApiVersion,
-  };
+  return getWhatsAppProviderConfig(integration);
 }
 
 /**
@@ -210,51 +278,11 @@ export async function sendWhatsAppText(
   externalMessageId?: string;
   error?: string;
 }> {
-  const response = await fetch(
-    `https://graph.facebook.com/${credentials.graphApiVersion}/${credentials.phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${credentials.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to,
-        type: "text",
-        text: {
-          preview_url: false,
-          body: message,
-        },
-      }),
-    },
+  return sendWhatsAppViaProvider(
+    credentials,
+    to,
+    message,
   );
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    console.error("WhatsApp send error:", JSON.stringify(result, null, 2));
-
-    return {
-      success: false,
-      error: result?.error?.message || "WhatsApp message could not be sent.",
-    };
-  }
-
-  const externalMessageId = result.messages?.[0]?.id;
-
-  if (!externalMessageId) {
-    return {
-      success: false,
-      error: "WhatsApp did not return a message id.",
-    };
-  }
-
-  return {
-    success: true,
-    externalMessageId,
-  };
 }
 
 async function getLastInboundMessageAt(conversationId: string) {
