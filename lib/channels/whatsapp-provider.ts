@@ -270,12 +270,22 @@ export async function sendWhatsAppViaProvider(
     return { success: false, error: "provider_rejected" };
   }
 
-  // WATI delivery-status webhooks correlate outbound messages using
-  // localMessageId. Persist that identifier whenever WATI returns it so
-  // delivered/read/failed callbacks can update the exact stored message.
+  // The documented v3 "send text message to an active conversation"
+  // response wraps the created message as { message: { id, ... } }
+  // (https://docs.wati.io/reference/post_api-ext-v3-conversations-messages-text) —
+  // none of the previously-checked shapes below ever matched that nested
+  // field, so a successful send always fell through to "no_message_id"
+  // and was reported to the user as a failed send even though WATI had
+  // already delivered the message. result.message.id is WATI's own
+  // internal identifier for the message, which is what its delivery-status
+  // webhooks correlate back to (as opposed to whatsappMessageId, which is
+  // Meta's own WAMID) — the same identifier family the older
+  // localMessageId-first fallback below was already written for.
   //
-  // Keep the older response shapes as compatibility fallbacks only.
+  // Keep the older, previously-checked response shapes as compatibility
+  // fallbacks only, in case a different WATI response variant is ever hit.
   const externalMessageId =
+    result?.message?.id ||
     result?.localMessageId ||
     result?.data?.localMessageId ||
     result?.messageId ||

@@ -234,6 +234,45 @@ export async function resolveWhatsAppIntegrationByBusinessId(
 }
 
 /**
+ * Resolve a business's WhatsApp integration by its own bound
+ * conversations.integrationId (NOT NULL in schema) rather than by
+ * "whichever active WhatsApp integration this business happens to have".
+ *
+ * A business can have more than one active "whatsapp" provider row at
+ * once (e.g. an old Meta connection left active while a new WATI
+ * connection is set up, or two rows from a partial re-connect). A
+ * conversation is always bound to exactly one integration at creation
+ * time — inbound messages, and every message already stored for that
+ * conversation, are scoped to it. Outbound sends must reuse that same
+ * identity rather than re-picking an unordered "active" row with
+ * .limit(1), which could otherwise silently send a reply through a
+ * different WhatsApp number (or a broken/legacy one) than the one the
+ * customer is actually messaging.
+ *
+ * Still fully tenant-scoped: businessId must match, so a conversation's
+ * integrationId can never be used to reach another business's row.
+ */
+export async function resolveWhatsAppIntegrationById(
+  integrationId: string,
+  businessId: string,
+) {
+  const result = await db
+    .select()
+    .from(integrations)
+    .where(
+      and(
+        eq(integrations.id, integrationId),
+        eq(integrations.businessId, businessId),
+        eq(integrations.provider, "whatsapp"),
+        eq(integrations.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+/**
  * Resolve the credentials to use for a specific WhatsApp integration.
  *
  * Each tenant's own encrypted access token takes priority so multiple
@@ -333,8 +372,21 @@ async function performTenantScopedSend(
   lastInboundAt: Date | null,
   recipient: string,
   message: string,
+  integrationId?: string,
 ): Promise<WhatsAppSendOutcome> {
-  const integration = await resolveWhatsAppIntegrationByBusinessId(businessId);
+  /*
+   * A conversation is always bound to exactly one integration
+   * (conversations.integrationId is NOT NULL) — when the caller knows
+   * it, resolve that exact row rather than an unordered "any active
+   * whatsapp integration for this business", which is only correct
+   * when a business has just one. See resolveWhatsAppIntegrationById's
+   * own kdoc. sendWhatsAppToPhone (AI-tool-initiated outreach with no
+   * conversation) has no integrationId to pass and keeps its existing
+   * by-businessId behavior unchanged.
+   */
+  const integration = integrationId
+    ? await resolveWhatsAppIntegrationById(integrationId, businessId)
+    : await resolveWhatsAppIntegrationByBusinessId(businessId);
 
   if (!integration) {
     return { success: false, error: "not_connected" };
@@ -385,6 +437,7 @@ export const whatsappAdapter: ChannelAdapter = {
       lastInboundAt,
       payload.recipient,
       payload.message,
+      payload.integrationId,
     );
 
     if (!result.success) {

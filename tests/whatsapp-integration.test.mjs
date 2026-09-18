@@ -30,6 +30,7 @@ let db, schema, encryption, whatsapp;
 
 const BIZ_GHANA = "wa-ghana";
 const BIZ_LABS = "wa-labs";
+const BIZ_MULTI = "wa-multi";
 
 async function seed() {
   const now = new Date();
@@ -96,6 +97,54 @@ async function seed() {
     content: "hello",
     messageType: "text",
     createdAt: now,
+  });
+
+  // A business mid-migration (or with two genuinely active numbers) has
+  // MORE THAN ONE active "whatsapp" integration row at once. A conversation
+  // is always bound to exactly one of them (conversations.integrationId is
+  // NOT NULL) — outbound sending must reuse that exact identity rather
+  // than an unordered "any active integration for this business" pick.
+  await db.insert(schema.businesses).values({
+    id: BIZ_MULTI,
+    name: "Multi-Number Business",
+    slug: "wa-multi",
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await db.insert(schema.integrations).values([
+    {
+      id: "int-multi-old",
+      businessId: BIZ_MULTI,
+      provider: "whatsapp",
+      status: "active",
+      externalPhoneNumberId: "phone-multi-old",
+      credentialsEncrypted: encryption.encrypt("token-multi-old"),
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "int-multi-new",
+      businessId: BIZ_MULTI,
+      provider: "whatsapp",
+      status: "active",
+      externalPhoneNumberId: "phone-multi-new",
+      credentialsEncrypted: encryption.encrypt("token-multi-new"),
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]);
+
+  await db.insert(schema.conversations).values({
+    id: "conv-multi-new",
+    businessId: BIZ_MULTI,
+    integrationId: "int-multi-new",
+    externalConversationId: "233200000200",
+    customerPhone: "233200000200",
+    status: "open",
+    createdAt: now,
+    updatedAt: now,
   });
 }
 
@@ -164,6 +213,61 @@ test("a disconnected integration cannot be resolved for outbound sending", async
   const resolved = await whatsapp.resolveWhatsAppIntegrationByBusinessId(BIZ_LABS);
   assert.equal(resolved.status, "active");
   assert.notEqual(resolved.id, "int-disconnected");
+});
+
+// --- A conversation's own bound integration must not be second-guessed
+//     by an unordered "any active integration for this business" pick ---
+
+test("resolveWhatsAppIntegrationById returns the conversation's exact bound integration, not just any active one", async () => {
+  const resolved = await whatsapp.resolveWhatsAppIntegrationById("int-multi-new", BIZ_MULTI);
+  assert.notEqual(resolved, null);
+  assert.equal(resolved.id, "int-multi-new");
+  assert.equal(resolved.externalPhoneNumberId, "phone-multi-new");
+});
+
+test("resolveWhatsAppIntegrationById resolves the OTHER active integration on the same business just as precisely", async () => {
+  // Proves this is a real by-id lookup, not silently falling back to
+  // .limit(1)-style "first active row" behavior regardless of which id
+  // was asked for.
+  const resolved = await whatsapp.resolveWhatsAppIntegrationById("int-multi-old", BIZ_MULTI);
+  assert.notEqual(resolved, null);
+  assert.equal(resolved.id, "int-multi-old");
+  assert.equal(resolved.externalPhoneNumberId, "phone-multi-old");
+});
+
+test("resolveWhatsAppIntegrationById never crosses tenant boundaries even with a real integrationId from another business", async () => {
+  const resolved = await whatsapp.resolveWhatsAppIntegrationById("int-ghana", BIZ_MULTI);
+  assert.equal(resolved, null);
+});
+
+test("resolveWhatsAppIntegrationById fails safely for an unknown integrationId", async () => {
+  const resolved = await whatsapp.resolveWhatsAppIntegrationById("int-does-not-exist", BIZ_MULTI);
+  assert.equal(resolved, null);
+});
+
+test("the send route forwards the conversation's own integrationId into the channel adapter payload", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const routeSource = await readFile(
+    path.join(REPO_ROOT, "app/api/messages/send/route.ts"),
+    "utf8",
+  );
+  assert.match(routeSource, /integrationId:\s*conversation\[0\]\.integrationId/);
+});
+
+test("whatsappAdapter.send threads payload.integrationId through rather than discarding it", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const whatsappSource = await readFile(
+    path.join(REPO_ROOT, "lib/channels/whatsapp.ts"),
+    "utf8",
+  );
+  assert.match(
+    whatsappSource,
+    /performTenantScopedSend\(\s*payload\.businessId,\s*lastInboundAt,\s*payload\.recipient,\s*payload\.message,\s*payload\.integrationId,?\s*\)/,
+  );
+  assert.match(
+    whatsappSource,
+    /integrationId\s*\?\s*await resolveWhatsAppIntegrationById\(integrationId, businessId\)\s*:\s*await resolveWhatsAppIntegrationByBusinessId\(businessId\)/,
+  );
 });
 
 // --- Per-tenant credential isolation (the core multi-tenant fix) ---

@@ -59,7 +59,14 @@ test("provider adapter contains no webhook or AI routing authority", () => {
 });
 
 
-test("WATI outbound persistence prefers localMessageId for status correlation", () => {
+test("WATI outbound send reads the documented message.id response field first", () => {
+  // https://docs.wati.io/reference/post_api-ext-v3-conversations-messages-text
+  // returns { message: { id, conversation_id, ... } } — none of the
+  // previously-checked flat/data-prefixed shapes ever matched this nested
+  // field, so a successful send always fell through to "no_message_id".
+  const messageDotIdIndex = source.indexOf(
+    "result?.message?.id",
+  );
   const localIndex = source.indexOf(
     "result?.localMessageId",
   );
@@ -71,8 +78,13 @@ test("WATI outbound persistence prefers localMessageId for status correlation", 
   );
 
   assert.ok(
-    localIndex >= 0,
-    "WATI localMessageId must be supported",
+    messageDotIdIndex >= 0,
+    "the documented message.id field must be read",
+  );
+
+  assert.ok(
+    localIndex > messageDotIdIndex,
+    "message.id must be checked before the localMessageId fallback",
   );
 
   assert.ok(
