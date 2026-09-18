@@ -98,3 +98,30 @@ test("Meta legacy fallback cannot cross-wire a tenant to another phone number", 
     /integration\.credentialsEncrypted\s*&&[\s\S]*integration\.externalPhoneNumberId/,
   );
 });
+
+test("WATI V3 text send uses target in the JSON body", async () => {
+  assert.match(
+    source,
+    /\/api\/ext\/v3\/conversations\/messages\/text/,
+  );
+
+  assert.doesNotMatch(
+    source,
+    /\?whatsappNumber=/,
+  );
+
+  assert.match(
+    source,
+    /const target\s*=/,
+  );
+
+  assert.match(
+    source,
+    /target,\s*\n\s*text:\s*message/,
+  );
+
+  assert.match(
+    source,
+    /\$\{config\.channelNumber\}:\$\{recipient\}/,
+  );
+});

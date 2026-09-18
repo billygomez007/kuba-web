@@ -221,16 +221,17 @@ export async function sendWhatsAppViaProvider(
   }
 
   const path =
-    `/api/ext/v3/conversations/messages/text` +
-    `?whatsappNumber=${encodeURIComponent(recipient)}`;
+    `/api/ext/v3/conversations/messages/text`;
 
-  const body: Record<string, string> = {
+  const target =
+    config.channelNumber
+      ? `${config.channelNumber}:${recipient}`
+      : recipient;
+
+  const body = {
+    target,
     text: message,
   };
-
-  if (config.channelNumber) {
-    body.channelNumber = config.channelNumber;
-  }
 
   const response = await fetch(`${config.apiBaseUrl}${path}`, {
     method: "POST",
