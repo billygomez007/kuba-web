@@ -98,9 +98,12 @@ export default function WhatsAppIntegrationPage() {
     setMessage("");
     setError("");
 
+    const form =
+      event.currentTarget;
+
     try {
       const formData =
-        new FormData(event.currentTarget);
+        new FormData(form);
 
       const response =
         await fetch(
@@ -125,7 +128,7 @@ export default function WhatsAppIntegrationPage() {
         "WhatsApp connected successfully.",
       );
 
-      event.currentTarget.reset();
+      form.reset();
 
       await loadIntegration();
     } catch (err) {
