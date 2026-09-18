@@ -125,3 +125,20 @@ test("WATI V3 text send uses target in the JSON body", async () => {
     /\$\{config\.channelNumber\}:\$\{recipient\}/,
   );
 });
+
+test("WATI V3 strips account path from API base URL", () => {
+  assert.match(
+    source,
+    /const apiUrl = new URL\(config\.apiBaseUrl\)/,
+  );
+
+  assert.match(
+    source,
+    /const v3BaseUrl = `\$\{apiUrl\.protocol\}\/\/\$\{apiUrl\.host\}`/,
+  );
+
+  assert.match(
+    source,
+    /fetch\(`\$\{v3BaseUrl\}\$\{path\}`/,
+  );
+});

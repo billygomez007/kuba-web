@@ -233,7 +233,18 @@ export async function sendWhatsAppViaProvider(
     text: message,
   };
 
-  const response = await fetch(`${config.apiBaseUrl}${path}`, {
+  const apiUrl = new URL(config.apiBaseUrl);
+
+  /*
+   * WATI's dashboard may expose an account-specific endpoint such as:
+   * https://live-mt-server.wati.io/12345678
+   *
+   * V3 endpoints live at the host root. Tenant/channel identity is carried
+   * by the V3 target value rather than by the account path segment.
+   */
+  const v3BaseUrl = `${apiUrl.protocol}//${apiUrl.host}`;
+
+  const response = await fetch(`${v3BaseUrl}${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.accessToken}`,
