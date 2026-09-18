@@ -192,7 +192,8 @@ export async function POST(
     getEventType(payload);
 
   const isMessageReceived =
-    eventType === "messageReceived";
+    eventType === "messageReceived" ||
+    eventType === "message";
 
   const status =
     WATI_STATUS_BY_EVENT[eventType];
