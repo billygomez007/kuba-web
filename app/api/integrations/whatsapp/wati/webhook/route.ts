@@ -157,9 +157,15 @@ const WATI_STATUS_BY_EVENT: Record<
   string,
   string
 > = {
+  sentMessageDELIVERED: "delivered",
   sentMessageDELIVERED_v2: "delivered",
+
+  sentMessageREAD: "read",
   sentMessageREAD_v2: "read",
+
+  sentMessageFAILED: "failed",
   sentMessageFAILED_v2: "failed",
+
   sessionMessageFAILED: "failed",
 };
 

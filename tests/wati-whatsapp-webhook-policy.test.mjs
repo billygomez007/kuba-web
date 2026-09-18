@@ -190,3 +190,33 @@ test("WATI accepts both documented inbound message event names", () => {
     /eventType\s*===\s*"message"/,
   );
 });
+
+
+test("WATI accepts production status-event aliases with and without _v2", () => {
+  assert.match(
+    source,
+    /sentMessageDELIVERED:\s*"delivered"/,
+  );
+  assert.match(
+    source,
+    /sentMessageDELIVERED_v2:\s*"delivered"/,
+  );
+
+  assert.match(
+    source,
+    /sentMessageREAD:\s*"read"/,
+  );
+  assert.match(
+    source,
+    /sentMessageREAD_v2:\s*"read"/,
+  );
+
+  assert.match(
+    source,
+    /sentMessageFAILED:\s*"failed"/,
+  );
+  assert.match(
+    source,
+    /sentMessageFAILED_v2:\s*"failed"/,
+  );
+});
