@@ -1,3 +1,4 @@
+import path from "node:path";
 // Static policy checks for the Meta WhatsApp Cloud API webhook route.
 //
 // Matches the style of tests/ai-authority-policy.test.mjs: these assert
@@ -18,10 +19,23 @@ const CONNECT_ROUTE = "app/api/integrations/whatsapp/route.ts";
 const CHANNEL_LIB = "lib/channels/whatsapp.ts";
 const FOLLOW_UP_SEND_ROUTE = "app/api/follow-ups/[id]/send/route.ts";
 
+const SHARED_INBOUND = path.join(
+  process.cwd(),
+  "lib/channels/whatsapp-inbound.ts",
+);
+
 let webhookSource;
+let sharedInboundSource;
+let whatsappPipelineSource;
 
 test.before(async () => {
   webhookSource = await readFile(WEBHOOK_ROUTE, "utf8");
+  sharedInboundSource = await readFile(
+    SHARED_INBOUND,
+    "utf8",
+  );
+  whatsappPipelineSource =
+    webhookSource + "\n" + sharedInboundSource;
 });
 
 test("GET verification compares hub.verify_token with a timing-safe comparison, not ===", () => {
@@ -34,7 +48,7 @@ test("GET verification compares hub.verify_token with a timing-safe comparison, 
 
 test("POST reads the raw body before parsing JSON, and verifies the signature before using parsed content", () => {
   const rawBodyIndex = webhookSource.indexOf("request.text()");
-  const verifyCallIndex = webhookSource.indexOf("verifyMetaSignature(rawBody");
+  const verifyCallIndex = webhookSource.indexOf("verifyMetaSignature(");
   const jsonParseIndex = webhookSource.indexOf("JSON.parse(rawBody)");
 
   assert.ok(rawBodyIndex > -1, "must read the raw request body");
@@ -46,7 +60,7 @@ test("POST reads the raw body before parsing JSON, and verifies the signature be
 });
 
 test("an invalid signature is rejected (403) before any parsed payload is trusted", () => {
-  const verifyIndex = webhookSource.indexOf("verifyMetaSignature(rawBody");
+  const verifyIndex = webhookSource.indexOf("verifyMetaSignature(");
   const forbiddenIndex = webhookSource.indexOf('{ error: "Forbidden" }');
   assert.ok(verifyIndex > -1 && forbiddenIndex > -1);
   assert.ok(verifyIndex < forbiddenIndex);
@@ -69,42 +83,108 @@ test("an unregistered phone number and an inactive business both fail closed", (
 });
 
 test("duplicate webhook delivery is detected via the shared idempotency lookup before any message is inserted", () => {
-  const dedupIndex = webhookSource.indexOf("findWhatsAppMessageByExternalId(");
-  const insertIndex = webhookSource.indexOf("db.insert(messages).values({\n      id: crypto.randomUUID(),\n      businessId: businessId,\n      conversationId: conversation.id,\n      integrationId: integration.id,\n      externalMessageId,");
-  assert.ok(dedupIndex > -1, "must check for an existing message by external id");
-  assert.ok(insertIndex > -1, "must insert the inbound message");
-  assert.ok(dedupIndex < insertIndex, "dedup check must happen before the inbound message is stored");
+  const dedupIndex = sharedInboundSource.indexOf(
+    "findWhatsAppMessageByExternalId(",
+  );
+  const insertIndex = sharedInboundSource.indexOf(
+    "db.insert(messages).values(",
+  );
+
+  assert.ok(
+    dedupIndex > -1,
+    "must check for an existing message by external id",
+  );
+  assert.ok(
+    insertIndex > -1,
+    "must insert the inbound message",
+  );
+  assert.ok(
+    dedupIndex < insertIndex,
+    "dedup check must happen before the inbound message is stored",
+  );
 });
 
 test("an AI reply is only generated/sent when the routing decision assigns the conversation to AI (human takeover gate)", () => {
-  const gateIndex = webhookSource.indexOf('routingDecision.assignmentType !== "ai"');
-  const generateIndex = webhookSource.indexOf("selectedAgent.generate(businessContext");
-  assert.ok(gateIndex > -1, "must gate on routingDecision.assignmentType");
-  assert.ok(generateIndex > -1, "must generate an AI reply somewhere");
-  assert.ok(gateIndex < generateIndex, "the human-takeover gate must run before the AI generates a reply");
+  const gateIndex = sharedInboundSource.indexOf(
+    'routingDecision.assignmentType !== "ai"',
+  );
+  const generateIndex = sharedInboundSource.indexOf(
+    "selectedAgent.generate(",
+  );
+
+  assert.ok(
+    gateIndex > -1,
+    "must gate on routingDecision.assignmentType",
+  );
+  assert.ok(
+    generateIndex > -1,
+    "must generate an AI reply somewhere",
+  );
+  assert.ok(
+    gateIndex < generateIndex,
+    "the human-takeover gate must run before the AI generates a reply",
+  );
 });
 
 test("unsupported/non-text message types are stored for the Unified Inbox but never fed to the AI as if they were text", () => {
   assert.match(webhookSource, /canGenerateAiReply/);
-  assert.match(webhookSource, /Viewing this content type is not yet supported/);
+  assert.match(
+    webhookSource,
+    /Viewing this content type is not yet supported/,
+  );
 });
 
 test("a signature-verified webhook records a truthful lastWebhookAt connection-health signal", () => {
-  const healthIndex = webhookSource.indexOf("lastWebhookAt: new Date()");
-  const statusHandlingIndex = webhookSource.indexOf("Message status callbacks");
-  assert.ok(healthIndex > -1, "must record lastWebhookAt");
-  assert.ok(healthIndex < statusHandlingIndex, "health signal must be recorded before branching on event type");
+  const healthIndex = sharedInboundSource.indexOf(
+    "lastWebhookAt: new Date()",
+  );
+  const statusHandlingIndex = sharedInboundSource.indexOf(
+    "for (const statusUpdate of params.statusUpdates || [])",
+  );
+
+  assert.ok(
+    healthIndex > -1,
+    "must record lastWebhookAt",
+  );
+  assert.ok(
+    statusHandlingIndex > -1,
+    "must process normalized status updates",
+  );
+  assert.ok(
+    healthIndex < statusHandlingIndex,
+    "health signal must be recorded before status/event processing",
+  );
 });
 
 test("Meta status callbacks (sent/delivered/read/failed) update stored message status instead of being silently dropped", () => {
   assert.match(webhookSource, /value\.statuses/);
-  assert.match(webhookSource, /statusUpdatedAt/);
+  assert.match(sharedInboundSource, /statusUpdatedAt/);
 });
 
 test("outbound replies use per-tenant resolved credentials, never a hardcoded global Authorization header", () => {
-  assert.match(webhookSource, /getWhatsAppCredentialsForIntegration\(integration\)/);
-  assert.match(webhookSource, /sendWhatsAppText\(credentials/);
-  assert.doesNotMatch(webhookSource, /Authorization: `Bearer \$\{ACCESS_TOKEN\}`/);
+  const credentialIndex = sharedInboundSource.indexOf(
+    "getWhatsAppCredentialsForIntegration(integration)",
+  );
+  const sendIndex = sharedInboundSource.indexOf(
+    "sendWhatsAppText(",
+  );
+
+  assert.ok(
+    credentialIndex > -1,
+    "must resolve credentials from the tenant integration",
+  );
+  assert.ok(
+    sendIndex > credentialIndex,
+    "tenant credentials must be resolved before outbound sending",
+  );
+  assert.match(
+    sharedInboundSource,
+    /sendWhatsAppText\(\s*credentials,/,
+  );
+  assert.doesNotMatch(
+    whatsappPipelineSource,
+    /Authorization: `Bearer \$\{ACCESS_TOKEN\}`/,
+  );
 });
 
 test("GET /api/integrations never selects or returns the encrypted WhatsApp credential column", async () => {
