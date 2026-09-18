@@ -191,6 +191,27 @@ export async function POST(
   const eventType =
     getEventType(payload);
 
+  const diagnosticData =
+    asRecord(payload.data);
+
+  console.info("WATI webhook event-shape diagnostic", {
+    eventType: eventType || null,
+    topLevelEventType:
+      asString(payload.eventType) || null,
+    topLevelType:
+      asString(payload.type) || null,
+    nestedEventType:
+      nestedString(diagnosticData, "eventType") || null,
+    nestedType:
+      nestedString(diagnosticData, "type") || null,
+    topLevelKeys:
+      Object.keys(payload).sort(),
+    dataKeys:
+      diagnosticData
+        ? Object.keys(diagnosticData).sort()
+        : [],
+  });
+
   const isMessageReceived =
     eventType === "messageReceived" ||
     eventType === "message";
