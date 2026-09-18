@@ -3,7 +3,11 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { businesses, conversations, integrations, messages } from "@/db/schema";
-import { decrypt } from "@/lib/encryption";
+import {
+  getWhatsAppProviderConfig,
+  sendWhatsAppViaProvider,
+  type WhatsAppProviderConfig,
+} from "@/lib/channels/whatsapp-provider";
 
 import type { ChannelAdapter } from "./types";
 
@@ -14,17 +18,14 @@ const DEFAULT_GRAPH_API_VERSION = "v25.0";
 // Outside that window a message template is required instead.
 const CUSTOMER_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export interface WhatsAppCredentials {
-  accessToken: string;
-  phoneNumberId: string;
-  graphApiVersion: string;
-}
+export type WhatsAppCredentials = WhatsAppProviderConfig;
 
 export interface WhatsAppIntegrationRecord {
   id: string;
   businessId: string;
   externalPhoneNumberId: string | null;
   credentialsEncrypted: string | null;
+  metadata: string | null;
 }
 
 /**
@@ -139,21 +140,7 @@ export async function resolveWhatsAppIntegrationByBusinessId(
 export function getWhatsAppCredentialsForIntegration(
   integration: WhatsAppIntegrationRecord,
 ): WhatsAppCredentials | null {
-  const accessToken = integration.credentialsEncrypted
-    ? decrypt(integration.credentialsEncrypted)
-    : process.env.WHATSAPP_ACCESS_TOKEN;
-
-  const phoneNumberId =
-    integration.externalPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-  const graphApiVersion =
-    process.env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_API_VERSION;
-
-  if (!accessToken || !phoneNumberId) {
-    return null;
-  }
-
-  return { accessToken, phoneNumberId, graphApiVersion };
+  return getWhatsAppProviderConfig(integration);
 }
 
 /**
@@ -181,41 +168,11 @@ export async function sendWhatsAppText(
   recipient: string,
   message: string,
 ): Promise<{ success: boolean; externalMessageId?: string; error?: string }> {
-  const response = await fetch(
-    `https://graph.facebook.com/${credentials.graphApiVersion}/${credentials.phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${credentials.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: recipient,
-        type: "text",
-        text: {
-          preview_url: false,
-          body: message,
-        },
-      }),
-    },
+  return sendWhatsAppViaProvider(
+    credentials,
+    recipient,
+    message,
   );
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    console.error("WhatsApp send error:", JSON.stringify(result, null, 2));
-    return { success: false, error: "provider_rejected" };
-  }
-
-  const externalMessageId = result.messages?.[0]?.id;
-
-  if (!externalMessageId) {
-    return { success: false, error: "no_message_id" };
-  }
-
-  return { success: true, externalMessageId };
 }
 
 async function getLastInboundMessageAt(conversationId: string) {

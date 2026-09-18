@@ -1,0 +1,59 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+const ROOT = process.cwd();
+
+const source = await readFile(
+  path.join(ROOT, "lib/channels/whatsapp-provider.ts"),
+  "utf8",
+);
+
+test("WATI provider is represented as a WhatsApp transport, not a new channel", () => {
+  assert.match(
+    source,
+    /export type WhatsAppTransportProvider = "meta" \| "wati"/,
+  );
+});
+
+test("WATI credentials come from encrypted credential storage", () => {
+  assert.match(source, /decrypt\(integration\.credentialsEncrypted\)/);
+  assert.doesNotMatch(source, /process\.env\.WATI_API_TOKEN/);
+});
+
+test("WATI base URL comes from non-secret integration metadata", () => {
+  assert.match(source, /metadata\.apiBaseUrl/);
+  assert.match(source, /url\.protocol !== "https:"/);
+});
+
+test("legacy WhatsApp integrations default safely to Meta", () => {
+  assert.match(
+    source,
+    /metadata\.transportProvider === "wati"\s*\?\s*"wati"\s*:\s*"meta"/,
+  );
+});
+
+test("WATI uses the V3 conversation text endpoint", () => {
+  assert.match(
+    source,
+    /\/api\/ext\/v3\/conversations\/messages\/text/,
+  );
+});
+
+test("WATI send uses bearer authentication", () => {
+  assert.match(
+    source,
+    /Authorization: `Bearer \$\{config\.accessToken\}`/,
+  );
+});
+
+test("provider adapter never accepts or derives a SuperKuba businessId", () => {
+  assert.doesNotMatch(source, /businessId/);
+});
+
+test("provider adapter contains no webhook or AI routing authority", () => {
+  assert.doesNotMatch(source, /RequestContext/);
+  assert.doesNotMatch(source, /routeConversationToTeam/);
+  assert.doesNotMatch(source, /kubaReceptionistAgent/);
+});

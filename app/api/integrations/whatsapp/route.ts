@@ -79,44 +79,110 @@ export async function POST(request: Request) {
     return forbiddenResponse();
   }
 
-  const formData =
-    await request.formData();
+  const formData = await request.formData();
 
-  const businessId =
+  const transportProvider =
     String(
-      formData.get("businessId") || "",
-    ).trim();
+      formData.get("transportProvider") || "meta",
+    ).trim() === "wati"
+      ? "wati"
+      : "meta";
 
-  const phoneNumberId =
-    String(
-      formData.get("phoneNumberId") || "",
-    ).trim();
+  let externalAccountId = "";
+  let externalPhoneNumberId = "";
+  let credential = "";
+  let metadata: Record<string, string> = {
+    source: "dashboard_setup",
+    transportProvider,
+  };
 
-  const accessToken =
-    String(
-      formData.get("accessToken") || "",
-    ).trim();
+  if (transportProvider === "wati") {
+    const apiBaseUrl =
+      String(formData.get("apiBaseUrl") || "").trim();
+    const channelNumber =
+      String(formData.get("channelNumber") || "").trim();
+    const apiToken =
+      String(formData.get("apiToken") || "").trim();
 
-  if (
-    !businessId ||
-    !phoneNumberId ||
-    !accessToken
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          "Business ID, Phone Number ID, and Access Token are required.",
-      },
-      { status: 400 },
-    );
+    if (!apiBaseUrl || !apiToken || !channelNumber) {
+      return NextResponse.json(
+        {
+          error:
+            "WATI API Base URL, API Token, and Channel Number are required.",
+        },
+        { status: 400 },
+      );
+    }
+
+    try {
+      const url = new URL(apiBaseUrl);
+
+      if (url.protocol !== "https:") {
+        throw new Error("invalid_protocol");
+      }
+
+      externalAccountId = url.pathname
+        .split("/")
+        .filter(Boolean)
+        .at(-1) || url.hostname;
+
+      // For WATI, this field is the authoritative external channel
+      // identity used to resolve inbound webhooks to the correct tenant.
+      // Never fall back to the WATI account id.
+      externalPhoneNumberId = channelNumber;
+
+      credential = apiToken;
+
+      metadata = {
+        ...metadata,
+        apiBaseUrl:
+          url.toString().replace(/\/+$/, ""),
+        channelNumber,
+      };
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "WATI API Base URL must be a valid HTTPS URL.",
+        },
+        { status: 400 },
+      );
+    }
+  } else {
+    const businessId =
+      String(
+        formData.get("businessId") || "",
+      ).trim();
+
+    const phoneNumberId =
+      String(
+        formData.get("phoneNumberId") || "",
+      ).trim();
+
+    const accessToken =
+      String(
+        formData.get("accessToken") || "",
+      ).trim();
+
+    if (
+      !businessId ||
+      !phoneNumberId ||
+      !accessToken
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Business ID, Phone Number ID, and Access Token are required.",
+        },
+        { status: 400 },
+      );
+    }
+
+    externalAccountId = businessId;
+    externalPhoneNumberId = phoneNumberId;
+    credential = accessToken;
   }
 
-  /**
-   * A Meta phone_number_id must belong to exactly one SuperKuba business.
-   * The webhook resolves tenants by this value, so allowing two businesses
-   * to register the same one would let inbound messages for one business
-   * be delivered into another's inbox.
-   */
   const claimedByAnotherBusiness =
     await db
       .select({ id: integrations.id })
@@ -124,7 +190,10 @@ export async function POST(request: Request) {
       .where(
         and(
           eq(integrations.provider, "whatsapp"),
-          eq(integrations.externalPhoneNumberId, phoneNumberId),
+          eq(
+            integrations.externalPhoneNumberId,
+            externalPhoneNumberId,
+          ),
           eq(integrations.status, "active"),
           ne(integrations.businessId, membership.businessId),
         ),
@@ -135,7 +204,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "This WhatsApp phone number is already connected to another Kuba business.",
+          "This WhatsApp connection is already connected to another Kuba business.",
       },
       { status: 409 },
     );
@@ -144,8 +213,7 @@ export async function POST(request: Request) {
   const existing =
     await db
       .select({
-        id:
-          integrations.id,
+        id: integrations.id,
       })
       .from(integrations)
       .where(
@@ -162,27 +230,26 @@ export async function POST(request: Request) {
       )
       .limit(1);
 
+  const values = {
+    status: "active",
+    externalAccountId,
+    externalPhoneNumberId,
+    displayName:
+      transportProvider === "wati"
+        ? "WhatsApp via WATI"
+        : "WhatsApp Business",
+    credentialsEncrypted:
+      encrypt(credential),
+    metadata:
+      JSON.stringify(metadata),
+    updatedAt:
+      new Date(),
+  };
+
   if (existing.length > 0) {
     await db
       .update(integrations)
-      .set({
-        status: "active",
-
-        externalAccountId:
-          businessId,
-
-        externalPhoneNumberId:
-          phoneNumberId,
-
-        displayName:
-          "WhatsApp Business",
-
-        credentialsEncrypted:
-          encrypt(accessToken),
-
-        updatedAt:
-          new Date(),
-      })
+      .set(values)
       .where(
         eq(
           integrations.id,
@@ -193,6 +260,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       updated: true,
+      transportProvider,
     });
   }
 
@@ -208,37 +276,16 @@ export async function POST(request: Request) {
       provider:
         "whatsapp",
 
-      status:
-        "active",
-
-      externalAccountId:
-        businessId,
-
-      externalPhoneNumberId:
-        phoneNumberId,
-
-      displayName:
-        "WhatsApp Business",
-
-      credentialsEncrypted:
-        encrypt(accessToken),
-
-      metadata:
-        JSON.stringify({
-          source:
-            "dashboard_setup",
-        }),
+      ...values,
 
       createdAt:
-        new Date(),
-
-      updatedAt:
         new Date(),
     });
 
   return NextResponse.json({
     success: true,
     created: true,
+    transportProvider,
   });
 }
 

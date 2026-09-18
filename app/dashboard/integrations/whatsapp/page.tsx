@@ -27,6 +27,9 @@ export default function WhatsAppIntegrationPage() {
   const [disconnecting, setDisconnecting] =
     useState(false);
 
+  const [transportProvider, setTransportProvider] =
+    useState<"meta" | "wati">("meta");
+
   const [message, setMessage] =
     useState("");
 
@@ -328,9 +331,9 @@ export default function WhatsAppIntegrationPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-white/50">
-                Enter your Meta WhatsApp Business
-                credentials. Your access token is
-                encrypted before it is stored.
+                Connect WhatsApp through Meta directly
+                or through WATI. Credentials are encrypted
+                before they are stored.
               </p>
             </div>
 
@@ -338,7 +341,34 @@ export default function WhatsAppIntegrationPage() {
               onSubmit={connect}
               className="space-y-5"
             >
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-white/70">
+                  WhatsApp Provider
+                </label>
 
+                <select
+                  name="transportProvider"
+                  value={transportProvider}
+                  onChange={(event) =>
+                    setTransportProvider(
+                      event.target.value === "wati"
+                        ? "wati"
+                        : "meta",
+                    )
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                >
+                  <option value="meta">
+                    Meta Cloud API
+                  </option>
+                  <option value="wati">
+                    WATI
+                  </option>
+                </select>
+              </div>
+
+              {transportProvider === "meta" ? (
+                <>
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white/70">
                   WhatsApp Business ID
@@ -383,6 +413,58 @@ export default function WhatsAppIntegrationPage() {
                   access token.
                 </p>
               </div>
+
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      WATI API Base URL
+                    </label>
+
+                    <input
+                      name="apiBaseUrl"
+                      required
+                      placeholder="https://live-mt-server.wati.io/..."
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      WhatsApp Channel Number
+                    </label>
+
+                    <input
+                      name="channelNumber"
+                      placeholder="+233..."
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+
+                    <p className="mt-2 text-xs text-white/35">
+                      Use the WhatsApp number connected to this WATI account.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      WATI API Token
+                    </label>
+
+                    <input
+                      name="apiToken"
+                      type="password"
+                      required
+                      placeholder="Enter WATI API token"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 p-4 outline-none transition focus:border-cyan-400/50"
+                    />
+
+                    <p className="mt-2 text-xs text-white/35">
+                      Kuba encrypts this token and never returns it through the integrations API.
+                    </p>
+                  </div>
+                </>
+              )}
 
               <button
                 type="submit"
