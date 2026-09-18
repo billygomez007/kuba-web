@@ -57,3 +57,31 @@ test("provider adapter contains no webhook or AI routing authority", () => {
   assert.doesNotMatch(source, /routeConversationToTeam/);
   assert.doesNotMatch(source, /kubaReceptionistAgent/);
 });
+
+
+test("WATI outbound persistence prefers localMessageId for status correlation", () => {
+  const localIndex = source.indexOf(
+    "result?.localMessageId",
+  );
+  const messageIndex = source.indexOf(
+    "result?.messageId",
+  );
+  const idIndex = source.indexOf(
+    "result?.id",
+  );
+
+  assert.ok(
+    localIndex >= 0,
+    "WATI localMessageId must be supported",
+  );
+
+  assert.ok(
+    messageIndex > localIndex,
+    "messageId must only be a fallback after localMessageId",
+  );
+
+  assert.ok(
+    idIndex > localIndex,
+    "generic id must only be a fallback after localMessageId",
+  );
+});

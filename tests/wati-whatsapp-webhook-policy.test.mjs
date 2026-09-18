@@ -32,7 +32,7 @@ test("WATI inbound tenant resolution uses channelPhoneNumber, never a payload bu
   );
   assert.match(
     source,
-    /resolveWhatsAppIntegrationByPhoneNumberId/,
+    /resolveWatiWhatsAppIntegrationByChannelNumber/,
   );
   assert.doesNotMatch(
     source,
@@ -139,27 +139,35 @@ test("WATI delivery states normalize into the shared WhatsApp status contract", 
   );
 });
 
-test("WATI status correlation prefers whatsappMessageId and can fall back to localMessageId", () => {
-  const whatsappIndex = source.indexOf(
-    'asString(payload.whatsappMessageId)',
+test("WATI status correlation prefers localMessageId and can fall back to whatsappMessageId", () => {
+  const statusSectionStart = source.indexOf(
+    "function normalizeStatus",
   );
+
   const localIndex = source.indexOf(
     'asString(payload.localMessageId)',
+    statusSectionStart,
+  );
+
+  const whatsappIndex = source.indexOf(
+    'asString(payload.whatsappMessageId)',
+    statusSectionStart,
   );
 
   assert.ok(
-    whatsappIndex >= 0,
-    "whatsappMessageId must be supported",
+    localIndex >= 0,
+    "localMessageId must be supported in status normalization",
   );
+
   assert.ok(
-    localIndex > whatsappIndex,
-    "localMessageId must be a fallback after whatsappMessageId",
+    whatsappIndex > localIndex,
+    "whatsappMessageId must only be a fallback after localMessageId",
   );
 });
 
 test("WATI status callbacks remain tenant-resolved before shared status persistence", () => {
   const resolveIndex = source.indexOf(
-    "resolveWhatsAppIntegrationByPhoneNumberId",
+    "resolveWatiWhatsAppIntegrationByChannelNumber",
     source.indexOf("export async function POST"),
   );
   const processStatusIndex = source.indexOf(
@@ -204,5 +212,18 @@ test("the adapter contains no direct AI agent execution or direct provider send"
   assert.doesNotMatch(
     source,
     /live-mt-server\.wati\.io/,
+  );
+});
+
+
+test("WATI webhook uses provider-aware tenant resolution", () => {
+  assert.match(
+    source,
+    /resolveWatiWhatsAppIntegrationByChannelNumber/,
+  );
+
+  assert.doesNotMatch(
+    source,
+    /resolveWhatsAppIntegrationByPhoneNumberId/,
   );
 });

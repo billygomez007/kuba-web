@@ -101,3 +101,15 @@ test("provider remains WhatsApp for the rest of SuperKuba", () => {
     /provider:\s*"whatsapp"/,
   );
 });
+
+
+test("WATI channel identity is canonicalized before persistence", () => {
+  assert.match(
+    routeSource,
+    /formData\.get\("channelNumber"\)[\s\S]*?replace\(\/\\D\/g,\s*""\)/,
+  );
+  assert.match(
+    routeSource,
+    /externalPhoneNumberId\s*=\s*channelNumber/,
+  );
+});
