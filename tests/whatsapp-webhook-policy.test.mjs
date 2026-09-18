@@ -16,12 +16,17 @@ const WEBHOOK_ROUTE = "app/api/integrations/whatsapp/webhook/route.ts";
 const INTEGRATIONS_LIST_ROUTE = "app/api/integrations/route.ts";
 const CONNECT_ROUTE = "app/api/integrations/whatsapp/route.ts";
 const CHANNEL_LIB = "lib/channels/whatsapp.ts";
+const SHARED_INBOUND = "lib/channels/whatsapp-inbound.ts";
 const FOLLOW_UP_SEND_ROUTE = "app/api/follow-ups/[id]/send/route.ts";
 
 let webhookSource;
+let inboundSource;
 
 test.before(async () => {
   webhookSource = await readFile(WEBHOOK_ROUTE, "utf8");
+  inboundSource = existsSync(SHARED_INBOUND)
+    ? await readFile(SHARED_INBOUND, "utf8")
+    : webhookSource;
 });
 
 test("GET verification compares hub.verify_token with a timing-safe comparison, not ===", () => {
@@ -69,23 +74,57 @@ test("an unregistered phone number and an inactive business both fail closed", (
 });
 
 test("duplicate webhook delivery is detected via the shared idempotency lookup before any message is inserted", () => {
-  const dedupIndex = webhookSource.indexOf("findWhatsAppMessageByExternalId(");
-  const insertIndex = webhookSource.indexOf("db.insert(messages).values({\n      id: crypto.randomUUID(),\n      businessId: businessId,\n      conversationId: conversation.id,\n      integrationId: integration.id,\n      externalMessageId,");
-  assert.ok(dedupIndex > -1, "must check for an existing message by external id");
-  assert.ok(insertIndex > -1, "must insert the inbound message");
-  assert.ok(dedupIndex < insertIndex, "dedup check must happen before the inbound message is stored");
+  const dedupIndex = inboundSource.search(
+    /findWhatsAppMessageByExternalId\s*\(/,
+  );
+
+  const insertIndex = inboundSource.search(
+    /db\s*\.\s*insert\s*\(\s*messages\s*\)\s*\.\s*values\s*\(\s*\{[\s\S]*?externalMessageId/,
+  );
+
+  assert.ok(
+    dedupIndex > -1,
+    "must check for an existing message by external id",
+  );
+
+  assert.ok(
+    insertIndex > -1,
+    "must insert the inbound message",
+  );
+
+  assert.ok(
+    dedupIndex < insertIndex,
+    "dedup check must happen before the inbound message is stored",
+  );
 });
 
 test("an AI reply is only generated/sent when the routing decision assigns the conversation to AI (human takeover gate)", () => {
-  const gateIndex = webhookSource.indexOf('routingDecision.assignmentType !== "ai"');
-  const generateIndex = webhookSource.indexOf("selectedAgent.generate(businessContext");
-  assert.ok(gateIndex > -1, "must gate on routingDecision.assignmentType");
-  assert.ok(generateIndex > -1, "must generate an AI reply somewhere");
-  assert.ok(gateIndex < generateIndex, "the human-takeover gate must run before the AI generates a reply");
+  const gateIndex = inboundSource.search(
+    /routingDecision\s*\.\s*assignmentType\s*!==\s*"ai"/,
+  );
+
+  const generateIndex = inboundSource.search(
+    /selectedAgent\s*\.\s*generate\s*\(\s*businessContext/,
+  );
+
+  assert.ok(
+    gateIndex > -1,
+    "must gate on routingDecision.assignmentType",
+  );
+
+  assert.ok(
+    generateIndex > -1,
+    "must generate an AI reply somewhere",
+  );
+
+  assert.ok(
+    gateIndex < generateIndex,
+    "the human-takeover gate must run before the AI generates a reply",
+  );
 });
 
 test("unsupported/non-text message types are stored for the Unified Inbox but never fed to the AI as if they were text", () => {
-  assert.match(webhookSource, /canGenerateAiReply/);
+  assert.match(inboundSource, /canGenerateAiReply/);
   assert.match(webhookSource, /Viewing this content type is not yet supported/);
 });
 
@@ -97,13 +136,30 @@ test("a signature-verified webhook records a truthful lastWebhookAt connection-h
 });
 
 test("Meta status callbacks (sent/delivered/read/failed) update stored message status instead of being silently dropped", () => {
-  assert.match(webhookSource, /value\.statuses/);
-  assert.match(webhookSource, /statusUpdatedAt/);
+  assert.match(
+    webhookSource,
+    /value\.statuses/,
+  );
+
+  assert.match(
+    webhookSource,
+    /updateWhatsAppMessageStatus\s*\(/,
+  );
+
+  assert.match(
+    webhookSource,
+    /integrationId:\s*integration\.id/,
+  );
+
+  assert.match(
+    webhookSource,
+    /externalMessageId:\s*statusExternalId/,
+  );
 });
 
 test("outbound replies use per-tenant resolved credentials, never a hardcoded global Authorization header", () => {
-  assert.match(webhookSource, /getWhatsAppCredentialsForIntegration\(integration\)/);
-  assert.match(webhookSource, /sendWhatsAppText\(credentials/);
+  assert.match(inboundSource, /getWhatsAppCredentialsForIntegration\s*\(\s*integration\s*,?\s*\)/);
+  assert.match(inboundSource, /sendWhatsAppText\s*\(\s*credentials\s*,/);
   assert.doesNotMatch(webhookSource, /Authorization: `Bearer \$\{ACCESS_TOKEN\}`/);
 });
 
