@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { and, desc, eq } from "drizzle-orm";
-import { RequestContext } from "@mastra/core/request-context";
 
 import { auth } from "@/lib/auth";
 import { getCurrentMembership } from "@/lib/auth/tenant";
@@ -9,8 +8,6 @@ import { getBusinessMembership, hasPermission, PERMISSIONS } from "@/lib/auth/pe
 import { db } from "@/db";
 import { getChannelAdapter } from "@/lib/channels/router";
 import { routeConversation } from "@/lib/ai-routing/router";
-import { kubaSalesAgent } from "@/mastra/agents/sales";
-import { getBusinessKnowledge } from "@/lib/ai/business-knowledge";
 import { shouldCreateFollowUp } from "@/lib/ai/followup-detector";
 import { logAIActivity } from "@/lib/ai/activity-log";
 import { canAccessConversation } from "@/lib/communications/conversation-access";
@@ -193,9 +190,6 @@ export async function POST(
   }
 
 
-  const businessContext = channel === "email" ? "" : await getBusinessKnowledge(business.businessId);
-
-
   const routing = channel === "email" ? null : routeConversation(trimmedContent);
 
 
@@ -374,61 +368,13 @@ export async function POST(
     createdAt: now,
   });
 
-  const aiResult = channel === "email" ? null : await kubaSalesAgent.generate(
-      `${businessContext}
-
-CUSTOMER MESSAGE:
-${trimmedContent}`,
-      {
-        memory: {
-          resource: session.user.id,
-          thread: `messaging-${business.businessId}`,
-        },
-        requestContext: new RequestContext([["businessId", business.businessId], ["employeeId", assignedEmployee[0]?.id ?? ""]]),
-      },
-    );
-
-
-  if (aiResult) await db.insert(messages).values({
-    id: crypto.randomUUID(),
-    businessId: business.businessId,
-    conversationId,
-    integrationId: conversation[0].integrationId,
-    externalMessageId: null,
-    direction: "outbound",
-    senderType: "assistant",
-    senderId: null,
-    content: aiResult.text,
-    messageType: "text",
-    createdAt: new Date(),
-  });
-
-
-  if (aiResult && assignedEmployee[0]) {
-
-    await logAIActivity({
-
-      businessId:
-        business.businessId,
-
-      employeeId:
-        assignedEmployee[0].id,
-
-      type:
-        "message_sent",
-
-      title:
-        "Replied to customer",
-
-      description:
-        aiResult.text,
-
-    });
-
-  }
-
-
-
+  /*
+   * Human-authored replies stop here.
+   *
+   * /api/messages/send represents an explicit human action in the
+   * Unified Inbox. Never generate a second AI response after the
+   * human message has already been sent to the customer.
+   */
   await db
     .update(conversations)
     .set({
