@@ -171,6 +171,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "notion"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/notion/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
