@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { capabilityMinimumPlan, planDefinitions } from "@/lib/billing/plan-definitions";
 import { getCatalogEntry } from "@/lib/billing/ai-workforce-catalog";
 import TrialBanner from "../components/dashboard/TrialBanner";
+import AskKubaAssistant from "../components/chat/AskKubaAssistant";
 
 type NavigationItem = {
   label: string;
@@ -872,6 +873,7 @@ export default function DashboardLayout({
           <>
             <TrialBanner />
             {children}
+            <AskKubaAssistant />
           </>
         )}
       </div>
