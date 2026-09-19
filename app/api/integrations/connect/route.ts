@@ -111,6 +111,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "salesforce"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/salesforce/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
