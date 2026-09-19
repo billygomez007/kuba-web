@@ -71,6 +71,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "quickbooks"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/quickbooks/start",
+    });
+  }
+
+  if (
     provider.id === "paystack_merchant"
   ) {
     return NextResponse.json({
