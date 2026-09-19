@@ -181,6 +181,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "google_drive"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/google-drive/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(

@@ -267,7 +267,7 @@ export const integrationProviders:
     environmentKeys: [
       "GOOGLE_INTEGRATION_CLIENT_ID",
       "GOOGLE_INTEGRATION_CLIENT_SECRET",
-      "GOOGLE_INTEGRATION_REDIRECT_URI",
+      "GOOGLE_DRIVE_REDIRECT_URI",
     ],
     enabled: true,
     description:
