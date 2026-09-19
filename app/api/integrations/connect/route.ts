@@ -191,6 +191,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "dropbox"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/dropbox/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
