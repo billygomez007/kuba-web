@@ -101,6 +101,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "hubspot"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/hubspot/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
