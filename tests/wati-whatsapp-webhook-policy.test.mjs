@@ -220,3 +220,26 @@ test("WATI accepts production status-event aliases with and without _v2", () => 
     /sentMessageFAILED_v2:\s*"failed"/,
   );
 });
+
+
+test("WATI status correlation uses provider outbound id before whatsappMessageId", () => {
+  const statusHelper = source.match(
+    /function getStatusMessageId[\s\S]*?\n}\n/,
+  )?.[0];
+
+  assert.ok(statusHelper);
+
+  const localIndex =
+    statusHelper.indexOf("payload.localMessageId");
+  const idIndex =
+    statusHelper.indexOf("payload.id");
+  const whatsappIndex =
+    statusHelper.indexOf("payload.whatsappMessageId");
+  const messageIndex =
+    statusHelper.indexOf("payload.messageId");
+
+  assert.ok(localIndex >= 0);
+  assert.ok(idIndex > localIndex);
+  assert.ok(whatsappIndex > idIndex);
+  assert.ok(messageIndex > whatsappIndex);
+});
