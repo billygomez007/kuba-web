@@ -151,6 +151,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "slack"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/slack/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
