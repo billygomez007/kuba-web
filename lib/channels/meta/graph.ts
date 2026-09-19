@@ -107,3 +107,91 @@ export async function getMetaPages(
     ? result.data
     : [];
 }
+
+export async function subscribeFacebookPage(
+  pageId: string,
+  pageAccessToken: string,
+) {
+  const version =
+    process.env.META_GRAPH_API_VERSION ||
+    "v25.0";
+
+  const url = new URL(
+    `https://graph.facebook.com/${version}/${pageId}/subscribed_apps`,
+  );
+
+  url.searchParams.set(
+    "access_token",
+    pageAccessToken,
+  );
+
+  url.searchParams.set(
+    "subscribed_fields",
+    [
+      "messages",
+      "messaging_postbacks",
+      "message_deliveries",
+      "message_reads",
+    ].join(","),
+  );
+
+  const response =
+    await fetch(url, {
+      method: "POST",
+    });
+
+  const body =
+    await response
+      .json()
+      .catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      body?.error?.message ||
+        "Unable to subscribe Facebook Page to Meta webhooks.",
+    );
+  }
+
+  if (
+    body?.success !== true
+  ) {
+    throw new Error(
+      "Meta did not confirm Facebook Page subscription.",
+    );
+  }
+
+  return true;
+}
+
+export async function verifyFacebookPageSubscription(
+  pageId: string,
+  pageAccessToken: string,
+) {
+  const version =
+    process.env.META_GRAPH_API_VERSION ||
+    "v25.0";
+
+  const url = new URL(
+    `https://graph.facebook.com/${version}/${pageId}/subscribed_apps`,
+  );
+
+  url.searchParams.set(
+    "access_token",
+    pageAccessToken,
+  );
+
+  const response =
+    await fetch(url);
+
+  const body =
+    await response
+      .json()
+      .catch(() => null);
+
+  if (!response.ok) {
+    return false;
+  }
+
+  return Array.isArray(body?.data) &&
+    body.data.length > 0;
+}

@@ -9,6 +9,7 @@ import { encrypt } from "@/lib/encryption";
 import {
   exchangeMetaCode,
   getMetaPages,
+  subscribeFacebookPage,
 } from "@/lib/channels/meta/graph";
 import { verifyMetaOAuthState } from "@/lib/channels/meta/oauth-state";
 
@@ -112,6 +113,10 @@ export async function GET(
         state.channel ===
         "facebook_messenger"
       ) {
+        await subscribeFacebookPage(
+          pageId,
+          pageAccessToken,
+        );
         const existing =
           (
             await db
