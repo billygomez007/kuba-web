@@ -161,6 +161,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "microsoft_teams"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/microsoft-teams/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
