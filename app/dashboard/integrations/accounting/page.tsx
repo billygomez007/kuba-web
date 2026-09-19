@@ -1,7 +1,11 @@
-"use client";
-
-import IntegrationStatusPage from "../IntegrationStatusPage";
+import ProviderGrid from "@/app/components/integrations/ProviderGrid";
 
 export default function AccountingIntegrationPage() {
-  return <IntegrationStatusPage title="Accounting" description="Connect a business accounting system to synchronize authoritative financial records with Kuba." providers={["QuickBooks Online", "Xero", "Sage", "Zoho Books"]} status="Coming Soon" notes={["No external accounting OAuth, ledger, invoice sync, expense sync, or reconciliation service exists.", "Subscription billing, payroll, sales records, and analytics remain separate domains.", "A future connector will require tenant-bound OAuth, encrypted tokens, provider webhooks, sync ownership, and accounting permissions."]} />;
+  return (
+    <ProviderGrid
+      category="accounting"
+      title="Accounting Integrations"
+      description="Connect QuickBooks Online, Xero, Sage, or Zoho Books to synchronize authorized business financial records."
+    />
+  );
 }

@@ -98,9 +98,8 @@ export default function IntegrationsPage() {
       provider: "voice",
       category: "Communication Channels",
       description:
-        "Connect phone calls via Plivo or Twilio.",
+        "Connect and manage AI voice calling providers and phone numbers.",
       icon: <FaGlobe size={40} />,
-      status: "coming-soon",
     },
     {
       name: "Facebook & Instagram",
@@ -129,12 +128,12 @@ export default function IntegrationsPage() {
   const commChannels = items.filter(i => i.category === "Communication Channels");
   const socialChannels = items.filter(i => i.category === "Social Channels");
   const remainingIntegrations = [
-    { name: "Calendar", href: "/dashboard/integrations/calendar", status: "Coming Soon", description: "Google Calendar, Outlook, and Apple Calendar connections." },
-    { name: "Payments", href: "/dashboard/integrations/payments", status: "Platform Billing Only", description: "Business merchant payments are not configured." },
-    { name: "Accounting", href: "/dashboard/integrations/accounting", status: "Coming Soon", description: "QuickBooks, Xero, Sage, and other accounting sync." },
-    { name: "CRM", href: "/dashboard/integrations/crm", status: "Coming Soon", description: "External CRM contact, lead, and deal synchronization." },
-    { name: "External Apps", href: "/dashboard/integrations/external-apps", status: "Coming Soon", description: "Business tool and collaboration connections." },
-    { name: "API / Developer Integrations", href: "/dashboard/integrations/developer", status: "Coming Soon", description: "Tenant-safe public API and webhook tooling." },
+    { name: "Calendar", href: "/dashboard/integrations/calendar", status: "Available", description: "Google Calendar, Outlook, and Apple Calendar connections." },
+    { name: "Payments", href: "/dashboard/integrations/payments", status: "Available", description: "Connect tenant-owned merchant payment accounts." },
+    { name: "Accounting", href: "/dashboard/integrations/accounting", status: "Available", description: "QuickBooks, Xero, Sage, and other accounting sync." },
+    { name: "CRM", href: "/dashboard/integrations/crm", status: "Available", description: "External CRM contact, lead, and deal synchronization." },
+    { name: "External Apps", href: "/dashboard/integrations/external-apps", status: "Available", description: "Business tool and collaboration connections." },
+    { name: "API / Developer Integrations", href: "/dashboard/integrations/developer", status: "Available", description: "Tenant-safe API keys, webhooks and developer tooling." },
   ];
 
   const getIntegrationStatus = (provider: string) => {
