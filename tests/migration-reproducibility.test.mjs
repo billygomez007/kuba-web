@@ -44,8 +44,9 @@ test("clean bootstrap reproduces the current schema and accepts a generated futu
     // organization_businesses — the multi-business "one login, many
     // workspaces" architecture). Update this literal deliberately whenever
     // a schema change legitimately adds or removes a table — it exists to
-    // catch accidental drift, not to block real schema growth.
-    assert.equal(tables.rows.length, 106);
+    // catch accidental drift, not to block real schema growth. The native
+    // Marketing OS adds twelve provider-neutral tables.
+    assert.equal(tables.rows.length, 118);
     assert.equal(tables.rows.some((row) => row.name === "__drizzle_migrations"), true);
     const emptyTables = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '__drizzle_migrations' AND sql NOT LIKE '%WITHOUT ROWID%'");
     for (const table of emptyTables.rows) {
