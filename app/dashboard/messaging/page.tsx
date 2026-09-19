@@ -322,7 +322,7 @@ export default function MessagingPage() {
 
   return (
 
-    <div className="flex h-[80vh] overflow-hidden rounded-3xl border border-white/10 bg-black">
+    <div className="flex h-[calc(100dvh-96px)] min-h-0 overflow-hidden rounded-3xl border border-white/10 bg-black">
 
 
       <div className="w-96 border-r border-white/10">
@@ -456,7 +456,7 @@ export default function MessagingPage() {
 
 
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 
 
         {selected ? (
@@ -572,7 +572,7 @@ export default function MessagingPage() {
 
 
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
 
 
           {messages.map((msg)=>(
@@ -626,7 +626,7 @@ export default function MessagingPage() {
 
 
 
-          <div className="p-5 border-t border-white/10 flex gap-3">
+          <div className="shrink-0 border-t border-white/10 p-5 flex gap-3">
 
             <input
               value={text}
