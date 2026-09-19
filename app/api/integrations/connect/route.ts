@@ -141,6 +141,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "microsoft_dynamics"
+  ) {
+    return NextResponse.json({
+      mode: "setup",
+      redirectUrl:
+        "/dashboard/integrations/microsoft-dynamics",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(

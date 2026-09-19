@@ -209,7 +209,7 @@ export const integrationProviders:
       "MICROSOFT_CLIENT_ID",
       "MICROSOFT_CLIENT_SECRET",
       "MICROSOFT_TENANT_ID",
-      "MICROSOFT_INTEGRATION_REDIRECT_URI",
+      "MICROSOFT_DYNAMICS_REDIRECT_URI",
     ],
     enabled: true,
     description:
