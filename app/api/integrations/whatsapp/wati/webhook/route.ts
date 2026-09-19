@@ -8,7 +8,6 @@ import {
 import {
   getWhatsAppTransportProvider,
 } from "@/lib/channels/whatsapp-provider";
-import { createAuditLog } from "@/lib/auth/audit";
 
 type WatiWebhookPayload = {
   eventType?: unknown;
@@ -198,27 +197,6 @@ export async function POST(
   const eventType =
     getEventType(payload);
 
-  const diagnosticData =
-    asRecord(payload.data);
-
-  console.info("WATI webhook event-shape diagnostic", {
-    eventType: eventType || null,
-    topLevelEventType:
-      asString(payload.eventType) || null,
-    topLevelType:
-      asString(payload.type) || null,
-    nestedEventType:
-      nestedString(diagnosticData, "eventType") || null,
-    nestedType:
-      nestedString(diagnosticData, "type") || null,
-    topLevelKeys:
-      Object.keys(payload).sort(),
-    dataKeys:
-      diagnosticData
-        ? Object.keys(diagnosticData).sort()
-        : [],
-  });
-
   const isMessageReceived =
     eventType === "messageReceived" ||
     eventType === "message";
@@ -254,36 +232,6 @@ export async function POST(
       channelPhoneNumber,
     );
 
-  if (resolved) {
-    const diagnosticData =
-      asRecord(payload.data);
-
-    await createAuditLog({
-      businessId: resolved.business.id,
-      action: "wati_webhook_event_diagnostic",
-      resource: "whatsapp_integration",
-      resourceId: resolved.integration.id,
-      description: "Temporary WATI webhook event-shape diagnostic",
-      metadata: {
-        eventType: eventType || null,
-        topLevelEventType:
-          asString(payload.eventType) || null,
-        topLevelType:
-          asString(payload.type) || null,
-        nestedEventType:
-          nestedString(diagnosticData, "eventType") || null,
-        nestedType:
-          nestedString(diagnosticData, "type") || null,
-        topLevelKeys:
-          Object.keys(payload).sort(),
-        dataKeys:
-          diagnosticData
-            ? Object.keys(diagnosticData).sort()
-            : [],
-      },
-    });
-  }
-
   if (
     !resolved ||
     resolved.business.status !== "active" ||
@@ -308,29 +256,6 @@ export async function POST(
   if (status) {
     const externalMessageId =
       getStatusMessageId(payload);
-
-    const statusData = asRecord(payload.data);
-
-    console.info("WATI status correlation diagnostic", {
-      eventType,
-      selectedExternalMessageId: externalMessageId || null,
-      localMessageId:
-        asString(payload.localMessageId) ||
-        nestedString(statusData, "localMessageId") ||
-        null,
-      whatsappMessageId:
-        asString(payload.whatsappMessageId) ||
-        nestedString(statusData, "whatsappMessageId") ||
-        null,
-      messageId:
-        asString(payload.messageId) ||
-        nestedString(statusData, "messageId") ||
-        null,
-      id:
-        asString(payload.id) ||
-        nestedString(statusData, "id") ||
-        null,
-    });
 
     if (!externalMessageId) {
       return NextResponse.json(
