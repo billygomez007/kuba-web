@@ -201,6 +201,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "zapier"
+  ) {
+    return NextResponse.json({
+      mode: "webhook",
+      redirectUrl:
+        "/dashboard/integrations/zapier",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
