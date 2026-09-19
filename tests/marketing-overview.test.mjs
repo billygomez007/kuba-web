@@ -253,3 +253,296 @@ test("REGRESSION: app/api/marketing/overview/route.ts enforces requireMarketingA
   assert.doesNotMatch(source, /request\.json\(/, "GET /api/marketing/overview must never read a request body");
   assert.doesNotMatch(source, /businessId["']\]/, "must never index into a client payload for businessId");
 });
+
+test("marketing AI activity includes only this business's marketing employees", async () => {
+  const now = new Date();
+
+  await db.insert(schema.aiEmployees).values([
+    {
+      id: "full-activity-marketing-a",
+      businessId: BIZ_A,
+      name: "Kuba Marketing A",
+      type: "marketing",
+      supervisionMode: "owner_supervised",
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "full-activity-sales-a",
+      businessId: BIZ_A,
+      name: "Kuba Sales A",
+      type: "sales",
+      supervisionMode: "owner_supervised",
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "full-activity-marketing-b",
+      businessId: BIZ_B,
+      name: "Kuba Marketing B",
+      type: "marketing",
+      supervisionMode: "owner_supervised",
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]);
+
+  await db.insert(schema.aiEmployeeActivities).values([
+    {
+      id: "full-activity-ai-a",
+      businessId: BIZ_A,
+      employeeId: "full-activity-marketing-a",
+      type: "marketing.draft.created",
+      title: "Marketing draft created",
+      description: "Prepared a real marketing draft.",
+      status: "completed",
+      createdAt: now,
+    },
+    {
+      id: "full-activity-sales-activity-a",
+      businessId: BIZ_A,
+      employeeId: "full-activity-sales-a",
+      type: "sales.lead.updated",
+      title: "Sales updated lead",
+      description: null,
+      status: "completed",
+      createdAt: now,
+    },
+    {
+      id: "full-activity-ai-b",
+      businessId: BIZ_B,
+      employeeId: "full-activity-marketing-b",
+      type: "marketing.draft.created",
+      title: "Other tenant marketing draft",
+      description: null,
+      status: "completed",
+      createdAt: now,
+    },
+  ]);
+
+  const overview = await getMarketingOverview(BIZ_A);
+  const ids = overview.marketingAIActivity.map((item) => item.id);
+
+  assert.ok(ids.includes("full-activity-ai-a"));
+  assert.equal(ids.includes("full-activity-sales-activity-a"), false);
+  assert.equal(ids.includes("full-activity-ai-b"), false);
+
+  const activity = overview.marketingAIActivity.find(
+    (item) => item.id === "full-activity-ai-a",
+  );
+
+  assert.equal(activity?.employeeName, "Kuba Marketing A");
+  assert.equal(activity?.status, "completed");
+});
+
+test("publishing alerts expose real failures and never leak another tenant", async () => {
+  const now = new Date();
+
+  await db.insert(schema.marketingContentItems).values([
+    {
+      id: "full-activity-content-a",
+      businessId: BIZ_A,
+      campaignId: "camp-a-active-1",
+      title: "Full Activity Launch Post",
+      contentType: "post",
+      status: "approved",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "full-activity-content-b",
+      businessId: BIZ_B,
+      campaignId: null,
+      title: "Other Tenant Post",
+      contentType: "post",
+      status: "approved",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]);
+
+  await db.insert(schema.marketingPublishJobs).values([
+    {
+      id: "full-activity-publish-a",
+      businessId: BIZ_A,
+      contentItemId: "full-activity-content-a",
+      contentVariantId: null,
+      channel: "instagram",
+      scheduledAt: now,
+      status: "failed",
+      idempotencyKey: "full-activity-publish-a",
+      failureCode: "provider_rejected",
+      failureMessageSafe: "Provider rejected the publish request.",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "full-activity-publish-b",
+      businessId: BIZ_B,
+      contentItemId: "full-activity-content-b",
+      contentVariantId: null,
+      channel: "facebook",
+      scheduledAt: now,
+      status: "failed",
+      idempotencyKey: "full-activity-publish-b",
+      failureCode: "provider_rejected",
+      failureMessageSafe: "Other tenant failure.",
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]);
+
+  const overview = await getMarketingOverview(BIZ_A);
+  const ids = overview.publishAlerts.map((item) => item.id);
+
+  assert.ok(ids.includes("full-activity-publish-a"));
+  assert.equal(ids.includes("full-activity-publish-b"), false);
+
+  const alert = overview.publishAlerts.find(
+    (item) => item.id === "full-activity-publish-a",
+  );
+
+  assert.equal(alert?.title, "Full Activity Launch Post");
+  assert.equal(alert?.channel, "instagram");
+  assert.equal(alert?.failureCode, "provider_rejected");
+  assert.ok(overview.needsAttentionCount > 0);
+});
+
+test("marketing sales attribution is persisted, truthful, and tenant-scoped", async () => {
+  const now = new Date();
+
+  await db.insert(schema.marketingCampaigns).values([
+    {
+      id: "full-activity-campaign-a",
+      businessId: BIZ_A,
+      name: "Full Activity Lead Generation",
+      objective: "lead_generation",
+      campaignType: "organic",
+      status: "active",
+      budgetCurrency: "USD",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "full-activity-campaign-b",
+      businessId: BIZ_B,
+      name: "Other Tenant Lead Generation",
+      objective: "lead_generation",
+      campaignType: "organic",
+      status: "active",
+      budgetCurrency: "USD",
+      approvalStatus: "approved",
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]);
+
+  await db.insert(schema.marketingAttributions).values([
+    {
+      id: "full-activity-attribution-a",
+      businessId: BIZ_A,
+      campaignId: "full-activity-campaign-a",
+      leadId: "full-activity-lead-a",
+      eventType: "lead_created",
+      occurredAt: now,
+      createdAt: now,
+    },
+    {
+      id: "full-activity-attribution-b",
+      businessId: BIZ_B,
+      campaignId: "full-activity-campaign-b",
+      leadId: "full-activity-lead-b",
+      eventType: "lead_created",
+      occurredAt: now,
+      createdAt: now,
+    },
+  ]);
+
+  const overview = await getMarketingOverview(BIZ_A);
+  const ids = overview.salesAttributions.map((item) => item.id);
+
+  assert.ok(ids.includes("full-activity-attribution-a"));
+  assert.equal(ids.includes("full-activity-attribution-b"), false);
+
+  const attribution = overview.salesAttributions.find(
+    (item) => item.id === "full-activity-attribution-a",
+  );
+
+  assert.equal(
+    attribution?.campaignName,
+    "Full Activity Lead Generation",
+  );
+  assert.equal(
+    attribution?.leadId,
+    "full-activity-lead-a",
+  );
+  assert.equal(
+    attribution?.eventType,
+    "lead_created",
+  );
+});
+
+test("empty tenant never receives fabricated full activity data", async () => {
+  const overview = await getMarketingOverview(
+    "full-activity-empty-business",
+  );
+
+  assert.deepEqual(overview.marketingAIActivity, []);
+  assert.deepEqual(overview.publishAlerts, []);
+  assert.deepEqual(overview.salesAttributions, []);
+  assert.equal(overview.needsAttentionCount, 0);
+});
+
+test("needs-attention count uses the true failed-job total even when alert preview is bounded", async () => {
+  const businessId = "full-activity-count-business";
+  const now = new Date();
+
+  await db.insert(schema.marketingContentItems).values({
+    id: "full-activity-count-content",
+    businessId,
+    campaignId: null,
+    title: "Count Test Content",
+    contentType: "post",
+    status: "approved",
+    approvalStatus: "approved",
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const jobs = Array.from({ length: 12 }, (_, index) => ({
+    id: `full-activity-count-job-${index}`,
+    businessId,
+    contentItemId: "full-activity-count-content",
+    contentVariantId: null,
+    channel: "instagram",
+    scheduledAt: now,
+    status: "failed",
+    idempotencyKey: `full-activity-count-idem-${index}`,
+    failureCode: "provider_rejected",
+    failureMessageSafe: "Provider rejected publishing.",
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await db.insert(schema.marketingPublishJobs).values(jobs);
+
+  const overview = await getMarketingOverview(businessId);
+
+  assert.equal(
+    overview.publishAlerts.length,
+    10,
+    "alert preview remains deliberately bounded",
+  );
+
+  assert.equal(
+    overview.needsAttentionCount,
+    12,
+    "summary count must reflect every failed publish job, not only the preview",
+  );
+});

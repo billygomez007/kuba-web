@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, like } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  aiEmployeeActivities,
   aiEmployees,
   auditLogs,
   marketingApprovals,
@@ -91,6 +92,38 @@ export type MarketingUpcomingActivity = {
   campaignId: string | null;
 };
 
+export type MarketingAIActivityItem = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: string;
+  title: string;
+  description: string | null;
+  status: string;
+  createdAt: Date;
+};
+
+export type MarketingPublishAlert = {
+  id: string;
+  title: string;
+  channel: string;
+  status: string;
+  failureCode: string | null;
+  failureMessage: string | null;
+  updatedAt: Date;
+};
+
+export type MarketingSalesAttribution = {
+  id: string;
+  campaignId: string;
+  campaignName: string | null;
+  leadId: string | null;
+  customerId: string | null;
+  dealId: string | null;
+  eventType: string;
+  occurredAt: Date;
+};
+
 export type MarketingOverviewResult = {
   summary: {
     activeCampaigns: number;
@@ -110,6 +143,10 @@ export type MarketingOverviewResult = {
   };
   approvalQueue: { id: string; resourceType: string; resourceId: string; resourceName: string | null; requesterName: string | null; createdAt: Date; status: string }[];
   recentActivity: { id: string; action: string; description: string | null; createdAt: Date }[];
+  marketingAIActivity: MarketingAIActivityItem[];
+  publishAlerts: MarketingPublishAlert[];
+  salesAttributions: MarketingSalesAttribution[];
+  needsAttentionCount: number;
 };
 
 const RECENT_LIMIT = 5;
@@ -212,6 +249,147 @@ export async function getMarketingOverview(businessId: string): Promise<Marketin
 
   const recentActivity = activityEvents.map((event) => ({ id: event.id, action: event.action, description: event.description, createdAt: event.createdAt }));
 
+
+  const marketingEmployeesForOverview = await db
+    .select({
+      id: aiEmployees.id,
+      name: aiEmployees.name,
+    })
+    .from(aiEmployees)
+    .where(
+      and(
+        eq(aiEmployees.businessId, businessId),
+        eq(aiEmployees.type, "marketing"),
+      ),
+    );
+
+  const marketingEmployeeNameById = new Map(
+    marketingEmployeesForOverview.map((employee) => [
+      employee.id,
+      employee.name,
+    ]),
+  );
+
+  const marketingAIActivityRows =
+    marketingEmployeesForOverview.length === 0
+      ? []
+      : (
+          await db
+            .select({
+              id: aiEmployeeActivities.id,
+              employeeId: aiEmployeeActivities.employeeId,
+              type: aiEmployeeActivities.type,
+              title: aiEmployeeActivities.title,
+              description: aiEmployeeActivities.description,
+              status: aiEmployeeActivities.status,
+              createdAt: aiEmployeeActivities.createdAt,
+            })
+            .from(aiEmployeeActivities)
+            .where(eq(aiEmployeeActivities.businessId, businessId))
+            .orderBy(desc(aiEmployeeActivities.createdAt))
+        )
+          .filter((activity) =>
+            marketingEmployeeNameById.has(activity.employeeId),
+          )
+          .slice(0, 12);
+
+  const marketingAIActivity: MarketingAIActivityItem[] =
+    marketingAIActivityRows.map((activity) => ({
+      ...activity,
+      employeeName:
+        marketingEmployeeNameById.get(activity.employeeId) ??
+        "Kuba Marketing",
+    }));
+
+  const publishJobRowsForOverview = await db
+    .select({
+      id: marketingPublishJobs.id,
+      contentItemId: marketingPublishJobs.contentItemId,
+      channel: marketingPublishJobs.channel,
+      status: marketingPublishJobs.status,
+      failureCode: marketingPublishJobs.failureCode,
+      failureMessageSafe: marketingPublishJobs.failureMessageSafe,
+      updatedAt: marketingPublishJobs.updatedAt,
+    })
+    .from(marketingPublishJobs)
+    .where(eq(marketingPublishJobs.businessId, businessId))
+    .orderBy(desc(marketingPublishJobs.updatedAt));
+
+  const contentTitleByIdForOverview = new Map(
+    contentItems.map((item) => [item.id, item.title]),
+  );
+
+  const failedPublishJobsForOverview =
+    publishJobRowsForOverview.filter(
+      (job) =>
+        job.status === "failed" ||
+        Boolean(job.failureCode) ||
+        Boolean(job.failureMessageSafe),
+    );
+
+  const publishAlerts: MarketingPublishAlert[] =
+    failedPublishJobsForOverview
+      .slice(0, 10)
+      .map((job) => ({
+        id: job.id,
+        title:
+          contentTitleByIdForOverview.get(job.contentItemId) ??
+          "Marketing publish job",
+        channel: job.channel,
+        status: job.status,
+        failureCode: job.failureCode,
+        failureMessage: job.failureMessageSafe,
+        updatedAt: job.updatedAt,
+      }));
+
+  const attributionRowsForOverview = await db
+    .select({
+      id: marketingAttributions.id,
+      campaignId: marketingAttributions.campaignId,
+      leadId: marketingAttributions.leadId,
+      customerId: marketingAttributions.customerId,
+      dealId: marketingAttributions.dealId,
+      eventType: marketingAttributions.eventType,
+      occurredAt: marketingAttributions.occurredAt,
+    })
+    .from(marketingAttributions)
+    .where(eq(marketingAttributions.businessId, businessId))
+    .orderBy(desc(marketingAttributions.occurredAt));
+
+  const campaignNameByIdForOverview = new Map(
+    campaigns.map((campaign) => [
+      campaign.id,
+      campaign.name,
+    ]),
+  );
+
+  const salesAttributions: MarketingSalesAttribution[] =
+    attributionRowsForOverview
+      .filter(
+        (attribution) =>
+          Boolean(attribution.leadId) ||
+          Boolean(attribution.customerId) ||
+          Boolean(attribution.dealId),
+      )
+      .slice(0, 10)
+      .map((attribution) => ({
+        ...attribution,
+        campaignName:
+          campaignNameByIdForOverview.get(
+            attribution.campaignId,
+          ) ?? null,
+      }));
+
+  const needsAttentionCount =
+    failedPublishJobsForOverview.length +
+    pendingApprovalsCount +
+    channelReadiness.filter(
+      (channel) =>
+        channel.state === "needs_attention" ||
+        channel.state === "expired" ||
+        channel.state === "disabled",
+    ).length;
+
   return {
     summary: { activeCampaigns, contentPieces: contentItems.length, scheduledContent, pendingApprovals: pendingApprovalsCount, leadsAttributed },
     campaignActivity,
@@ -222,5 +400,9 @@ export async function getMarketingOverview(businessId: string): Promise<Marketin
     audienceOverview,
     approvalQueue,
     recentActivity,
+    marketingAIActivity,
+    publishAlerts,
+    salesAttributions,
+    needsAttentionCount,
   };
 }
