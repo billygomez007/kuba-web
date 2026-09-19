@@ -113,7 +113,6 @@ export default function IntegrationsPage() {
           <FaFacebook size={40} />
           <FaInstagram size={40} />
         </div>,
-      status: "coming-soon",
     },
     {
       name: "Telegram",
@@ -143,9 +142,10 @@ export default function IntegrationsPage() {
     const isWebsiteConfigured = provider === "website_chat" && isActive;
     const isWhatsAppConfigured = provider === "whatsapp" && isActive;
     const isEmailConfigured = provider === "email" && isActive;
+    const isMetaConfigured = provider === "meta" && isActive;
 
     return {
-      connected: isWhatsAppConfigured || isWebsiteConfigured || isEmailConfigured,
+      connected: isWhatsAppConfigured || isWebsiteConfigured || isEmailConfigured || isMetaConfigured,
       integration,
     };
   };
