@@ -211,6 +211,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "make"
+  ) {
+    return NextResponse.json({
+      mode: "webhook",
+      redirectUrl:
+        "/dashboard/integrations/make",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
