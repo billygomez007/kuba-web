@@ -81,6 +81,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "microsoft_calendar"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/microsoft-calendar/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
