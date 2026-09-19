@@ -92,7 +92,8 @@ for (const file of componentFiles) {
     const hasAction =
       /\bonClick\s*=/.test(attrs) ||
       /\btype\s*=\s*["']submit["']/.test(attrs) ||
-      /\bformAction\s*=/.test(attrs);
+      /\bformAction\s*=/.test(attrs) ||
+      /\bdisabled\b/.test(attrs);
 
     if (!hasAction) {
       const before = source.slice(Math.max(0, match.index - 180), match.index);

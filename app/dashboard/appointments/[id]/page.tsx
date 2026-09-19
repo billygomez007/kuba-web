@@ -109,7 +109,7 @@ export default function AppointmentDetailPage({ params }: { params: Promise<{ id
           <form onSubmit={(event) => { event.preventDefault(); void patch({ startAt: new Date(reschedule.startAt).toISOString(), endAt: new Date(reschedule.endAt).toISOString() }); }} className="mt-6 grid gap-4 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.035] p-6 sm:grid-cols-2">
             <label><span className="text-xs font-bold uppercase tracking-wider text-white/40">New start</span><input type="datetime-local" required value={reschedule.startAt} onChange={(event) => setReschedule({ ...reschedule, startAt: event.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm" /></label>
             <label><span className="text-xs font-bold uppercase tracking-wider text-white/40">New end</span><input type="datetime-local" required value={reschedule.endAt} onChange={(event) => setReschedule({ ...reschedule, endAt: event.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm" /></label>
-            <button className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-black sm:col-span-2">Save new time</button>
+            <button type="submit" className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-black sm:col-span-2">Save new time</button>
           </form>
         )}
 
