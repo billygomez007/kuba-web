@@ -71,6 +71,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "google_calendar"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/google-calendar/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(

@@ -136,9 +136,26 @@ export default function ProviderGrid({
     if (
       body.redirectUrl
     ) {
-      router.push(
-        body.redirectUrl,
-      );
+      if (
+        body.redirectUrl.startsWith(
+          "/api/",
+        ) ||
+        body.redirectUrl.startsWith(
+          "http://",
+        ) ||
+        body.redirectUrl.startsWith(
+          "https://",
+        )
+      ) {
+        window.location.assign(
+          body.redirectUrl,
+        );
+      } else {
+        router.push(
+          body.redirectUrl,
+        );
+      }
+
       return;
     }
 
