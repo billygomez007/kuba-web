@@ -110,12 +110,12 @@ function getStatusMessageId(
   return (
     asString(payload.localMessageId) ||
     nestedString(data, "localMessageId") ||
+    asString(payload.id) ||
+    nestedString(data, "id") ||
     asString(payload.whatsappMessageId) ||
     nestedString(data, "whatsappMessageId") ||
     asString(payload.messageId) ||
-    nestedString(data, "messageId") ||
-    asString(payload.id) ||
-    nestedString(data, "id")
+    nestedString(data, "messageId")
   );
 }
 
