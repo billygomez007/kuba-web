@@ -127,7 +127,7 @@ export async function GET(
                   ),
                   eq(
                     integrations.provider,
-                    "meta",
+                    "facebook",
                   ),
                   eq(
                     integrations.externalAccountId,
@@ -186,7 +186,7 @@ export async function GET(
                 crypto.randomUUID(),
               businessId:
                 state.businessId,
-              provider: "meta",
+              provider: "facebook",
               status: "pending",
               externalAccountId:
                 pageId,
@@ -252,7 +252,7 @@ export async function GET(
                   ),
                   eq(
                     integrations.provider,
-                    "meta",
+                    "instagram",
                   ),
                   eq(
                     integrations.externalAccountId,
@@ -318,7 +318,7 @@ export async function GET(
                 crypto.randomUUID(),
               businessId:
                 state.businessId,
-              provider: "meta",
+              provider: "instagram",
               status: "pending",
               externalAccountId:
                 instagramId,

@@ -1,7 +1,10 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { integrations } from "@/db/schema";
+import {
+  businesses,
+  integrations,
+} from "@/db/schema";
 import { decrypt } from "@/lib/encryption";
 
 import type {
@@ -25,9 +28,10 @@ export function parseMetaMetadata(
       return null;
     }
 
-    const channel = (parsed as {
-      channel?: unknown;
-    }).channel;
+    const channel =
+      (parsed as {
+        channel?: unknown;
+      }).channel;
 
     if (
       channel !== "facebook_messenger" &&
@@ -42,30 +46,46 @@ export function parseMetaMetadata(
   }
 }
 
+function providerForChannel(
+  channel: MetaChannel,
+) {
+  return channel === "facebook_messenger"
+    ? "facebook"
+    : "instagram";
+}
+
 export async function resolveMetaIntegrationByExternalAccount(
   channel: MetaChannel,
   externalAccountId: string,
 ) {
   const rows = await db
-    .select()
+    .select({
+      integration: integrations,
+      business: businesses,
+    })
     .from(integrations)
+    .innerJoin(
+      businesses,
+      eq(
+        integrations.businessId,
+        businesses.id,
+      ),
+    )
     .where(
       and(
-        eq(integrations.provider, "meta"),
-        eq(integrations.status, "active"),
+        eq(
+          integrations.provider,
+          providerForChannel(channel),
+        ),
         eq(
           integrations.externalAccountId,
           externalAccountId,
         ),
       ),
-    );
+    )
+    .limit(1);
 
-  return (
-    rows.find((row) => {
-      const metadata = parseMetaMetadata(row.metadata);
-      return metadata?.channel === channel;
-    }) || null
-  );
+  return rows[0] ?? null;
 }
 
 export function getMetaAccessToken(
@@ -77,5 +97,7 @@ export function getMetaAccessToken(
     return null;
   }
 
-  return decrypt(integration.credentialsEncrypted);
+  return decrypt(
+    integration.credentialsEncrypted,
+  );
 }

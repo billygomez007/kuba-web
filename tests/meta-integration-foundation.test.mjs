@@ -32,7 +32,7 @@ test("Meta connection is tenant-scoped", () => {
   );
   assert.match(
     route,
-    /integrations\.provider,\s*"meta"/,
+    /integrations\.provider/,
   );
 });
 

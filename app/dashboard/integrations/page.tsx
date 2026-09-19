@@ -142,7 +142,14 @@ export default function IntegrationsPage() {
     const isWebsiteConfigured = provider === "website_chat" && isActive;
     const isWhatsAppConfigured = provider === "whatsapp" && isActive;
     const isEmailConfigured = provider === "email" && isActive;
-    const isMetaConfigured = provider === "meta" && isActive;
+    const isMetaConfigured =
+      provider === "meta" &&
+      integrations.some(
+        (item) =>
+          (item.provider === "facebook" ||
+            item.provider === "instagram") &&
+          item.status === "active",
+      );
 
     return {
       connected: isWhatsAppConfigured || isWebsiteConfigured || isEmailConfigured || isMetaConfigured,
