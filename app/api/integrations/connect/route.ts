@@ -91,6 +91,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "apple_calendar"
+  ) {
+    return NextResponse.json({
+      mode: "credentials",
+      redirectUrl:
+        "/dashboard/integrations/apple-calendar",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
