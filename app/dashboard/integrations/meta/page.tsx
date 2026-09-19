@@ -184,6 +184,8 @@ function ChannelCard({
 }) {
   const connected =
     integration?.status === "active";
+  const pending =
+    integration?.status === "pending";
 
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
@@ -208,7 +210,9 @@ function ChannelCard({
             ? "Checking"
             : connected
               ? "Connected"
-              : "Not connected"}
+              : pending
+                ? "Discovered"
+                : "Not connected"}
         </span>
       </div>
 
@@ -230,14 +234,16 @@ function ChannelCard({
       <button
         type="button"
         onClick={onConnect}
-        disabled={connecting || connected}
+        disabled={connecting || connected || pending}
         className="mt-6 rounded-xl bg-white px-5 py-3 text-sm font-bold text-black disabled:cursor-not-allowed disabled:opacity-40"
       >
         {connected
           ? "Connected"
-          : connecting
-            ? "Opening Meta..."
-            : `Connect ${title}`}
+          : pending
+            ? "Awaiting webhook verification"
+            : connecting
+              ? "Opening Meta..."
+              : `Connect ${title}`}
       </button>
     </section>
   );

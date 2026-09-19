@@ -44,8 +44,9 @@ test("Meta OAuth does not claim connection before verification", () => {
 
   assert.match(
     callback,
-    /pending-verification/,
+    /status:\s*"pending"/,
   );
+
   assert.doesNotMatch(
     callback,
     /status:\s*"active"/,

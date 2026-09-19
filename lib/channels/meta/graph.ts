@@ -1,0 +1,109 @@
+const DEFAULT_GRAPH_VERSION = "v25.0";
+
+function graphVersion() {
+  return (
+    process.env.META_GRAPH_API_VERSION ||
+    DEFAULT_GRAPH_VERSION
+  );
+}
+
+async function graphGet(
+  path: string,
+  params: Record<string, string>,
+) {
+  const url = new URL(
+    `https://graph.facebook.com/${graphVersion()}/${path}`,
+  );
+
+  for (
+    const [key, value]
+    of Object.entries(params)
+  ) {
+    url.searchParams.set(
+      key,
+      value,
+    );
+  }
+
+  const response =
+    await fetch(url);
+
+  const body =
+    await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      body?.error?.message ||
+        "Meta Graph request failed.",
+    );
+  }
+
+  return body;
+}
+
+export async function exchangeMetaCode(
+  code: string,
+) {
+  const appId =
+    process.env.META_APP_ID;
+
+  const appSecret =
+    process.env.META_APP_SECRET;
+
+  const redirectUri =
+    process.env.META_OAUTH_REDIRECT_URI;
+
+  if (
+    !appId ||
+    !appSecret ||
+    !redirectUri
+  ) {
+    throw new Error(
+      "Meta OAuth credentials are incomplete.",
+    );
+  }
+
+  const result =
+    await graphGet(
+      "oauth/access_token",
+      {
+        client_id: appId,
+        client_secret: appSecret,
+        redirect_uri: redirectUri,
+        code,
+      },
+    );
+
+  const accessToken =
+    result?.access_token;
+
+  if (
+    typeof accessToken !== "string" ||
+    !accessToken.trim()
+  ) {
+    throw new Error(
+      "Meta did not return an access token.",
+    );
+  }
+
+  return accessToken;
+}
+
+export async function getMetaPages(
+  userAccessToken: string,
+) {
+  const result =
+    await graphGet(
+      "me/accounts",
+      {
+        fields:
+          "id,name,access_token,instagram_business_account{id,username,name}",
+        access_token:
+          userAccessToken,
+      },
+    );
+
+  return Array.isArray(result?.data)
+    ? result.data
+    : [];
+}

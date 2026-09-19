@@ -6,7 +6,8 @@ import { integrations } from "@/db/schema";
 import { getCurrentMembership } from "@/lib/auth/tenant";
 
 export async function GET() {
-  const membership = await getCurrentMembership();
+  const membership =
+    await getCurrentMembership();
 
   if (!membership) {
     return NextResponse.json(
@@ -15,34 +16,57 @@ export async function GET() {
     );
   }
 
-  const rows = await db
-    .select({
-      id: integrations.id,
-      status: integrations.status,
-      externalAccountId:
-        integrations.externalAccountId,
-      displayName: integrations.displayName,
-      metadata: integrations.metadata,
-      lastWebhookAt: integrations.lastWebhookAt,
-      createdAt: integrations.createdAt,
-    })
-    .from(integrations)
-    .where(
-      and(
-        eq(
-          integrations.businessId,
-          membership.businessId,
+  const rows =
+    await db
+      .select({
+        id: integrations.id,
+        status:
+          integrations.status,
+        externalAccountId:
+          integrations.externalAccountId,
+        displayName:
+          integrations.displayName,
+        metadata:
+          integrations.metadata,
+        lastWebhookAt:
+          integrations.lastWebhookAt,
+        createdAt:
+          integrations.createdAt,
+      })
+      .from(integrations)
+      .where(
+        and(
+          eq(
+            integrations.businessId,
+            membership.businessId,
+          ),
+          eq(
+            integrations.provider,
+            "meta",
+          ),
         ),
-        eq(integrations.provider, "meta"),
-      ),
-    );
+      );
 
   return NextResponse.json({
-    integrations: rows.map((row) => ({
-      ...row,
-      metadata: row.metadata
-        ? JSON.parse(row.metadata)
-        : null,
-    })),
+    integrations:
+      rows.map((row) => {
+        let metadata = null;
+
+        try {
+          metadata =
+            row.metadata
+              ? JSON.parse(
+                  row.metadata,
+                )
+              : null;
+        } catch {
+          metadata = null;
+        }
+
+        return {
+          ...row,
+          metadata,
+        };
+      }),
   });
 }
