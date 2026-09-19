@@ -131,6 +131,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "zoho_crm"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/zoho-crm/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
