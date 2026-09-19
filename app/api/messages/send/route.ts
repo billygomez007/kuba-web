@@ -325,6 +325,19 @@ export async function POST(
   }
 
 
+  if (
+    (channel === "facebook" || channel === "instagram") &&
+    !conversation[0].externalConversationId
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "This social conversation has no external recipient identifier.",
+      },
+      { status: 400 },
+    );
+  }
+
   const adapter =
     getChannelAdapter(channel);
 
@@ -337,7 +350,7 @@ export async function POST(
         channel === "email"
           ? conversation[0].customerEmail!
           : channel === "facebook" || channel === "instagram"
-            ? conversation[0].externalConversationId
+            ? conversation[0].externalConversationId!
             : conversation[0].customerPhone ||
               conversation[0].customerEmail ||
               conversation[0].externalConversationId ||

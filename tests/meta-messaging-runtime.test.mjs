@@ -129,3 +129,21 @@ test("Facebook and Instagram adapters no longer fake delivery", () => {
     );
   }
 });
+
+test("Social outbound requires a real external recipient", () => {
+  const source =
+    fs.readFileSync(
+      "app/api/messages/send/route.ts",
+      "utf8",
+    );
+
+  assert.match(
+    source,
+    /social conversation has no external recipient identifier/,
+  );
+
+  assert.match(
+    source,
+    /externalConversationId!/,
+  );
+});
