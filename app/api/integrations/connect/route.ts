@@ -71,6 +71,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "paystack_merchant"
+  ) {
+    return NextResponse.json({
+      mode: "credentials",
+      redirectUrl:
+        "/dashboard/integrations/paystack-merchant",
+    });
+  }
+
+  if (
     provider.id === "google_calendar"
   ) {
     return NextResponse.json({
