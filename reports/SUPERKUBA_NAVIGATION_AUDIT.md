@@ -1,13 +1,13 @@
 # SuperKuba Dashboard Navigation Audit
 
-Generated: 2026-09-19T13:15:44.240Z
+Generated: 2026-09-19T13:18:36.605Z
 
 Pages discovered: 149
-Static Link href destinations scanned: 163
+Static Link href destinations scanned: 164
 Static router/redirect destinations scanned: 35
 Broken static Link destinations: 0
 Broken static router/redirect destinations: 0
-Buttons requiring manual review: 13
+Buttons requiring manual review: 10
 
 ## Broken static links
 
@@ -29,9 +29,6 @@ None found.
 - app/dashboard/marketing/content/[id]/edit/page.tsx — "{saving ? "Saving…" : "Save changes"}"
 - app/dashboard/marketing/content/new/page.tsx — "{saving ? "Saving…" : "Save draft"}"
 - app/dashboard/tickets/page.tsx — "Create ticket"
-- app/dashboard/workforce/monitoring/page.tsx — "Review"
-- app/dashboard/workforce/monitoring/page.tsx — "Assign"
-- app/dashboard/workforce/monitoring/page.tsx — "Resolve"
 
 ## Dashboard routes
 
