@@ -3,6 +3,7 @@ import Link from "next/link";
 import MarketingHeader from "./components/MarketingHeader";
 import MarketingFooter from "./components/MarketingFooter";
 import ProductShowcase from "./components/ui/ProductShowcase";
+import SuperKubaSiteWidget from "./components/chat/SuperKubaSiteWidget";
 import {
   ArrowRight,
   Bot,
@@ -632,6 +633,7 @@ AI workforce solutions built around how your industry operates.
         </div>
       </section>
 
+      <SuperKubaSiteWidget />
       <MarketingFooter />
     </main>
   );
