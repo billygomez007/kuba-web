@@ -121,6 +121,16 @@ export async function POST(
   }
 
   if (
+    provider.id === "pipedrive"
+  ) {
+    return NextResponse.json({
+      mode: "oauth",
+      redirectUrl:
+        "/api/integrations/pipedrive/start",
+    });
+  }
+
+  if (
     provider.connectionType ===
       "oauth" &&
     !providerEnvironmentReady(
