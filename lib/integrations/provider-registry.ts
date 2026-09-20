@@ -72,7 +72,7 @@ export const integrationProviders:
       "STRIPE_CONNECT_CLIENT_ID",
       "STRIPE_SECRET_KEY",
     ],
-    enabled: true,
+    enabled: false,
     description:
       "Connect a business Stripe merchant account.",
   },
@@ -318,17 +318,6 @@ export const integrationProviders:
     description:
       "Connect a tenant-owned Telegram Bot.",
   },
-  {
-    id: "sms_twilio",
-    name: "Twilio SMS",
-    category: "messaging",
-    connectionType: "api_key",
-    environmentKeys: [],
-    enabled: true,
-    description:
-      "Connect tenant-owned Twilio SMS credentials.",
-  },
-
   {
     id: "voice",
     name: "Voice",
