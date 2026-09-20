@@ -1,23 +1,33 @@
-import {
+import type {
   ChannelAdapter,
 } from "./types";
 
+import {
+  sendMetaMessage,
+} from "./meta/outbound";
 
-export const facebookAdapter: ChannelAdapter = {
+export const facebookAdapter:
+  ChannelAdapter = {
+    async send(payload) {
+      if (!payload.integrationId) {
+        return {
+          success: false,
+          error:
+            "integration_required",
+        };
+      }
 
-  async send(payload) {
-
-    console.log(
-      "Facebook:",
-      payload,
-    );
-
-    return {
-      success: true,
-      externalMessageId:
-        crypto.randomUUID(),
-    };
-
-  },
-
-};
+      return sendMetaMessage({
+        businessId:
+          payload.businessId,
+        integrationId:
+          payload.integrationId,
+        recipient:
+          payload.recipient,
+        message:
+          payload.message,
+        provider:
+          "facebook",
+      });
+    },
+  };

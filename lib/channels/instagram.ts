@@ -1,23 +1,33 @@
-import {
+import type {
   ChannelAdapter,
 } from "./types";
 
+import {
+  sendMetaMessage,
+} from "./meta/outbound";
 
-export const instagramAdapter: ChannelAdapter = {
+export const instagramAdapter:
+  ChannelAdapter = {
+    async send(payload) {
+      if (!payload.integrationId) {
+        return {
+          success: false,
+          error:
+            "integration_required",
+        };
+      }
 
-  async send(payload) {
-
-    console.log(
-      "Instagram:",
-      payload,
-    );
-
-    return {
-      success: true,
-      externalMessageId:
-        crypto.randomUUID(),
-    };
-
-  },
-
-};
+      return sendMetaMessage({
+        businessId:
+          payload.businessId,
+        integrationId:
+          payload.integrationId,
+        recipient:
+          payload.recipient,
+        message:
+          payload.message,
+        provider:
+          "instagram",
+      });
+    },
+  };
