@@ -111,7 +111,7 @@ export const integrationProviders:
       "XERO_CLIENT_SECRET",
       "XERO_REDIRECT_URI",
     ],
-    enabled: true,
+    enabled: false,
     description:
       "Synchronize Xero accounting records.",
   },
@@ -125,7 +125,7 @@ export const integrationProviders:
       "SAGE_CLIENT_SECRET",
       "SAGE_REDIRECT_URI",
     ],
-    enabled: true,
+    enabled: false,
     description:
       "Connect supported Sage accounting services.",
   },
@@ -139,7 +139,7 @@ export const integrationProviders:
       "ZOHO_CLIENT_SECRET",
       "ZOHO_REDIRECT_URI",
     ],
-    enabled: true,
+    enabled: false,
     description:
       "Synchronize Zoho Books financial records.",
   },
@@ -314,7 +314,7 @@ export const integrationProviders:
     category: "messaging",
     connectionType: "bot_token",
     environmentKeys: [],
-    enabled: true,
+    enabled: false,
     description:
       "Connect a tenant-owned Telegram Bot.",
   },
