@@ -34,7 +34,6 @@ test("remaining provider catalog exists", () => {
       "zapier",
       "make",
       "telegram",
-      "sms_twilio",
       "voice",
       "developer_api",
     ]
@@ -112,4 +111,11 @@ test("placeholder category pages now use real provider surfaces", () => {
       /Coming Soon/,
     );
   }
+});
+
+test("Twilio SMS is intentionally not offered", () => {
+  assert.doesNotMatch(
+    registry,
+    /id: "sms_twilio"/,
+  );
 });

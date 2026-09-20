@@ -127,13 +127,49 @@ export default function IntegrationsPage() {
 
   const commChannels = items.filter(i => i.category === "Communication Channels");
   const socialChannels = items.filter(i => i.category === "Social Channels");
-  const remainingIntegrations = [
-    { name: "Calendar", href: "/dashboard/integrations/calendar", status: "Available", description: "Google Calendar, Outlook, and Apple Calendar connections." },
-    { name: "Payments", href: "/dashboard/integrations/payments", status: "Available", description: "Connect tenant-owned merchant payment accounts." },
-    { name: "Accounting", href: "/dashboard/integrations/accounting", status: "Available", description: "QuickBooks, Xero, Sage, and other accounting sync." },
-    { name: "CRM", href: "/dashboard/integrations/crm", status: "Available", description: "External CRM contact, lead, and deal synchronization." },
-    { name: "External Apps", href: "/dashboard/integrations/external-apps", status: "Available", description: "Business tool and collaboration connections." },
-    { name: "API / Developer Integrations", href: "/dashboard/integrations/developer", status: "Available", description: "Tenant-safe API keys, webhooks and developer tooling." },
+  const providerSections = [
+    {
+      title: "Calendar",
+      providers: [
+        { name: "Google Calendar", href: "/dashboard/integrations/calendar" },
+        { name: "Microsoft Outlook Calendar", href: "/dashboard/integrations/calendar" },
+        { name: "Apple Calendar", href: "/dashboard/integrations/apple-calendar" },
+      ],
+    },
+    {
+      title: "Payments & Accounting",
+      providers: [
+        { name: "Paystack", href: "/dashboard/integrations/payments" },
+        { name: "QuickBooks Online", href: "/dashboard/integrations/accounting" },
+      ],
+    },
+    {
+      title: "CRM",
+      providers: [
+        { name: "Salesforce", href: "/dashboard/integrations/crm" },
+        { name: "HubSpot", href: "/dashboard/integrations/crm" },
+        { name: "Pipedrive", href: "/dashboard/integrations/crm" },
+        { name: "Zoho CRM", href: "/dashboard/integrations/crm" },
+        { name: "Microsoft Dynamics 365", href: "/dashboard/integrations/microsoft-dynamics" },
+      ],
+    },
+    {
+      title: "Business Apps",
+      providers: [
+        { name: "Slack", href: "/dashboard/integrations/external-apps" },
+        { name: "Microsoft Teams", href: "/dashboard/integrations/external-apps" },
+        { name: "Notion", href: "/dashboard/integrations/external-apps" },
+        { name: "Google Drive", href: "/dashboard/integrations/external-apps" },
+        { name: "Dropbox", href: "/dashboard/integrations/external-apps" },
+      ],
+    },
+    {
+      title: "Automation",
+      providers: [
+        { name: "Zapier", href: "/dashboard/integrations/zapier" },
+        { name: "Make", href: "/dashboard/integrations/make" },
+      ],
+    },
   ];
 
   const getIntegrationStatus = (provider: string) => {
@@ -294,18 +330,38 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
-      {/* Remaining integration categories */}
+      {/* Provider integrations */}
       <div className="mb-12">
-        <h2 className="mb-6 text-2xl font-bold">Remaining Integrations</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {remainingIntegrations.map((item) => (
-            <Link key={item.name} href={item.href} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-cyan-300/25 hover:bg-white/[0.06]">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="font-semibold">{item.name}</h3>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-200/70">{item.status}</span>
+        <h2 className="mb-6 text-2xl font-bold">Business Integrations</h2>
+
+        <div className="space-y-8">
+          {providerSections.map((section) => (
+            <section key={section.title}>
+              <h3 className="mb-4 text-lg font-semibold text-white/80">
+                {section.title}
+              </h3>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {section.providers.map((provider) => (
+                  <Link
+                    key={provider.name}
+                    href={provider.href}
+                    className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-cyan-300/25 hover:bg-white/[0.06]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h4 className="font-semibold">{provider.name}</h4>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-cyan-200/70">
+                        Available
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-sm text-white/45">
+                      Open integration settings
+                    </p>
+                  </Link>
+                ))}
               </div>
-              <p className="mt-2 text-sm text-white/50">{item.description}</p>
-            </Link>
+            </section>
           ))}
         </div>
       </div>
