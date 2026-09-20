@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Mastra's LibSQL memory adapter depends on native Node.js libSQL
+  // packages. Keep them outside the webpack server bundle.
+  serverExternalPackages: [
+    "@mastra/libsql",
+    "@libsql/client",
+    "@libsql/hrana-client",
+    "@libsql/darwin-arm64",
+    "libsql",
+  ],
   async headers() {
     return [
       {
