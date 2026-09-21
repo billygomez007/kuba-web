@@ -1,97 +1,81 @@
 import crypto from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { integrations } from "@/db/schema";
-import { createAuditLog } from "@/lib/auth/audit";
-import { encrypt } from "@/lib/encryption";
-import { requirePostizAccess } from "@/lib/integrations/postiz/access";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 import {
-  exchangePostizAuthorizationCode,
+  encryptPostizCredential,
+  exchangePostizCode,
   POSTIZ_PROVIDER,
+  verifyPostizOAuthState,
 } from "@/lib/integrations/postiz/client";
-import { verifyPostizOAuthState } from "@/lib/integrations/postiz/oauth-state";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-function dashboardRedirect(request: Request, params: Record<string, string>) {
+function redirectWithResult(
+  request: NextRequest,
+  result: "connected" | "error",
+  reason?: string,
+) {
   const url = new URL("/dashboard/integrations", request.url);
 
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
+  url.searchParams.set("postiz", result);
+
+  if (reason) {
+    url.searchParams.set("reason", reason);
   }
 
   return NextResponse.redirect(url);
 }
 
-export async function GET(request: Request) {
-  const access = await requirePostizAccess("manage");
+export async function GET(request: NextRequest) {
+  const context = await requireBusinessMembership();
 
-  if (!access.ok) {
-    return dashboardRedirect(request, {
-      postiz: "error",
-      reason: "access_denied",
-    });
+  if (!context.user || !context.membership) {
+    return redirectWithResult(request, "error", "unauthorized");
   }
 
-  const url = new URL(request.url);
-  const providerError = url.searchParams.get("error");
-  const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
+  const code = request.nextUrl.searchParams.get("code");
+  const state = request.nextUrl.searchParams.get("state");
+  const providerError = request.nextUrl.searchParams.get("error");
 
   if (providerError) {
-    return dashboardRedirect(request, {
-      postiz: "error",
-      reason: "provider_denied",
-    });
+    return redirectWithResult(
+      request,
+      "error",
+      "authorization_denied",
+    );
   }
 
   if (!code || !state) {
-    return dashboardRedirect(request, {
-      postiz: "error",
-      reason: "invalid_callback",
-    });
+    return redirectWithResult(
+      request,
+      "error",
+      "missing_oauth_parameters",
+    );
   }
 
-  let statePayload;
-
-  try {
-    statePayload = verifyPostizOAuthState(state);
-  } catch (error) {
-    console.error("Postiz OAuth state verification failed:", error);
-
-    return dashboardRedirect(request, {
-      postiz: "error",
-      reason: "invalid_state",
-    });
-  }
+  const statePayload = verifyPostizOAuthState(state);
 
   if (
     !statePayload ||
-    statePayload.businessId !== access.membership.businessId ||
-    statePayload.userId !== access.user.id
+    statePayload.businessId !== context.membership.businessId ||
+    statePayload.userId !== context.user.id
   ) {
-    return dashboardRedirect(request, {
-      postiz: "error",
-      reason: "invalid_state",
-    });
+    return redirectWithResult(
+      request,
+      "error",
+      "invalid_oauth_state",
+    );
   }
 
   try {
-    const redirectUri = new URL(
-      "/api/integrations/postiz/callback",
-      request.url,
-    ).toString();
-
-    const token = await exchangePostizAuthorizationCode(code, redirectUri);
-
-    const accessToken = token.access_token ?? token.accessToken;
-
-    if (typeof accessToken !== "string" || !accessToken.trim()) {
-      throw new Error("Postiz did not return an access token.");
-    }
+    const accessToken = await exchangePostizCode(code);
+    const credentialsEncrypted =
+      encryptPostizCredential(accessToken);
 
     const now = new Date();
 
@@ -102,25 +86,22 @@ export async function GET(request: Request) {
       .from(integrations)
       .where(
         and(
-          eq(integrations.businessId, access.membership.businessId),
+          eq(
+            integrations.businessId,
+            context.membership.businessId,
+          ),
           eq(integrations.provider, POSTIZ_PROVIDER),
         ),
       )
       .limit(1);
 
-    const credentialsEncrypted = encrypt(JSON.stringify(token));
-
     const metadata = JSON.stringify({
-      kind: "social_publishing_provider",
+      kind: "social_provider",
       provider: POSTIZ_PROVIDER,
-      connectedVia: "oauth",
+      connectedByUserId: context.user.id,
     });
 
-    let integrationId: string;
-
     if (existing[0]) {
-      integrationId = existing[0].id;
-
       await db
         .update(integrations)
         .set({
@@ -132,16 +113,17 @@ export async function GET(request: Request) {
         })
         .where(
           and(
-            eq(integrations.id, integrationId),
-            eq(integrations.businessId, access.membership.businessId),
+            eq(integrations.id, existing[0].id),
+            eq(
+              integrations.businessId,
+              context.membership.businessId,
+            ),
           ),
         );
     } else {
-      integrationId = crypto.randomUUID();
-
       await db.insert(integrations).values({
-        id: integrationId,
-        businessId: access.membership.businessId,
+        id: crypto.randomUUID(),
+        businessId: context.membership.businessId,
         provider: POSTIZ_PROVIDER,
         status: "active",
         displayName: "Postiz",
@@ -152,27 +134,14 @@ export async function GET(request: Request) {
       });
     }
 
-    await createAuditLog({
-      businessId: access.membership.businessId,
-      userId: access.user.id,
-      action: "integration.postiz.connected",
-      resource: "integration",
-      resourceId: integrationId,
-      description: "Connected Postiz social publishing provider.",
-      metadata: {
-        provider: POSTIZ_PROVIDER,
-      },
-    });
-
-    return dashboardRedirect(request, {
-      postiz: "connected",
-    });
+    return redirectWithResult(request, "connected");
   } catch (error) {
     console.error("Postiz OAuth callback failed:", error);
 
-    return dashboardRedirect(request, {
-      postiz: "error",
-      reason: "token_exchange_failed",
-    });
+    return redirectWithResult(
+      request,
+      "error",
+      "token_exchange_failed",
+    );
   }
 }

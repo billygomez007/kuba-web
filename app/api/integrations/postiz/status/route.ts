@@ -3,18 +3,18 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { integrations } from "@/db/schema";
-import { requirePostizAccess } from "@/lib/integrations/postiz/access";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 import { POSTIZ_PROVIDER } from "@/lib/integrations/postiz/client";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET() {
-  const access = await requirePostizAccess("view");
+  const context = await requireBusinessMembership();
 
-  if (!access.ok) {
+  if (!context.user || !context.membership) {
     return NextResponse.json(
-      { error: access.error },
-      { status: access.status },
+      { error: context.error || "Business access denied." },
+      { status: context.user ? 403 : 401 },
     );
   }
 
@@ -28,7 +28,10 @@ export async function GET() {
     .from(integrations)
     .where(
       and(
-        eq(integrations.businessId, access.membership.businessId),
+        eq(
+          integrations.businessId,
+          context.membership.businessId,
+        ),
         eq(integrations.provider, POSTIZ_PROVIDER),
       ),
     )
@@ -38,9 +41,13 @@ export async function GET() {
 
   return NextResponse.json({
     provider: POSTIZ_PROVIDER,
-    connected: integration?.status === "active",
-    status: integration?.status ?? "not_connected",
-    displayName: integration?.displayName ?? "Postiz",
-    updatedAt: integration?.updatedAt ?? null,
+    connected:
+      integration?.status === "active",
+    status:
+      integration?.status || "not_connected",
+    displayName:
+      integration?.displayName || "Postiz",
+    updatedAt:
+      integration?.updatedAt || null,
   });
 }

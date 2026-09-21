@@ -3,23 +3,22 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { integrations } from "@/db/schema";
-import { createAuditLog } from "@/lib/auth/audit";
-import { requirePostizAccess } from "@/lib/integrations/postiz/access";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 import {
-  getPostizAccessToken,
-  listPostizIntegrations,
+  decryptPostizCredential,
+  listPostizAccounts,
   POSTIZ_PROVIDER,
 } from "@/lib/integrations/postiz/client";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST() {
-  const access = await requirePostizAccess("manage");
+  const context = await requireBusinessMembership();
 
-  if (!access.ok) {
+  if (!context.user || !context.membership) {
     return NextResponse.json(
-      { error: access.error },
-      { status: access.status },
+      { error: context.error || "Business access denied." },
+      { status: context.user ? 403 : 401 },
     );
   }
 
@@ -27,12 +26,16 @@ export async function POST() {
     .select({
       id: integrations.id,
       status: integrations.status,
-      credentialsEncrypted: integrations.credentialsEncrypted,
+      credentialsEncrypted:
+        integrations.credentialsEncrypted,
     })
     .from(integrations)
     .where(
       and(
-        eq(integrations.businessId, access.membership.businessId),
+        eq(
+          integrations.businessId,
+          context.membership.businessId,
+        ),
         eq(integrations.provider, POSTIZ_PROVIDER),
       ),
     )
@@ -47,59 +50,44 @@ export async function POST() {
   ) {
     return NextResponse.json(
       {
-        error: "Postiz is not connected for the selected business.",
+        error:
+          "Postiz is not connected for the selected business.",
       },
       { status: 409 },
     );
   }
 
   try {
-    const token = getPostizAccessToken(integration.credentialsEncrypted);
+    const accessToken = decryptPostizCredential(
+      integration.credentialsEncrypted,
+    );
 
-    const accounts = await listPostizIntegrations(token);
+    const accounts = await listPostizAccounts(accessToken);
 
-    const normalized = accounts.map((account) => ({
-      id:
-        typeof account.id === "string"
-          ? account.id
-          : typeof account.identifier === "string"
-            ? account.identifier
-            : null,
-      provider: typeof account.provider === "string" ? account.provider : null,
-      name:
-        typeof account.displayName === "string"
-          ? account.displayName
-          : typeof account.name === "string"
-            ? account.name
-            : null,
-      handle: typeof account.handle === "string" ? account.handle : null,
-      disabled: account.disabled === true,
-    }));
-
-    await createAuditLog({
-      businessId: access.membership.businessId,
-      userId: access.user.id,
-      action: "integration.postiz.synced",
-      resource: "integration",
-      resourceId: integration.id,
-      description: "Loaded connected social accounts from Postiz.",
-      metadata: {
-        provider: POSTIZ_PROVIDER,
-        accountCount: normalized.length,
-      },
-    });
-
+    /*
+     * Do not persist these into marketing_social_accounts yet.
+     * That native Marketing table is not on current production main.
+     * This endpoint provides a safe provider-neutral bridge that the
+     * Marketing release can consume later.
+     */
     return NextResponse.json({
       provider: POSTIZ_PROVIDER,
-      connected: true,
-      accounts: normalized,
+      count: accounts.length,
+      accounts: accounts.map((account) => ({
+        id: account.id,
+        provider: account.provider,
+        name: account.name,
+        handle: account.handle,
+        picture: account.picture,
+      })),
     });
   } catch (error) {
-    console.error("Postiz synchronization failed:", error);
+    console.error("Postiz account sync failed:", error);
 
     return NextResponse.json(
       {
-        error: "Connected Postiz accounts could not be loaded.",
+        error:
+          "SuperKuba could not retrieve the connected social accounts from Postiz.",
       },
       { status: 502 },
     );

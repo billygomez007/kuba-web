@@ -1,46 +1,41 @@
 import { NextResponse } from "next/server";
 
-import { requirePostizAccess } from "@/lib/integrations/postiz/access";
-import { getPostizConfig } from "@/lib/integrations/postiz/client";
-import { createPostizOAuthState } from "@/lib/integrations/postiz/oauth-state";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
+import {
+  buildPostizAuthorizationUrl,
+  createPostizOAuthState,
+} from "@/lib/integrations/postiz/client";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-export async function GET(request: Request) {
-  const access = await requirePostizAccess("manage");
+export async function GET() {
+  const context = await requireBusinessMembership();
 
-  if (!access.ok) {
+  if (!context.user || !context.membership) {
     return NextResponse.json(
-      { error: access.error },
-      { status: access.status },
+      { error: context.error || "Business access denied." },
+      { status: context.user ? 403 : 401 },
     );
   }
 
   try {
-    const config = getPostizConfig();
-    const state = createPostizOAuthState(
-      access.membership.businessId,
-      access.user.id,
+    const state = createPostizOAuthState({
+      businessId: context.membership.businessId,
+      userId: context.user.id,
+    });
+
+    return NextResponse.redirect(
+      buildPostizAuthorizationUrl(state),
     );
-
-    const redirectUri = new URL(
-      "/api/integrations/postiz/callback",
-      request.url,
-    ).toString();
-
-    const authorizeUrl = new URL("/oauth/authorize", config.baseUrl);
-    authorizeUrl.searchParams.set("client_id", config.clientId);
-    authorizeUrl.searchParams.set("response_type", "code");
-    authorizeUrl.searchParams.set("redirect_uri", redirectUri);
-    authorizeUrl.searchParams.set("state", state);
-
-    return NextResponse.redirect(authorizeUrl);
   } catch (error) {
     console.error("Postiz OAuth start failed:", error);
 
     return NextResponse.json(
-      { error: "Postiz connection could not be started." },
-      { status: 500 },
+      {
+        error:
+          "Postiz is not configured correctly for this SuperKuba environment.",
+      },
+      { status: 503 },
     );
   }
 }

@@ -3,19 +3,18 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { integrations } from "@/db/schema";
-import { createAuditLog } from "@/lib/auth/audit";
-import { requirePostizAccess } from "@/lib/integrations/postiz/access";
+import { requireBusinessMembership } from "@/lib/auth/tenant";
 import { POSTIZ_PROVIDER } from "@/lib/integrations/postiz/client";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function DELETE() {
-  const access = await requirePostizAccess("manage");
+  const context = await requireBusinessMembership();
 
-  if (!access.ok) {
+  if (!context.user || !context.membership) {
     return NextResponse.json(
-      { error: access.error },
-      { status: access.status },
+      { error: context.error || "Business access denied." },
+      { status: context.user ? 403 : 401 },
     );
   }
 
@@ -26,7 +25,10 @@ export async function DELETE() {
     .from(integrations)
     .where(
       and(
-        eq(integrations.businessId, access.membership.businessId),
+        eq(
+          integrations.businessId,
+          context.membership.businessId,
+        ),
         eq(integrations.provider, POSTIZ_PROVIDER),
       ),
     )
@@ -36,39 +38,29 @@ export async function DELETE() {
     return NextResponse.json({
       success: true,
       disconnected: false,
-      status: "not_connected",
+      alreadyDisconnected: true,
     });
   }
 
   await db
     .update(integrations)
     .set({
-      status: "disconnected",
+      status: "inactive",
       credentialsEncrypted: null,
       updatedAt: new Date(),
     })
     .where(
       and(
         eq(integrations.id, existing[0].id),
-        eq(integrations.businessId, access.membership.businessId),
+        eq(
+          integrations.businessId,
+          context.membership.businessId,
+        ),
       ),
     );
-
-  await createAuditLog({
-    businessId: access.membership.businessId,
-    userId: access.user.id,
-    action: "integration.postiz.disconnected",
-    resource: "integration",
-    resourceId: existing[0].id,
-    description: "Disconnected Postiz social publishing provider.",
-    metadata: {
-      provider: POSTIZ_PROVIDER,
-    },
-  });
 
   return NextResponse.json({
     success: true,
     disconnected: true,
-    status: "disconnected",
   });
 }
