@@ -143,7 +143,7 @@ const navigationGroups: NavigationGroup[] = [
     title: "Integrations",
     icon: "⌘",
     items: [
-      { label: "Communication Channels", href: "/dashboard/integrations", icon: "✉", permission: "integrations.view", children: ["WhatsApp", "Email", "SMS", "Voice", "Website Chat"] },
+      { label: "Communication Channels", href: "/dashboard/integrations", icon: "✉", permission: "integrations.view", children: ["WhatsApp", "Email", "SMS", "Voice", "Website Chat", "Social Accounts"] },
     ],
   },
   {

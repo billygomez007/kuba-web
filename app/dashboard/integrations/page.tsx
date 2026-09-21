@@ -36,8 +36,11 @@ type IntegrationsOverview = {
 export default function IntegrationsPage() {
   const router = useRouter();
   const [integrations, setIntegrations] = useState<IntegrationRecord[]>([]);
-  const [stats, setStats] = useState({ connected: 0, total: 0, lastUpdated: new Date().toISOString() });
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    connected: 0,
+    total: 0,
+    lastUpdated: new Date().toISOString(),
+  });
 
   useEffect(() => {
     const loadIntegrations = async () => {
@@ -48,11 +51,15 @@ export default function IntegrationsPage() {
 
         const data = (await res.json()) as IntegrationsOverview;
         setIntegrations(data.integrations || []);
-        setStats(data.stats || { connected: 0, total: 0, lastUpdated: new Date().toISOString() });
+        setStats(
+          data.stats || {
+            connected: 0,
+            total: 0,
+            lastUpdated: new Date().toISOString(),
+          },
+        );
       } catch (err) {
         console.error("Failed to load integrations:", err);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -64,32 +71,28 @@ export default function IntegrationsPage() {
       name: "WhatsApp",
       provider: "whatsapp",
       category: "Communication Channels",
-      description:
-        "Connect WhatsApp so Kuba can communicate with customers.",
+      description: "Connect WhatsApp so Kuba can communicate with customers.",
       icon: <FaWhatsapp size={40} />,
     },
     {
       name: "Email",
       provider: "email",
       category: "Communication Channels",
-      description:
-        "Connect business email communication.",
+      description: "Connect business email communication.",
       icon: <FaEnvelope size={40} />,
     },
     {
       name: "Website Chat",
       provider: "website_chat",
       category: "Communication Channels",
-      description:
-        "Add Kuba chat to your website.",
+      description: "Add Kuba chat to your website.",
       icon: <FaGlobe size={40} />,
     },
     {
       name: "SMS",
       provider: "sms",
       category: "Communication Channels",
-      description:
-        "Connect SMS for customer messaging.",
+      description: "Connect SMS for customer messaging.",
       icon: <FaEnvelope size={40} />,
       status: "coming-soon",
     },
@@ -102,45 +105,55 @@ export default function IntegrationsPage() {
       icon: <FaGlobe size={40} />,
     },
     {
-      name: "Facebook & Instagram",
-      provider: "meta",
+      name: "Social Accounts",
+      provider: "postiz",
       category: "Social Channels",
       description:
-        "Manage social conversations.",
-      icon:
+        "Connect and manage Facebook, Instagram, LinkedIn, X, TikTok and other social channels.",
+      icon: (
         <div className="flex gap-2">
           <FaFacebook size={40} />
           <FaInstagram size={40} />
-        </div>,
-      status: "coming-soon",
+        </div>
+      ),
     },
     {
       name: "Telegram",
       provider: "telegram",
       category: "Social Channels",
-      description:
-        "Connect Telegram for customer conversations.",
+      description: "Connect Telegram for customer conversations.",
       icon: <FaTelegram size={40} />,
       status: "coming-soon",
     },
   ];
 
-  const commChannels = items.filter(i => i.category === "Communication Channels");
-  const socialChannels = items.filter(i => i.category === "Social Channels");
+  const commChannels = items.filter(
+    (i) => i.category === "Communication Channels",
+  );
+  const socialChannels = items.filter((i) => i.category === "Social Channels");
   const providerSections = [
     {
       title: "Calendar",
       providers: [
         { name: "Google Calendar", href: "/dashboard/integrations/calendar" },
-        { name: "Microsoft Outlook Calendar", href: "/dashboard/integrations/calendar" },
-        { name: "Apple Calendar", href: "/dashboard/integrations/apple-calendar" },
+        {
+          name: "Microsoft Outlook Calendar",
+          href: "/dashboard/integrations/calendar",
+        },
+        {
+          name: "Apple Calendar",
+          href: "/dashboard/integrations/apple-calendar",
+        },
       ],
     },
     {
       title: "Payments & Accounting",
       providers: [
         { name: "Paystack", href: "/dashboard/integrations/payments" },
-        { name: "QuickBooks Online", href: "/dashboard/integrations/accounting" },
+        {
+          name: "QuickBooks Online",
+          href: "/dashboard/integrations/accounting",
+        },
       ],
     },
     {
@@ -150,14 +163,20 @@ export default function IntegrationsPage() {
         { name: "HubSpot", href: "/dashboard/integrations/crm" },
         { name: "Pipedrive", href: "/dashboard/integrations/crm" },
         { name: "Zoho CRM", href: "/dashboard/integrations/crm" },
-        { name: "Microsoft Dynamics 365", href: "/dashboard/integrations/microsoft-dynamics" },
+        {
+          name: "Microsoft Dynamics 365",
+          href: "/dashboard/integrations/microsoft-dynamics",
+        },
       ],
     },
     {
       title: "Business Apps",
       providers: [
         { name: "Slack", href: "/dashboard/integrations/external-apps" },
-        { name: "Microsoft Teams", href: "/dashboard/integrations/external-apps" },
+        {
+          name: "Microsoft Teams",
+          href: "/dashboard/integrations/external-apps",
+        },
         { name: "Notion", href: "/dashboard/integrations/external-apps" },
         { name: "Google Drive", href: "/dashboard/integrations/external-apps" },
         { name: "Dropbox", href: "/dashboard/integrations/external-apps" },
@@ -178,9 +197,14 @@ export default function IntegrationsPage() {
     const isWebsiteConfigured = provider === "website_chat" && isActive;
     const isWhatsAppConfigured = provider === "whatsapp" && isActive;
     const isEmailConfigured = provider === "email" && isActive;
+    const isPostizConfigured = provider === "postiz" && isActive;
 
     return {
-      connected: isWhatsAppConfigured || isWebsiteConfigured || isEmailConfigured,
+      connected:
+        isWhatsAppConfigured ||
+        isWebsiteConfigured ||
+        isEmailConfigured ||
+        isPostizConfigured,
       integration,
     };
   };
@@ -199,16 +223,22 @@ export default function IntegrationsPage() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
           <div className="text-sm text-white/60">Connected</div>
           <div className="mt-2 text-3xl font-bold">{stats.connected}</div>
-          <div className="mt-1 text-xs text-white/40">of {stats.total} integrations</div>
+          <div className="mt-1 text-xs text-white/40">
+            of {stats.total} integrations
+          </div>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
           <div className="text-sm text-white/60">Status</div>
-          <div className="mt-2 text-lg font-semibold text-green-400">Active</div>
+          <div className="mt-2 text-lg font-semibold text-green-400">
+            Active
+          </div>
           <div className="mt-1 text-xs text-white/40">Last updated now</div>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
           <div className="text-sm text-white/60">Setup Required</div>
-          <div className="mt-2 text-3xl font-bold">{stats.total - stats.connected}</div>
+          <div className="mt-2 text-3xl font-bold">
+            {stats.total - stats.connected}
+          </div>
           <div className="mt-1 text-xs text-white/40">Not yet configured</div>
         </div>
       </div>
@@ -218,7 +248,9 @@ export default function IntegrationsPage() {
         <h2 className="mb-6 text-2xl font-bold">Communication Channels</h2>
         <div className="grid gap-5 md:grid-cols-2">
           {commChannels.map((item) => {
-            const { connected, integration } = getIntegrationStatus(item.provider);
+            const { connected, integration } = getIntegrationStatus(
+              item.provider,
+            );
             const isComingSoon = item.status === "coming-soon";
 
             return (
@@ -228,8 +260,12 @@ export default function IntegrationsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="text-white">{item.icon}</div>
-                  {connected && <FaCheckCircle className="text-green-400" size={24} />}
-                  {!connected && !isComingSoon && <FaTimesCircle className="text-white/40" size={24} />}
+                  {connected && (
+                    <FaCheckCircle className="text-green-400" size={24} />
+                  )}
+                  {!connected && !isComingSoon && (
+                    <FaTimesCircle className="text-white/40" size={24} />
+                  )}
                 </div>
 
                 <h3 className="mt-4 text-xl font-bold">{item.name}</h3>
@@ -238,13 +274,22 @@ export default function IntegrationsPage() {
 
                 {integration && (
                   <div className="mt-3 text-xs text-white/40">
-                    <div>Account: {integration.displayName || integration.externalAccountId || "Configured"}</div>
+                    <div>
+                      Account:{" "}
+                      {integration.displayName ||
+                        integration.externalAccountId ||
+                        "Configured"}
+                    </div>
                   </div>
                 )}
 
                 <div className="mt-5 flex items-center justify-between">
                   <span className="text-xs uppercase text-white/40">
-                    {connected ? "Connected" : isComingSoon ? "Coming Soon" : "Configuration Required"}
+                    {connected
+                      ? "Connected"
+                      : isComingSoon
+                        ? "Coming Soon"
+                        : "Configuration Required"}
                   </span>
 
                   {!isComingSoon && (
@@ -292,8 +337,12 @@ export default function IntegrationsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="text-white">{item.icon}</div>
-                  {connected && <FaCheckCircle className="text-green-400" size={24} />}
-                  {!connected && !isComingSoon && <FaTimesCircle className="text-white/40" size={24} />}
+                  {connected && (
+                    <FaCheckCircle className="text-green-400" size={24} />
+                  )}
+                  {!connected && !isComingSoon && (
+                    <FaTimesCircle className="text-white/40" size={24} />
+                  )}
                 </div>
 
                 <h3 className="mt-4 text-xl font-bold">{item.name}</h3>
@@ -302,13 +351,18 @@ export default function IntegrationsPage() {
 
                 <div className="mt-5 flex items-center justify-between">
                   <span className="text-xs uppercase text-white/40">
-                    {isComingSoon ? "Coming Soon" : connected ? "Connected" : "Not connected"}
+                    {isComingSoon
+                      ? "Coming Soon"
+                      : connected
+                        ? "Connected"
+                        : "Not connected"}
                   </span>
 
                   {!isComingSoon && (
                     <button
                       onClick={() => {
                         const routeMap: Record<string, string> = {
+                          postiz: "/dashboard/integrations/postiz",
                           meta: "/dashboard/integrations/meta",
                           telegram: "/dashboard/integrations/telegram",
                         };
