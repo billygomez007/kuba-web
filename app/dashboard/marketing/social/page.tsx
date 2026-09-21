@@ -12,6 +12,20 @@ export default function MarketingSocialPage() {
   return <OperationsShell title="Channel Readiness" description="Connected social accounts synced through SuperKuba appear here for this business. These channel records are used by Marketing for channel readiness and publishing workflows.">
     <div><Button variant="secondary" onClick={reload}>Refresh records</Button></div>
     <DataState error={error} loading={!data} reload={reload} />
-    <div className="grid gap-4 md:grid-cols-2">{data?.readiness.map(channel => <Card key={channel.provider} className="space-y-4"><h2 className="text-lg font-bold capitalize">{channel.provider}</h2>{channel.accounts.length === 0 ? <p className="text-sm text-text-tertiary">Not connected · No account record saved.</p> : channel.accounts.map(account => <div key={account.id} className="space-y-2 border-t border-border-muted pt-3"><div className="flex flex-wrap justify-between gap-2"><h3 className="break-words font-semibold">{account.displayName}</h3><StatusBadge status={account.readinessState} label={account.readinessState.replaceAll("_", " ")} /></div>{account.handle && <p className="break-words text-sm text-text-tertiary">{account.handle}</p>}<p className="text-xs text-text-tertiary">Saved status: {account.status} · Connected: {dateLabel(account.connectedAt)} · Expires: {dateLabel(account.expiresAt)}</p></div>)}<p className="break-words text-sm text-warning">{channel.code}</p><p className="text-sm text-text-muted">Provider execution unavailable.</p></Card>)}</div>
+    <div className="grid gap-4 md:grid-cols-2">{data?.readiness.map(channel => <Card key={channel.provider} className="space-y-4"><h2 className="text-lg font-bold capitalize">{channel.provider}</h2>{channel.accounts.length === 0 ? <p className="text-sm text-text-tertiary">Not connected · No account record saved.</p> : channel.accounts.map(account => <div key={account.id} className="space-y-2 border-t border-border-muted pt-3"><div className="flex flex-wrap justify-between gap-2"><h3 className="break-words font-semibold">{account.displayName}</h3><StatusBadge status={account.readinessState} label={account.readinessState.replaceAll("_", " ")} /></div>{account.handle && <p className="break-words text-sm text-text-tertiary">{account.handle}</p>}<p className="text-xs text-text-tertiary">Saved status: {account.status} · Connected: {dateLabel(account.connectedAt)} · Expires: {dateLabel(account.expiresAt)}</p></div>)}{channel.execution === "ready" ? (
+  <>
+    <p className="break-words text-sm text-success">POSTIZ_PUBLISHING_READY</p>
+    <p className="text-sm text-text-muted">
+      Publishing is available through the connected Postiz account.
+    </p>
+  </>
+) : (
+  <>
+    <p className="break-words text-sm text-warning">{channel.code}</p>
+    <p className="text-sm text-text-muted">
+      Provider execution unavailable.
+    </p>
+  </>
+)}</Card>)}</div>
   </OperationsShell>;
 }

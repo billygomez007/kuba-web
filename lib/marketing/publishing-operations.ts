@@ -63,6 +63,7 @@ export function getMarketingChannelAccounts(businessId: string) {
   return db.select({
     id: marketingSocialAccounts.id, provider: marketingSocialAccounts.provider,
     displayName: marketingSocialAccounts.displayName, handle: marketingSocialAccounts.handle,
+    accountType: marketingSocialAccounts.accountType,
     status: marketingSocialAccounts.status, connectedAt: marketingSocialAccounts.connectedAt,
     expiresAt: marketingSocialAccounts.expiresAt, updatedAt: marketingSocialAccounts.updatedAt,
   }).from(marketingSocialAccounts).where(eq(marketingSocialAccounts.businessId, businessId)).orderBy(desc(marketingSocialAccounts.updatedAt));
@@ -95,14 +96,37 @@ export async function getMarketingCalendar(businessId: string, from: Date, to: D
   return { entries, variants: variants.filter(row => row.scheduledAt && row.scheduledAt >= from && row.scheduledAt <= to), jobs: jobs.filter(row => row.scheduledAt && row.scheduledAt >= from && row.scheduledAt <= to) };
 }
 
-export function marketingChannelReadiness(accounts: Awaited<ReturnType<typeof getMarketingChannelAccounts>>, now = new Date()) {
-  return MARKETING_SOCIAL_PROVIDERS.map(provider => ({
-    provider,
-    accounts: accounts.filter(account => account.provider === provider).map(account => ({
-      ...account,
-      readinessState: account.status === "connected" && account.expiresAt && account.expiresAt <= now ? "expired" : account.status,
-    })),
-    execution: "blocked" as const,
-    code: "PUBLISHING_ADAPTER_UNAVAILABLE" as const,
-  }));
+export function marketingChannelReadiness(
+  accounts: Awaited<ReturnType<typeof getMarketingChannelAccounts>>,
+  now = new Date(),
+) {
+  return MARKETING_SOCIAL_PROVIDERS.map((provider) => {
+    const providerAccounts = accounts
+      .filter((account) => account.provider === provider)
+      .map((account) => ({
+        ...account,
+        readinessState:
+          account.status === "connected" &&
+          account.expiresAt &&
+          account.expiresAt <= now
+            ? "expired"
+            : account.status,
+      }));
+
+    const hasReadyPostizAccount = providerAccounts.some(
+      (account) =>
+        account.status === "connected" &&
+        account.accountType === "postiz" &&
+        (!account.expiresAt || account.expiresAt > now),
+    );
+
+    return {
+      provider,
+      accounts: providerAccounts,
+      execution: hasReadyPostizAccount ? ("ready" as const) : ("blocked" as const),
+      code: hasReadyPostizAccount
+        ? ("POSTIZ_PUBLISHING_READY" as const)
+        : ("PUBLISHING_ADAPTER_UNAVAILABLE" as const),
+    };
+  });
 }
