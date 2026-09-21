@@ -162,7 +162,11 @@ export default function PostizIntegrationPage() {
         } synchronized.`,
       );
 
-      await loadStatus();
+      setStatus((current) => ({
+        ...current,
+        connected: true,
+        status: "active",
+      }));
     } catch (error) {
       console.error("Postiz sync failed:", error);
       setMessage(
