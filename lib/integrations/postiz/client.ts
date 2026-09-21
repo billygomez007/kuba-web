@@ -328,4 +328,80 @@ export async function listPostizAccounts(
     .filter((account): account is PostizAccount => account !== null);
 }
 
+
+export async function createPostizScheduledPost(input: {
+  accessToken: string;
+  integrationId: string;
+  provider: string;
+  content: string;
+  scheduledAt: Date;
+}): Promise<{ id: string | null; raw: unknown }> {
+  const config = getPostizConfig();
+
+  const response = await fetch(`${config.apiUrl}/public/v1/posts`, {
+    method: "POST",
+    headers: {
+      Authorization: input.accessToken,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      type: "schedule",
+      date: input.scheduledAt.toISOString(),
+      shortLink: false,
+      tags: [],
+      posts: [
+        {
+          integration: {
+            id: input.integrationId,
+          },
+          value: [
+            {
+              content: input.content,
+              image: [],
+            },
+          ],
+          settings: {
+            __type: input.provider,
+          },
+        },
+      ],
+    }),
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as unknown;
+
+  if (!response.ok) {
+    throw new Error(
+      `Postiz post creation failed with HTTP ${response.status}.`,
+    );
+  }
+
+  let id: string | null = null;
+
+  if (payload && typeof payload === "object") {
+    const raw = payload as Record<string, unknown>;
+
+    const candidate =
+      raw.id ??
+      raw.postId ??
+      raw.post_id ??
+      (Array.isArray(raw.posts) &&
+      raw.posts[0] &&
+      typeof raw.posts[0] === "object"
+        ? (raw.posts[0] as Record<string, unknown>).id
+        : null);
+
+    if (typeof candidate === "string" || typeof candidate === "number") {
+      id = String(candidate);
+    }
+  }
+
+  return {
+    id,
+    raw: payload,
+  };
+}
+
 export const POSTIZ_PROVIDER = PROVIDER;

@@ -17,17 +17,6 @@ export async function GET() {
   const accounts = await getMarketingChannelAccounts(access.businessId);
   const readiness = marketingChannelReadiness(accounts);
 
-  console.log("Marketing social accounts diagnostic", {
-    businessId: access.businessId,
-    accountCount: accounts.length,
-    accounts: accounts.map((account) => ({
-      id: account.id,
-      provider: account.provider,
-      displayName: account.displayName,
-      status: account.status,
-    })),
-  });
-
   return NextResponse.json({
     accounts,
     providers,

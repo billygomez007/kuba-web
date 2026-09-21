@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { db } from "@/db";
-import { auditLogs, marketingPublishJobs } from "@/db/schema";
+import {
+  auditLogs,
+  integrations,
+  marketingContentVariants,
+  marketingPublishJobs,
+  marketingSocialAccounts,
+} from "@/db/schema";
 import { MARKETING_CHANNELS, requireMarketingAccess } from "@/lib/marketing/context";
 import { getMarketingPublishingOperations } from "@/lib/marketing/publishing-operations";
 import { parseMarketingDate } from "@/lib/marketing/publishing-policy";
+import {
+  createPostizScheduledPost,
+  decryptPostizCredential,
+  POSTIZ_PROVIDER,
+} from "@/lib/integrations/postiz/client";
+import { and, eq } from "drizzle-orm";
 import {
   marketingCampaignBelongsToBusiness,
   marketingContentBelongsToBusiness,
@@ -55,29 +67,230 @@ export async function POST(request: Request) {
     }
 
     const now = new Date();
-    // Preserve scheduling intent; no worker/adapter exists to execute this job.
+
+    let postizIntegrationId: string | null = null;
+    let postizAccessToken: string | null = null;
+    let postContent: string | null = null;
+
+    if (socialAccountId) {
+      const [account] = await tx
+        .select({
+          externalAccountId: marketingSocialAccounts.externalAccountId,
+          status: marketingSocialAccounts.status,
+          accountType: marketingSocialAccounts.accountType,
+        })
+        .from(marketingSocialAccounts)
+        .where(
+          and(
+            eq(marketingSocialAccounts.id, socialAccountId),
+            eq(marketingSocialAccounts.businessId, access.businessId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        !account ||
+        account.status !== "connected" ||
+        account.accountType !== "postiz" ||
+        !account.externalAccountId
+      ) {
+        return fail(
+          "Selected social account is not connected through Postiz.",
+          409,
+        );
+      }
+
+      postizIntegrationId = account.externalAccountId;
+
+      const [integration] = await tx
+        .select({
+          credentialsEncrypted: integrations.credentialsEncrypted,
+          status: integrations.status,
+        })
+        .from(integrations)
+        .where(
+          and(
+            eq(integrations.businessId, access.businessId),
+            eq(integrations.provider, POSTIZ_PROVIDER),
+          ),
+        )
+        .limit(1);
+
+      if (
+        !integration ||
+        integration.status !== "active" ||
+        !integration.credentialsEncrypted
+      ) {
+        return fail(
+          "Postiz is not connected for this business.",
+          409,
+        );
+      }
+
+      postizAccessToken = decryptPostizCredential(
+        integration.credentialsEncrypted,
+      );
+    }
+
+    if (contentVariantId) {
+      const [variant] = await tx
+        .select({
+          text: marketingContentVariants.text,
+          headline: marketingContentVariants.headline,
+        })
+        .from(marketingContentVariants)
+        .where(
+          and(
+            eq(marketingContentVariants.id, contentVariantId),
+            eq(marketingContentVariants.businessId, access.businessId),
+          ),
+        )
+        .limit(1);
+
+      if (variant) {
+        postContent = [variant.headline, variant.text]
+          .filter(Boolean)
+          .join("\n\n")
+          .trim();
+      }
+    }
+
+    if (!postContent) {
+      return fail(
+        "A channel-specific content variant is required before publishing.",
+        409,
+      );
+    }
+
+    const effectiveScheduledAt =
+      scheduledAt && scheduledAt.getTime() > Date.now()
+        ? scheduledAt
+        : new Date(Date.now() + 30_000);
+
     const job = {
-      id: randomUUID(), businessId: access.businessId, campaignId,
-      contentItemId: body.contentItemId, contentVariantId, socialAccountId,
-      channel: body.channel, scheduledAt, status: scheduledAt ? "scheduled" : "queued",
-      attemptCount: 0, idempotencyKey: body.idempotencyKey ?? randomUUID(),
-      providerPostId: null, publishedAt: null, failedAt: null,
-      failureCode: "PUBLISHING_ADAPTER_UNAVAILABLE",
-      failureMessageSafe: "This channel is not connected to a publishing provider.",
-      metadata: null, createdAt: now, updatedAt: now,
+      id: randomUUID(),
+      businessId: access.businessId,
+      campaignId,
+      contentItemId: body.contentItemId,
+      contentVariantId,
+      socialAccountId,
+      channel: body.channel,
+      scheduledAt: effectiveScheduledAt,
+      status: "queued",
+      attemptCount: 0,
+      idempotencyKey: body.idempotencyKey ?? randomUUID(),
+      providerPostId: null,
+      publishedAt: null,
+      failedAt: null,
+      failureCode: null,
+      failureMessageSafe: null,
+      metadata: JSON.stringify({
+        provider: "postiz",
+        requestedScheduledAt: scheduledAt?.toISOString() ?? null,
+      }),
+      createdAt: now,
+      updatedAt: now,
     };
     const inserted = await tx.insert(marketingPublishJobs).values(job).onConflictDoNothing({
       target: [marketingPublishJobs.businessId, marketingPublishJobs.idempotencyKey],
     }).returning({ id: marketingPublishJobs.id });
     if (!inserted.length) return NextResponse.json({ error: "A publish job with this idempotency key already exists.", code: "DUPLICATE_IDEMPOTENCY_KEY" }, { status: 409 });
-    await tx.insert(auditLogs).values({
-      id: randomUUID(), businessId: access.businessId, userId: access.userId,
-      action: scheduledAt ? "marketing.publish_job.scheduled" : "marketing.publish_job.created",
-      resource: "marketing_publish_job", resourceId: job.id,
-      description: scheduledAt ? "Marketing publish job scheduled; provider execution unavailable." : "Marketing publish job queued; provider execution unavailable.",
-      metadata: JSON.stringify({ contentItemId: content.id, channel: job.channel, scheduledAt, execution: "blocked" }),
-      createdAt: now,
-    });
-    return NextResponse.json({ job, execution: "blocked", code: "PUBLISHING_ADAPTER_UNAVAILABLE" }, { status: 201 });
+    if (!postizAccessToken || !postizIntegrationId) {
+      return fail(
+        "A connected Postiz social account is required for publishing.",
+        409,
+      );
+    }
+
+    try {
+      const postiz = await createPostizScheduledPost({
+        accessToken: postizAccessToken,
+        integrationId: postizIntegrationId,
+        provider: body.channel,
+        content: postContent,
+        scheduledAt: effectiveScheduledAt,
+      });
+
+      await tx
+        .update(marketingPublishJobs)
+        .set({
+          status: "scheduled",
+          attemptCount: 1,
+          providerPostId: postiz.id,
+          failureCode: null,
+          failureMessageSafe: null,
+          metadata: JSON.stringify({
+            provider: "postiz",
+            postizResponseReceived: true,
+          }),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(marketingPublishJobs.id, job.id),
+            eq(marketingPublishJobs.businessId, access.businessId),
+          ),
+        );
+
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        businessId: access.businessId,
+        userId: access.userId,
+        action: "marketing.publish_job.scheduled",
+        resource: "marketing_publish_job",
+        resourceId: job.id,
+        description: "Marketing publish job sent to Postiz.",
+        metadata: JSON.stringify({
+          contentItemId: content.id,
+          channel: job.channel,
+          scheduledAt: effectiveScheduledAt,
+          provider: "postiz",
+          providerPostId: postiz.id,
+        }),
+        createdAt: now,
+      });
+
+      return NextResponse.json(
+        {
+          job: {
+            ...job,
+            status: "scheduled",
+            attemptCount: 1,
+            providerPostId: postiz.id,
+          },
+          execution: "scheduled",
+          provider: "postiz",
+        },
+        { status: 201 },
+      );
+    } catch (error) {
+      console.error("Postiz publishing failed:", error);
+
+      await tx
+        .update(marketingPublishJobs)
+        .set({
+          status: "failed",
+          attemptCount: 1,
+          failedAt: new Date(),
+          failureCode: "POSTIZ_PUBLISH_FAILED",
+          failureMessageSafe:
+            "Postiz could not schedule this social media post.",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(marketingPublishJobs.id, job.id),
+            eq(marketingPublishJobs.businessId, access.businessId),
+          ),
+        );
+
+      return NextResponse.json(
+        {
+          error: "Postiz could not schedule this social media post.",
+          code: "POSTIZ_PUBLISH_FAILED",
+        },
+        { status: 502 },
+      );
+    }
   });
 }
