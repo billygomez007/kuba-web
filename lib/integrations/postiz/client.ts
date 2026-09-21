@@ -296,7 +296,7 @@ export async function listPostizAccounts(
     {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: accessToken,
         Accept: "application/json",
       },
       cache: "no-store",
